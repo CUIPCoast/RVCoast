@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "packagerOpts": {
+      "ignoredFolders": ["node_modules", "assets"]
+    },
+    "entryPoint": "app/_layout.jsx",
+    "name": "coast",
+    "slug": "coast",
+    "scheme": "coast",
+    "version": "1.0.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "59f5a2c0-1fa7-404b-9971-102bda608697"
+      }
+    },
+    "owner": "melissastan",
+    "plugins": [
+      "expo-font"
+    ]
+  }
+}
