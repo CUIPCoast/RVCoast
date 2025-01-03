@@ -6,6 +6,8 @@ import Settings from '../screens/Settings';
 import { View, StyleSheet } from 'react-native';
 import { Image } from 'react-native-svg';
 import Icon from 'react-native-vector-icons/AntDesign';
+import LightScreenTablet from '../screens/LightScreenTablet';
+import ClimateControl from '../screens/ClimateControlScreenTablet';
 const Tab = createBottomTabNavigator();
 
 const screenOptions = (route, color) => {
@@ -57,8 +59,8 @@ const TabletTabs = () => {
 >
 
         <Tab.Screen name="Home" component={MainScreen} />
-        <Tab.Screen name="System" component={System} />
-        <Tab.Screen name="Air Conditioning" component={AirCon} />
+        <Tab.Screen name="System" component={LightScreenTablet} />
+        <Tab.Screen name="Air Conditioning" component={ClimateControl} />
         <Tab.Screen name="Settings" component={Settings} />
       </Tab.Navigator>
     </View>
