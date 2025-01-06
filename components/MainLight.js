@@ -1,6 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Slider } from 'react-native-elements';
+import useScreenSize from "../helper/useScreenSize.jsx";
+
 
 const MainLight = ({
   name,
@@ -9,6 +11,28 @@ const MainLight = ({
   value = min,
   onValueChange = () => {},
 }) => {
+  const isTablet = useScreenSize(); 
+  if (isTablet) {
+    return (
+      
+      <View style={styles.tabletContainer}>
+        <Text style={styles.tabletName}>{name}</Text>
+        <Slider
+        value={value}
+        onValueChange={onValueChange}
+        minimumValue={min}
+        maximumValue={max}
+        step={1} // Ensures whole number values
+        minimumTrackTintColor="#FFB267"
+        thumbStyle={styles.customThumb}
+        trackStyle={styles.trackStyle}
+        containerStyle={styles.sliderContainer}
+        accessibilityLabel={`${name} slider`}
+        accessibilityValue={{ min, max, now: value }}
+      />
+      </View>
+    );
+  }
   return (
     <View style={styles.container}>
       <Text style={styles.name}>{name}</Text>
@@ -31,6 +55,22 @@ const MainLight = ({
 
 
 const styles = StyleSheet.create({
+  tabletContainer: {
+    marginVertical: 10,
+    paddingHorizontal: 32,
+  },
+  tabletName: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    marginBottom: 5,
+    alignSelf: 'flex-start', // Ensures the text aligns to the left
+    marginLeft: -30, // Explicitly set to ensure no unintended margin
+    paddingLeft: 0, // Ensures no additional padding on the left
+  },
+  
+  tabletSlider:{
+    width: '100%',
+  },
   container: {
 
     marginVertical: 10,
