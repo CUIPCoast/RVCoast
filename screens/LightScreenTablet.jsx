@@ -166,14 +166,14 @@ const LightScreenTablet = () => {
               name="Kitchen Light"
               min={0}
               max={100}
-              value={sliderValues.LeftReadingLight}
+              value={sliderValues.KitchenLight}
               onValueChange={(value) => handleSliderChange('KitchenLight', value)}
             />
             <MainLight
               name="Dining Light"
               min={0}
               max={100}
-              value={sliderValues.LeftReadingLight}
+              value={sliderValues.DiningLight}
               onValueChange={(value) => handleSliderChange('DiningLight', value)}
             />
             <MainLight

@@ -182,15 +182,15 @@ const MainScreen = () => {
 
                 
                 <Row className="rounded-xl mt15" style={{ justifyContent: "center", alignItems: "center" }}>
-                <Col size={60} style={{ justifyContent: "center", alignItems: "center" }}>
+                <Col className="pb-10 mt10  "size={60} style={{ justifyContent: "center", alignItems: "center" }}>
                 
-                <Row className="bg-brown rounded-xl ml-2  pb-4 ">
+                <Row className="bg-brown rounded-xl ml-2  pb-10 ">
     <ModalComponent nameComponent={"Devices"} />
 </Row>
 
 </Col>
 
-    <Col size={60} style={{ justifyContent: "center", alignItems: "center" }}>
+    <Col className="pb-5 mt15" size={60} style={{ justifyContent: "center", alignItems: "center" }}>
         <Row
             className="bg-brown rounded-xl ml-2 mt8"
             style={{
@@ -219,8 +219,8 @@ const MainScreen = () => {
                 <Image
                     source={require("../assets/abpost61724photoroom-3.png")}
                     style={{
-                        width: 150,
-                        height: 150,
+                        width: 120,
+                        height: 120,
                         resizeMode: "contain",
                     }}
                 />

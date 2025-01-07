@@ -75,14 +75,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#000', // Optional background color
   },
   tabBar: {
-    backgroundColor: '#211D1D',
+    backgroundColor: '#242124',
     borderRadius: 15, // Rounded corners
     marginHorizontal: 20, // Ensure it doesn't touch screen edges
     marginBottom: 10, // Space from bottom of the screen
     
     height: 60, // Adjust height as needed
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
     
