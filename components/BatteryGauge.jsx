@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { View, Text } from 'react-native';
-import Svg, { Defs, LinearGradient, Stop, Path } from 'react-native-svg';
+import Svg, { Defs, LinearGradient, Stop, Path, Rect } from 'react-native-svg';
 import Animated, { Easing, useAnimatedProps, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -42,53 +42,52 @@ const BatteryGauge = () => {
 
   return (
     <View className="items-center justify-center mt-6">
-      <Svg width={size} height={size}>
-        <Defs>
-          <LinearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0">
-            {/* <Stop offset="0" stopColor="red" />
-            <Stop offset="0.5" stopColor="yellow" /> */}
-            <Stop offset="1" stopColor="green" />
-          </LinearGradient>
-        </Defs>
+    <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <Defs>
+        <LinearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <Stop offset="0" stopColor="red" stopOpacity="1" />
+          <Stop offset="0.5" stopColor="yellow" stopOpacity="1" />
+          <Stop offset="1" stopColor="green" stopOpacity="1" />
+        </LinearGradient>
+      </Defs>
 
-        <Path
-          d={d}
-          fill="none"
-          stroke="#e2e2e8"
-          strokeDasharray={`${circumference} ${circumference}`}
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-        />
-        <AnimatedPath
-          d={d}
-          fill="none"
-          stroke="url(#grad)"
-          strokeDasharray={`${circumference} ${circumference}`}
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-          animatedProps={animatedProps}
-        />
-      </Svg>
+      {/* Background gauge path */}
+      <Path
+        d={d}
+        fill="none"
+        stroke="#e2e2e8"
+        strokeDasharray={`${circumference} ${circumference}`}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+      />
 
-      <View className="absolute top-15">
-  <View className="mb-12 items-center justify-center">
-    <Text className="text-yellow-500 text-xl">⚡️</Text>
-    <Text className="text-3xl font-bold text-white">12.5 V</Text>
-    <Text className="text-xs text-gray-300">Battery</Text>
-  </View>
-</View>
+      {/* Animated gradient-filled gauge path */}
+      <AnimatedPath
+        d={d}
+        fill="none"
+        stroke="url(#grad)"
+        strokeDasharray={`${circumference} ${circumference}`}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        animatedProps={animatedProps}
+      />
+    </Svg>
 
-      
-      <View className="flex-row absolute bottom-10 w-1/4 justify-between pb-6">
-        <Text className="text-xs text-gray-400">L</Text>
-        <Text className="text-xs text-gray-400">H</Text>
+    {/* Overlay text */}
+    <View className="absolute top-15">
+      <View className="mb-12 items-center justify-center">
+        <Text className="text-yellow-500 text-xl">⚡️</Text>
+        <Text className="text-3xl font-bold text-white">12.5 V</Text>
+        <Text className="text-xs text-gray-300">Battery</Text>
       </View>
-      
-
-      
-
-
     </View>
+
+    {/* Low and High labels */}
+    <View className="flex-row absolute bottom-10 w-1/4 justify-between pb-6">
+      <Text className="text-xs text-gray-400">L</Text>
+      <Text className="text-xs text-gray-400">H</Text>
+    </View>
+  </View>
   );
 };
 

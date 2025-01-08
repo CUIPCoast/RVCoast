@@ -274,18 +274,12 @@ const [isOn, setIsOn] = useState(false);
     
     
    }}
-  
-  
-   leftIconStyle={{
-     backgroundColor: 'white',
-     borderRadius: 20,
-     marginRight: 1,
+   buttonContainerStyle={{
+    color:"FFFFFF",
    }}
-   rightIconStyle={{
-     backgroundColor: 'white',
-     borderRadius: 20,
-     marginLeft: 10,
-   }}
+  
+   leftIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginRight: 10, top:20, height: 40, width: 50, paddingLeft: 4 }}
+   rightIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginLeft: 10, top:20, height: 40, width: 50, paddingLeft: 5 }}
   
   
   
@@ -293,6 +287,9 @@ const [isOn, setIsOn] = useState(false);
    isHideTailText={true}
    unit={'°F'}
  />
+
+
+
 
 
            <View style={tabletStyles.buttonsContainer}>
@@ -316,32 +313,7 @@ const [isOn, setIsOn] = useState(false);
 
               
              </View>
-             <View style={tabletStyles.timerInputContainer}>
-               <TextInput
-                 style={tabletStyles.timerInput}
-               value={timerDuration !== undefined ? timerDuration.toString() : ''}
-                 onChangeText={(text) => setTimerDuration(parseInt(text) || 0)}
-                 keyboardType="numeric"
-                 placeholder="Time"
-               />
-               <View style={tabletStyles.timerButtonsContainer}>
-                 <TouchableOpacity
-                   style={[tabletStyles.timerButton, timerUnit === "hours" ? tabletStyles.activeTimerButton : null]}
-                  onPress={handleHoursSelection}
-                 >
-                 <Text style={{ color: 'black' }}>Hours</Text>
-
-                 </TouchableOpacity>
-                 <TouchableOpacity
-                   style={[tabletStyles.timerButton, timerUnit === "minutes" ? tabletStyles.activeTimerButton : null]}
-                   onPress={handleMinutesSelection}
-                 >
-                   <Text style={tabletStyles.timerButtonText}>Minutes</Text>
-                 </TouchableOpacity>
-               </View>
-              
-
-             </View>
+             
              {timerRunning && (
                <Text style={tabletStyles.countdownText}>
                  Remaining: {formatRemainingTime()}
