@@ -52,7 +52,7 @@ const Settings = () => {
               </Row>
 
                   
-       
+              <GroupComponent />
 
 
       </Grid>);
