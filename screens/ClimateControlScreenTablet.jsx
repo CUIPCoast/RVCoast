@@ -8,7 +8,22 @@ import ToggleSwitch from "../components/ToggleSwitch.jsx";
 import { RadialSlider } from 'react-native-radial-slider';
 import moment from 'moment'; 
 
+
+
+
 const ClimateControl = () => {
+
+  const [activeButtons, setActiveButtons] = useState([]); // State for active buttons
+
+  const handleButtonPress = (label) => {
+    setActiveButtons((prev) =>
+      prev.includes(label)
+        ? prev.filter((item) => item !== label) // Remove if already active
+        : [...prev, label] // Add if not active
+    );
+  };
+
+  const features = ["Cool", "Toe Kick", "Furnace"];
 
   const [speed, setSpeed] = useState(0);
   const [isOn, setIsOn] = useState(false);
@@ -22,6 +37,18 @@ const ClimateControl = () => {
     source={require("../assets/SettingGearTablet.png")}
     />;
 
+    
+    const [activeButton, setActiveButton] = useState(null);
+    const [isNightToggled, setIsNightToggled] = useState(false);
+    const [isDehumidToggled, setIsDehumidToggled] = useState(false);
+
+    const handleNightPress = () => {
+      setIsNightToggled(!isNightToggled); // Toggle Night button state
+    };
+  
+    const handleDehumidPress = () => {
+      setIsDehumidToggled(!isDehumidToggled); // Toggle Dehumid button state
+    };
   // If the screen is a tablet, render nothing (null) to hide the tab navigator
   if (isTablet) {
     return (
@@ -151,46 +178,87 @@ const ClimateControl = () => {
     />
 
     <View style={{ flexDirection: "row", alignItems: "flex-start", marginTop: 10 }}>
-      {/* Auxiliary Box */}
-      <Col
-        style={{
-          width: 380, // Adjust width to allow space for buttons
-          height: 270,
-          backgroundColor: "#1B1B1B",
-          borderRadius: 10,
-          justifyContent: "flex-start",
-          padding: 20,
-          margin: 25,
-          right: 80,
-          bottom:10,
-        }}
-      >
-        <Text
+     {/* Auxiliary Box */}
+<Col
+  style={{
+    width: 380, // Adjust width to allow space for buttons
+    height: 270,
+    backgroundColor: "#1B1B1B",
+    borderRadius: 10,
+    justifyContent: "flex-start",
+    padding: 20,
+    margin: 25,
+    right: 80,
+    bottom: 10,
+  }}
+>
+  <Text
+    style={{
+      color: "white",
+      fontSize: 16,
+      position: "absolute",
+      top: 20,
+      left: 10,
+    }}
+  >
+    Auxiliary (Back)
+  </Text>
+  <View
+    style={{
+      height: 1,
+      backgroundColor: "white",
+      width: "100%",
+      marginTop: 40,
+    }}
+  />
+  <View style={{ flex: 1, justifyContent: "flex-start", alignItems: "flex-start" }}>
+      {features.map((label, index) => (
+        <View
+          key={index}
           style={{
-            color: "white",
-            fontSize: 16,
-            position: "absolute",
-            top: 20,
-            left: 10,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginVertical: 10,
+            width: "100%", // Adjust the width as needed
           }}
         >
-          Auxiliary (Back)
-        </Text>
-        <View
-          style={{
-            height: 1,
-            backgroundColor: "white",
-            width: "100%",
-            marginTop: 40,
-          }}
-        />
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-          <Text style={{ color: "white", fontSize: 18 }}>
-            Additional Controls Coming Soon
-          </Text>
-        </View>
-      </Col>
+          {/* Feature Button */}
+          <TouchableOpacity
+            onPress={() => handleButtonPress(label)}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              backgroundColor: activeButtons.includes(label) ? "#444" : "#1B1B1B",
+              borderRadius: 5, // Reduced border radius for a compact look
+              paddingVertical: 10, // Smaller padding for vertical space
+              paddingHorizontal: 15, // Smaller padding for horizontal space
+              width: 220,
+            }}
+          >
+            <Image
+              source={getImageForLabel(label)}
+              style={{ width: 30, height: 30, marginRight: 5 }} // Smaller image with reduced margin
+            />
+            <Text
+              style={{
+                color: activeButtons.includes(label) ? "#FFB267" : "white", // Highlight active button text
+                fontSize: 16,
+              }}
+            >
+              {label}
+            </Text>
+          </TouchableOpacity>
 
+          {/* Toggle Button */}
+          <ToggleButton />
+        </View>
+      ))}
+    </View>
+
+
+
+</Col>
      {/* Buttons next to Auxiliary Box */}
 <View
   style={{
@@ -201,38 +269,38 @@ const ClimateControl = () => {
     top: 100,
   }}
 >
+<TouchableOpacity
+        style={{
+          backgroundColor: isNightToggled ? "#301934" : "#9966CC", // Toggle between two colors
+          paddingVertical: 15,
+          paddingHorizontal: 20,
+          borderRadius: 5,
+          marginBottom: 10,
+          width: 150,
+          alignItems: "center",
+          flexDirection: "row",
+          justifyContent: "center",
+        }}
+        onPress={handleNightPress}
+      >
+        <Image
+          source={require("../assets/moon.png")}
+          style={{ width: 30, height: 30, marginRight: 10 }}
+        />
+        <Text style={{ color: "white", fontSize: 16 }}>Night</Text>
+      </TouchableOpacity>
   <TouchableOpacity
     style={{
-      backgroundColor: "#301934",
+      backgroundColor: isDehumidToggled ? "#003262" : "#00B9E8",
       paddingVertical: 15,
       paddingHorizontal: 20,
       borderRadius: 5,
-      marginBottom: 10,
       width: 150,
       alignItems: "center",
       flexDirection: "row",
       justifyContent: "center",
     }}
-    onPress={() => console.log("Button 1 Pressed")}
-  >
-    <Image
-      source={require("../assets/moon.png")}
-      style={{ width: 30, height: 30, marginRight: 10 }}
-    />
-    <Text style={{ color: "white", fontSize: 16 }}>Night</Text>
-  </TouchableOpacity>
-  <TouchableOpacity
-    style={{
-      backgroundColor: "#003262",
-      paddingVertical: 15,
-      paddingHorizontal: 20,
-      borderRadius: 5,
-      width: 150,
-      alignItems: "center",
-      flexDirection: "row",
-      justifyContent: "center",
-    }}
-    onPress={() => console.log("Button 2 Pressed")}
+    onPress={handleDehumidPress}
   >
     <Image
       source={require("../assets/drop.png")}
@@ -261,11 +329,71 @@ const ClimateControl = () => {
   }
 }
 
+const getImageForLabel = (label) => {
+  const images = {
+    "Cool": require("../assets/snowflake.png"), // Example for Cool
+    "Toe Kick": require("../assets/toekick.png"), // Example for Toe Kick
+    "Furnace": require("../assets/furnace.png"), // Example for Furnace
+  };
+  return images[label] || require("../assets/questionmark.png"); // Fallback to a default image
+};
+
+// Helper component for toggle button functionality
+const ToggleButton = () => {
+  const [state, setState] = React.useState("Low");
+
+  const toggleState = () => {
+    const nextState = {
+      Low: "Med",
+      Med: "High",
+      High: "Low",
+    };
+    setState(nextState[state]);
+  };
+
+  return (
+    <Text
+      onPress={toggleState}
+      style={{
+        color: "white",
+        fontSize: 16,
+        padding: 10,
+        backgroundColor: "#333",
+        borderRadius: 5,
+        textAlign: "center",
+        width: 80,
+      }}
+    >
+      {state}
+    </Text>
+  );
+};
+
 const styles = StyleSheet.create({
     container: {
       flex: 1,
       justifyContent: 'center',
       top: 15,
+    },
+    row: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginVertical: 10,
+      width: "100%",
+    },
+    image: {
+      width: 30,
+      height: 30,
+      marginRight: 10,
+    },
+    buttonText: {
+      color: "white",
+      fontSize: 16,
+      marginRight: 120,
+    },
+    activeButtonText: {
+      color: "#FFB267", // Highlight color for active button
     },
   });
   
