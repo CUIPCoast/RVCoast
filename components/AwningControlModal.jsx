@@ -86,10 +86,10 @@ const styles = StyleSheet.create({
     paddingLeft: 120,
     paddingRight: 120,
     paddingBottom: 60,
-    top: 20,
+    top: 30,
     
     closeButton: {
-      backgroundColor: "white", // White background
+      backgroundColor: "red", // White background
       paddingVertical: 10, // Padding for better touch area
       paddingHorizontal: 20, // Padding for better touch area
       borderRadius: 5, // Rounded corners

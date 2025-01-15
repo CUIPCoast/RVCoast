@@ -35,7 +35,7 @@ const screenOptions = (route, color) => {
       name={iconName}
       color={color}
       size={24}
-      style={{ marginTop: 3 }} // Lower the icon
+      style={{ marginTop: 2 }} // Lower the icon
     />
   );
 };
@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 10, // Add space on the sides
-    paddingBottom: 5, // Add space at the bottom
+    paddingBottom: -10, // Add space at the bottom
     backgroundColor: '#000', // Optional background color
   },
   tabBar: {
@@ -79,6 +79,7 @@ const styles = StyleSheet.create({
     borderRadius: 15, // Rounded corners
     marginHorizontal: 20, // Ensure it doesn't touch screen edges
     marginBottom: 10, // Space from bottom of the screen
+    
     
     height: 60, // Adjust height as needed
     shadowColor: '#000',

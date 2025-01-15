@@ -22,8 +22,8 @@ const ModalComponent = ({nameComponent}) => {
         return <Home />;
       case 'Devices':
         return <Devices />;
-      // case 'Wifi':
-      //   return <Wifi />;
+       case 'Wifi':
+        return <Wifi />;
       // case 'Awning':
       //   return <AwningControlModal />;
       default:
@@ -55,7 +55,7 @@ const ModalComponent = ({nameComponent}) => {
             setModalVisible(!modalVisible);
           }}>
           <View className="flex-1 justify-center items-center">
-            <View className="bg-gray-400 items-end rounded-xl">
+            <View className="bg-gray-200 items-end rounded-xl">
               <Pressable
                 onPress={() => setModalVisible(!modalVisible)}>
                 <Text className="text-bold text-white pt-4 pr-6">X</Text>

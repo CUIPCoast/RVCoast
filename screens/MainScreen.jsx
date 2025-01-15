@@ -5,7 +5,7 @@ import System from './System';
 import moment from 'moment'; 
 import Settings from './Settings';
 import ModalComponent from '../components/ModalComponent';
-
+import { Platform } from 'react-native';
 import TankHeaterControl from "../components/TankHeaterControl";
 import { useNavigation } from "@react-navigation/native";
 import AwningControlModal from "../components/AwningControlModal";
@@ -15,31 +15,26 @@ import Home from "./Home";
 
 
 const MainScreen = () => {
-    var now = moment().format();
+    
     var currentDate = moment().format("MMMM Do, YYYY");
     var DayOfTheWeek = moment().format("dddd");
-    const navigation = useNavigation(); // Access navigation
+    
+
     const [isModalVisible, setModalVisible] = useState(false);
     const [isOn, setIsOn] = useState(false);
     const [isOnGray, setIsOnGray] = useState(false);
 
-
-    const [sliderValues, setSliderValues] = useState({
-        BedOverHead: 50,
-        OverHeadVanityLight: 30,
-        AccentLight: 60,
-    });
+    const [isFreshHeaterOn, setFreshHeaterOn] = useState(false);
+    const [isGreyHeaterOn, setGreyHeaterOn] = useState(false);
+    const [isWaterHeaterOn, setWaterHeaterOn] = useState(false);
+    const [isWaterPumpOn, setWaterPumpOn] = useState(false);
+  
     
-// Function to handle slider changes
-  const handleSliderChange = (sliderName, value) => {
-    setSliderValues((prevValues) => ({
-      ...prevValues,
-      [sliderName]: value,
-    }));
-  };
-  const handleButtonClick = (buttonName) => {
-    console.log(`${buttonName} clicked`);
-    // Add your navigation or functionality here
+    
+
+   // Button toggle handler
+   const handleToggle = (toggleFunction, currentValue) => {
+    toggleFunction(!currentValue);
   };
   
   return (
@@ -75,7 +70,15 @@ const MainScreen = () => {
                     {/* <Text className="text-white">1a</Text> */}
                     <Home />
                 </Row>
-                <Row className="bg-brown rounded-xl m-3 mb-10" size={75}>
+                <Row className="bg-brown rounded-xl m-3 mb-10" 
+                style = {{
+                  shadowColor: "#FFFFFF", // Shadow color for iOS
+    shadowOffset: { width: 100, height: 120, }, // Shadow offset for iOS
+    shadowOpacity: 0.5, // Shadow opacity for iOS
+    shadowRadius: 6, // Shadow blur radius for iOS
+    elevation: 6, // Shadow for Android
+                }}
+                size={75}>
                     <System />
                 </Row>
             </Col>
@@ -89,70 +92,99 @@ const MainScreen = () => {
     padding: 15, // Adds padding around the content
     marginBottom: 20,
     position: "relative", // Allows absolutely positioned children
+    shadowColor: "#FFFFFF", // Shadow color for iOS
+    shadowOffset: { width: 100, height: 120, }, // Shadow offset for iOS
+    shadowOpacity: 0.5, // Shadow opacity for iOS
+    shadowRadius: 6, // Shadow blur radius for iOS
+    elevation: 6, // Shadow for Android
   }}
 >
-<View className="flex-row justify-between items-start w-full mt-[-10]">
+
+<View className="flex-row justify-between items-start w-full mt-[-5] pb-2">
   <View>
     <Text className="text-white mb-1">Heaters</Text>
     {/* Buttons below Heaters */}
+    <ScrollView>
+    <View className="space-y0 mb-4">
+       {/* Fresh Heater Button */}
+       <TouchableOpacity
+              onPress={() => handleToggle(setFreshHeaterOn, isFreshHeaterOn)}
+              style={{
+                backgroundColor: isFreshHeaterOn ? "#4CAF05" : "#1A1A1D",
+                flexDirection: "row",
+                alignItems: "center",
+                padding: 10,
+                borderRadius: 5,
+                marginBottom: 10,
+              }}
+            >
+              <Image
+                source={require("../assets/icons8-water-heater-64.png")}
+                style={{ width: 25, height: 25, marginRight: 10 }}
+              />
+              <Text style={{ color: "white" }}>Fresh Heater</Text>
+            </TouchableOpacity>
+
+      {/* Grey Heater Button */}
+      <TouchableOpacity
+              onPress={() => handleToggle(setGreyHeaterOn, isGreyHeaterOn)}
+              style={{
+                backgroundColor: isGreyHeaterOn ? "#4CAF05" : "#1A1A1D",
+                flexDirection: "row",
+                alignItems: "center",
+                padding: 10,
+                borderRadius: 5,
+                marginBottom: 10,
+              }}
+            >
+              <Image
+                source={require("../assets/icons8-water-heater-64.png")}
+                style={{ width: 25, height: 25, marginRight: 10 }}
+              />
+              <Text style={{ color: "white" }}>Grey Heater</Text>
+            </TouchableOpacity>
+
+            {/* Water Heater Button */}
+            <TouchableOpacity
+              onPress={() => handleToggle(setWaterHeaterOn, isWaterHeaterOn)}
+              style={{
+                backgroundColor: isWaterHeaterOn ? "#4CAF05" : "#1A1A1D",
+                flexDirection: "row",
+                alignItems: "center",
+                padding: 10,
+                borderRadius: 5,
+                marginBottom: 10,
+              }}
+            >
+              <Image
+                source={require("../assets/icons8-water-heater-64.png")}
+                style={{ width: 25, height: 25, marginRight: 10 }}
+              />
+              <Text style={{ color: "white" }}>Water Heater</Text>
+            </TouchableOpacity>
+
     
-    <View className="space-y-2 mb-4">
-      {/* Button 1 */}
-      <TouchableOpacity
-        className="flex-row items-center bg-gray-700 rounded-md p-2"
-        style={{ backgroundColor: "#1A1A1D" }}
-        onPress={() => handleButtonClick("Fresh Heater")}
-      >
-        <Image
-          source={require("../assets/icons8-water-heater-64.png")} // Replace with your image path
-          className="h-7 w-7 mr-1"
-          style={{ resizeMode: "contain" }}
-        />
-        <Text className="text-white text-sm">Fresh Heater</Text>
-      </TouchableOpacity>
 
-      {/* Button 2 */}
-      <TouchableOpacity
-        className="flex-row items-center bg-gray-700 rounded-md p-2"
-        style={{ backgroundColor: "#1A1A1D" }}
-        onPress={() => handleButtonClick("Grey Heater")}
-      >
-        <Image
-          source={require("../assets/icons8-water-heater-64.png")} // Replace with your image path
-          className="h-7 w-7 mr-1"
-          style={{ resizeMode: "contain" }}
-        />
-        <Text className="text-white text-sm">Grey Heater</Text>
-      </TouchableOpacity>
-
-      {/* Button 3 */}
-      <TouchableOpacity
-        className="flex-row items-center bg-gray-700 rounded-md p-2"
-        style={{ backgroundColor: "#1A1A1D" }}
-        onPress={() => handleButtonClick("Water Heater")}
-      >
-        <Image
-          source={require("../assets/icons8-water-heater-64 (1).png")} // Replace with your image path
-          className="h-7 w-7 mr-1"
-          style={{ resizeMode: "contain" }}
-        />
-        <Text className="text-white text-sm">Water Heater</Text>
-      </TouchableOpacity>
-
-      {/* Button 4 */}
-      <TouchableOpacity
-        className="flex-row items-center bg-gray-700 rounded-md p-2"
-        style={{ backgroundColor: "#1A1A1D" }}
-        onPress={() => handleButtonClick("Water Pump")}
-      >
-        <Image
-          source={require("../assets/icons8-water-pump-64.png")} // Replace with your image path
-          className="h-7 w-7 mr-1"
-          style={{ resizeMode: "contain" }}
-        />
-        <Text className="text-white text-sm">Water Pump</Text>
-      </TouchableOpacity>
+       {/* Water Pump Button */}
+       <TouchableOpacity
+              onPress={() => handleToggle(setWaterPumpOn, isWaterPumpOn)}
+              style={{
+                backgroundColor: isWaterPumpOn ? "#4CAF05" : "#1A1A1D",
+                flexDirection: "row",
+                alignItems: "center",
+                padding: 10,
+                borderRadius: 5,
+              }}
+            >
+              <Image
+                source={require("../assets/icons8-water-pump-64.png")}
+                style={{ width: 25, height: 25, marginRight: 10 }}
+              />
+              <Text style={{ color: "white" }}>Water Pump</Text>
+            </TouchableOpacity>
     </View>
+    </ScrollView>
+    
 
     
     
@@ -181,10 +213,21 @@ const MainScreen = () => {
 </Row>
 
                 
-                <Row className="rounded-xl mt15" style={{ justifyContent: "center", alignItems: "center" }}>
+                <Row className="rounded-xl mt15" style={{ 
+                  justifyContent: "center", 
+                  alignItems: "center",  
+                  
+                  }}>
                 <Col className="pb-10 mt10  "size={60} style={{ justifyContent: "center", alignItems: "center" }}>
                 
-                <Row className="bg-brown rounded-xl ml-2  pb-10 ">
+                <Row className="bg-brown rounded-xl ml-2  pb-10 "
+                style={{
+                  shadowColor: "#FFF", // Shadow color (black by default, adjust as needed)
+                  shadowOffset: { width: 0, height: 6 }, // Shadow offset
+                  shadowOpacity: 1, // Shadow transparency
+                  shadowRadius: 4, // Shadow blur radius
+                  elevation: 6, // Shadow elevation (required for Android)
+                }}>
     <ModalComponent nameComponent={"Devices"} />
 </Row>
 
@@ -202,6 +245,11 @@ const MainScreen = () => {
                 width: 220, // Adjusted width for the container
                 height: 180,
                 position: "relative",
+                shadowColor: "#FFF", // Shadow color (black by default, adjust as needed)
+                shadowOffset: { width: 0, height: 6 }, // Shadow offset
+                shadowOpacity: 1, // Shadow transparency
+                shadowRadius: 4, // Shadow blur radius
+                elevation: 6, // Shadow elevation (required for Android)
             }}
         >
             <Text
@@ -233,7 +281,14 @@ const MainScreen = () => {
 
             </Col>
 
-            <Col className="bg-brown p-2 rounded-xl m-3 mb-10" size={15} >
+            <Col className="bg-brown p-2 rounded-xl m-3 mb-10" size={15} style ={{
+
+shadowColor: "#FFF", // Shadow color (black by default, adjust as needed)
+shadowOffset: { width: 0, height: 12 }, // Shadow offset
+shadowOpacity: 1, // Shadow transparency
+shadowRadius: 6, // Shadow blur radius
+elevation: 6, // Shadow elevation (required for Android)
+            }} >
                 <Text className="text-white">Air Conditioning</Text>
                 <AirCon  />
             </Col>

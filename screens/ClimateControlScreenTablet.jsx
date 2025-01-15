@@ -23,6 +23,10 @@ const ClimateControl = () => {
     );
   };
 
+  // Preload images
+  const moonImage = require("../assets/moon.png");
+  const sunImage = require("../assets/sun.png");
+
   const features = ["Cool", "Toe Kick", "Furnace"];
 
   const [speed, setSpeed] = useState(0);
@@ -242,7 +246,7 @@ const ClimateControl = () => {
             />
             <Text
               style={{
-                color: activeButtons.includes(label) ? "#FFB267" : "white", // Highlight active button text
+                color: "white",
                 fontSize: 16,
               }}
             >
@@ -271,7 +275,7 @@ const ClimateControl = () => {
 >
 <TouchableOpacity
         style={{
-          backgroundColor: isNightToggled ? "#301934" : "#9966CC", // Toggle between two colors
+          backgroundColor: isNightToggled ? "#301934" : "#FFBA00", // Toggle between two colors
           paddingVertical: 15,
           paddingHorizontal: 20,
           borderRadius: 5,
@@ -284,10 +288,10 @@ const ClimateControl = () => {
         onPress={handleNightPress}
       >
         <Image
-          source={require("../assets/moon.png")}
+          source={isNightToggled ? moonImage : sunImage}
           style={{ width: 30, height: 30, marginRight: 10 }}
         />
-        <Text style={{ color: "white", fontSize: 16 }}>Night</Text>
+        <Text style={{ color: "white", fontSize: 16 }}> {isNightToggled ? "Night" : "Daytime"}</Text>
       </TouchableOpacity>
   <TouchableOpacity
     style={{
@@ -352,50 +356,46 @@ const ToggleButton = () => {
   };
 
   return (
-    <Text
+    <TouchableOpacity
       onPress={toggleState}
-      style={{
-        color: "white",
-        fontSize: 16,
-        padding: 10,
-        backgroundColor: "#333",
-        borderRadius: 5,
-        textAlign: "center",
-        width: 80,
-      }}
+      style={[styles.button, styles[state.toLowerCase()]]} // Add state-specific styling
+      activeOpacity={0.7} // Adjust feedback opacity
     >
-      {state}
-    </Text>
+      <Text style={styles.buttonText}>{state}</Text>
+    </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      justifyContent: 'center',
-      top: 15,
-    },
-    row: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      marginVertical: 10,
-      width: "100%",
-    },
-    image: {
-      width: 30,
-      height: 30,
-      marginRight: 10,
-    },
-    buttonText: {
-      color: "white",
-      fontSize: 16,
-      marginRight: 120,
-    },
-    activeButtonText: {
-      color: "#FFB267", // Highlight color for active button
-    },
-  });
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    
+  },
+  button: {
+    padding: 10,
+    backgroundColor: "#333", // Default button color
+    borderRadius: 5,
+    alignItems: "center",
+    justifyContent: "center",
+    width: 80,
+  },
+  buttonText: {
+    color: "white",
+    fontSize: 16,
+  },
+  // Add specific styles for each state if needed
+  low: {
+    backgroundColor: "#848482", // Green for Low
+  },
+  med: {
+    backgroundColor: "#242124", // Orange for Medium
+  },
+  high: {
+    backgroundColor: "#100C08", // Red for High
+  },
+});
   
 
 export default ClimateControl;
