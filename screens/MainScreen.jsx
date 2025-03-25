@@ -104,86 +104,45 @@ const MainScreen = () => {
   <View>
     <Text className="text-white mb-1">Heaters</Text>
     {/* Buttons below Heaters */}
-    <ScrollView>
-    <View className="space-y0 mb-4">
-       {/* Fresh Heater Button */}
-       <TouchableOpacity
-              onPress={() => handleToggle(setFreshHeaterOn, isFreshHeaterOn)}
-              style={{
-                backgroundColor: isFreshHeaterOn ? "#4CAF05" : "#1A1A1D",
-                flexDirection: "row",
-                alignItems: "center",
-                padding: 10,
-                borderRadius: 5,
-                marginBottom: 10,
-              }}
-            >
-              <Image
-                source={require("../assets/icons8-water-heater-64.png")}
-                style={{ width: 25, height: 25, marginRight: 10 }}
-              />
-              <Text style={{ color: "white" }}>Fresh Heater</Text>
-            </TouchableOpacity>
-
-      {/* Grey Heater Button */}
-      <TouchableOpacity
-              onPress={() => handleToggle(setGreyHeaterOn, isGreyHeaterOn)}
-              style={{
-                backgroundColor: isGreyHeaterOn ? "#4CAF05" : "#1A1A1D",
-                flexDirection: "row",
-                alignItems: "center",
-                padding: 10,
-                borderRadius: 5,
-                marginBottom: 10,
-              }}
-            >
-              <Image
-                source={require("../assets/icons8-water-heater-64.png")}
-                style={{ width: 25, height: 25, marginRight: 10 }}
-              />
-              <Text style={{ color: "white" }}>Grey Heater</Text>
-            </TouchableOpacity>
-
-            {/* Water Heater Button */}
-            <TouchableOpacity
-              onPress={() => handleToggle(setWaterHeaterOn, isWaterHeaterOn)}
-              style={{
-                backgroundColor: isWaterHeaterOn ? "#4CAF05" : "#1A1A1D",
-                flexDirection: "row",
-                alignItems: "center",
-                padding: 10,
-                borderRadius: 5,
-                marginBottom: 10,
-              }}
-            >
-              <Image
-                source={require("../assets/icons8-water-heater-64.png")}
-                style={{ width: 25, height: 25, marginRight: 10 }}
-              />
-              <Text style={{ color: "white" }}>Water Heater</Text>
-            </TouchableOpacity>
-
     
+    <View className="mt-5 space-y-2 mb-5">
+  {/* Water Heater Button */}
+  <TouchableOpacity
+    onPress={() => handleToggle(setWaterHeaterOn, isWaterHeaterOn)}
+    style={{
+      backgroundColor: isWaterHeaterOn ? "#4CAF05" : "#1A1A1D",
+      flexDirection: "row",
+      alignItems: "center",
+      padding: 10,
+      borderRadius: 5,
+    }}
+  >
+    <Image
+      source={require("../assets/icons8-water-heater-64.png")}
+      style={{ width: 55, height: 55, marginRight: 10 }}
+    />
+    <Text style={{ color: "white" }}>Water Heater</Text>
+  </TouchableOpacity>
 
-       {/* Water Pump Button */}
-       <TouchableOpacity
-              onPress={() => handleToggle(setWaterPumpOn, isWaterPumpOn)}
-              style={{
-                backgroundColor: isWaterPumpOn ? "#4CAF05" : "#1A1A1D",
-                flexDirection: "row",
-                alignItems: "center",
-                padding: 10,
-                borderRadius: 5,
-              }}
-            >
-              <Image
-                source={require("../assets/icons8-water-pump-64.png")}
-                style={{ width: 25, height: 25, marginRight: 10 }}
-              />
-              <Text style={{ color: "white" }}>Water Pump</Text>
-            </TouchableOpacity>
-    </View>
-    </ScrollView>
+  {/* Water Pump Button */}
+  <TouchableOpacity
+    onPress={() => handleToggle(setWaterPumpOn, isWaterPumpOn)}
+    style={{
+      backgroundColor: isWaterPumpOn ? "#4CAF05" : "#1A1A1D",
+      flexDirection: "row",
+      alignItems: "center",
+      padding: 10,
+      borderRadius: 5,
+    }}
+  >
+    <Image
+      source={require("../assets/icons8-water-pump-64.png")}
+      style={{ width: 55, height: 55, marginRight: 10 }}
+    />
+    <Text style={{ color: "white" }}>Water Pump</Text>
+  </TouchableOpacity>
+</View>
+    
     
 
     
@@ -191,22 +150,23 @@ const MainScreen = () => {
   </View>
 
   {/* TankHeaterControls stay in the same place */}
-  <View className="flex-row space-x-4">
-    <TankHeaterControl
-      name="Fresh Water"
-      percentage={80}
-      isOn={isOn}
-      setIsOn={setIsOn}
-      trackColor={{ minimum: "lightblue", maximum: "white" }}
-    />
-    <TankHeaterControl
-      name="Gray Water"
-      percentage={40}
-      isOn={isOnGray}
-      setIsOn={setIsOnGray}
-      trackColor={{ minimum: "gray", maximum: "white" }}
-    />
-  </View>
+  <View className="flex-row justify-between w-60 px-4">
+  <TankHeaterControl
+    name="Fresh Water"
+    initialPercentage={80}
+    isOn={isOn}
+    setIsOn={setIsOn}
+    trackColor={{ minimum: "lightblue", maximum: "white" }}
+  />
+  
+  <TankHeaterControl
+    name="Gray Water"
+    initialPercentage={40}
+    isOn={isOnGray}
+    setIsOn={setIsOnGray}
+    trackColor={{ minimum: "gray", maximum: "white" }}
+  />
+</View>
 </View>
 
 

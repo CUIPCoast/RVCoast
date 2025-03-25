@@ -29,9 +29,7 @@ const TankHeaterControl = ({ name, initialPercentage, isOn, setIsOn, trackColor 
           />
           <Text className="text-white text-md font-semibold mt-2">{percentage}%</Text> {/* Percentage below slider */}
         </View>
-        <View className="ml-3">
-          <ToggleSwitch isOn={isOn} setIsOn={setIsOn} />
-        </View>
+        
       </View>
     );
   }
