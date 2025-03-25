@@ -25,10 +25,10 @@ const Settings = () => {
 
   // If the screen is a tablet, render nothing (null) to hide the tab navigator
   if (isTablet) {
-    return <LightControl />;
+    //<LightControl />;
       
-      /*
-      <Grid className="bg-black">
+      
+    return  <Grid className="bg-black">
          <Row size={10}>
                           <Row className="bg-black" size={9}>
                               <Col className="m-1 ml-3">
@@ -60,7 +60,7 @@ const Settings = () => {
 
 
       </Grid>
-      */
+      
       
   }
 
