@@ -8,6 +8,9 @@ import ToggleSwitch from "../components/ToggleSwitch.jsx";
 import moment from 'moment'; 
 
 
+import LightControl from '../TestingAPI/LightControl.jsx';
+
+
 const Settings = () => {
   const [isOn, setIsOn] = useState(false);
   var now = moment().format();
@@ -22,8 +25,9 @@ const Settings = () => {
 
   // If the screen is a tablet, render nothing (null) to hide the tab navigator
   if (isTablet) {
-    return (
+    return <LightControl />;
       
+      /*
       <Grid className="bg-black">
          <Row size={10}>
                           <Row className="bg-black" size={9}>
@@ -55,7 +59,9 @@ const Settings = () => {
               <GroupComponent />
 
 
-      </Grid>);
+      </Grid>
+      */
+      
   }
 
   return (

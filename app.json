@@ -23,6 +23,10 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
+      },
+      "config": {
+        "usesCleartextTraffic": true,
+        "networkSecurityConfig": "assets\network_security_config.xml"
       }
     },
     "web": {
