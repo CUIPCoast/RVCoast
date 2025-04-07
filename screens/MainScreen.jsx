@@ -11,8 +11,7 @@ import { useNavigation } from "@react-navigation/native";
 import AwningControlModal from "../components/AwningControlModal";
 import AirCon from "./AirCon.jsx";
 import Home from "./Home";
-import { RVControlService } from "../API/rvAPI";
-
+import { WaterService } from '../API/RVControlServices.js';
 const MainScreen = () => {
     
     var currentDate = moment().format("MMMM Do, YYYY");
@@ -26,28 +25,52 @@ const MainScreen = () => {
     const [isGreyHeaterOn, setGreyHeaterOn] = useState(false);
     const [isWaterHeaterOn, setWaterHeaterOn] = useState(false);
     const [isWaterPumpOn, setWaterPumpOn] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState(null);
   
+    // Clear error message after 5 seconds
+    useEffect(() => {
+        if (errorMessage) {
+            const timer = setTimeout(() => {
+                setErrorMessage(null);
+            }, 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [errorMessage]);
+
     // Handle water pump toggle
     const handleWaterPumpToggle = async () => {
+        setIsLoading(true);
         try {
-            // Using raw command as per the provided CAN bus logs
-            await RVControlService.executeRawCommand('19FEDB9F#2CFFC805FF00FFFF');
-            setWaterPumpOn(!isWaterPumpOn);
+            const result = await WaterService.toggleWaterPump();
+            if (result.success) {
+                setWaterPumpOn(!isWaterPumpOn);
+                setErrorMessage(null);
+            } else {
+                setErrorMessage(`Failed to toggle water pump: ${result.error}`);
+            }
         } catch (error) {
-            console.error('Failed to toggle water pump:', error);
-            // Optionally add error handling/display here
+            setErrorMessage(`Error: ${error.message}`);
+        } finally {
+            setIsLoading(false);
         }
     };
     
     // Handle water heater toggle
     const handleWaterHeaterToggle = async () => {
+        setIsLoading(true);
         try {
-            // Using raw command as per the provided CAN bus logs
-            await RVControlService.executeRawCommand('19FEDB9F#2BFFC805FF00FFFF');
-            setWaterHeaterOn(!isWaterHeaterOn);
+            const result = await WaterService.toggleWaterHeater();
+            if (result.success) {
+                setWaterHeaterOn(!isWaterHeaterOn);
+                setErrorMessage(null);
+            } else {
+                setErrorMessage(`Failed to toggle water heater: ${result.error}`);
+            }
         } catch (error) {
-            console.error('Failed to toggle water heater:', error);
-            // Optionally add error handling/display here
+            setErrorMessage(`Error: ${error.message}`);
+        } finally {
+            setIsLoading(false);
         }
     };
     
@@ -78,6 +101,21 @@ const MainScreen = () => {
                     </View>
                 </Row>
             </Row>
+
+            {/* Error message display */}
+            {errorMessage && (
+                <View style={styles.errorContainer}>
+                    <Text style={styles.errorText}>{errorMessage}</Text>
+                </View>
+            )}
+
+            {/* Loading indicator */}
+            {isLoading && (
+                <View style={styles.loadingOverlay}>
+                    <Text style={styles.loadingText}>Processing command...</Text>
+                </View>
+            )}
+
             <Row size={80}>
                 <Col size={15} className="">
                     <Row className=" rounded-xl mr-3 ml-3 mt-3" size={25}>
@@ -118,7 +156,7 @@ const MainScreen = () => {
                     <Text className="text-white mb-1">Heaters</Text>
                     
                     <View className="mt-5 space-y-2 mb-5">
-                    {/* Water Heater Button - Updated with direct handler */}
+                    {/* Water Heater Button - Updated with service handler */}
                     <TouchableOpacity
                         onPress={handleWaterHeaterToggle}
                         style={{
@@ -128,6 +166,7 @@ const MainScreen = () => {
                         padding: 10,
                         borderRadius: 5,
                         }}
+                        disabled={isLoading}
                     >
                         <Image
                         source={require("../assets/icons8-water-heater-64.png")}
@@ -136,7 +175,7 @@ const MainScreen = () => {
                         <Text style={{ color: "white" }}>Water Heater</Text>
                     </TouchableOpacity>
 
-                    {/* Water Pump Button - Updated with direct handler */}
+                    {/* Water Pump Button - Updated with service handler */}
                     <TouchableOpacity
                         onPress={handleWaterPumpToggle}
                         style={{
@@ -146,6 +185,7 @@ const MainScreen = () => {
                         padding: 10,
                         borderRadius: 5,
                         }}
+                        disabled={isLoading}
                     >
                         <Image
                         source={require("../assets/icons8-water-pump-64.png")}
@@ -185,9 +225,9 @@ const MainScreen = () => {
                   alignItems: "center",  
                   
                   }}>
-                <Col className="pb-10 mt10  "size={60} style={{ justifyContent: "center", alignItems: "center" }}>
+                <Col className="pb-10 mt10" size={60} style={{ justifyContent: "center", alignItems: "center" }}>
                 
-                <Row className="bg-brown rounded-xl ml-2  pb-10 "
+                <Row className="bg-brown rounded-xl ml-2 pb-10"
                 style={{
                   shadowColor: "#FFF",
                   shadowOffset: { width: 0, height: 6 },
@@ -262,6 +302,36 @@ const MainScreen = () => {
             
         </Grid>
     );
+};
+
+const styles = {
+    errorContainer: {
+        backgroundColor: "rgba(255, 0, 0, 0.1)",
+        padding: 10,
+        margin: 10,
+        borderRadius: 5,
+        borderWidth: 1,
+        borderColor: "red",
+        zIndex: 1000,
+    },
+    errorText: {
+        color: "white",
+        textAlign: "center",
+    },
+    loadingOverlay: {
+        position: "absolute",
+        top: "50%",
+        left: "50%",
+        transform: [{ translateX: -100 }, { translateY: -25 }],
+        backgroundColor: "rgba(0, 0, 0, 0.7)",
+        padding: 20,
+        borderRadius: 10,
+        zIndex: 1000,
+    },
+    loadingText: {
+        color: "white",
+        fontSize: 16,
+    }
 };
 
 export default MainScreen;

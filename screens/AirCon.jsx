@@ -14,6 +14,7 @@ import { RadialSlider } from 'react-native-radial-slider';
 import useScreenSize from "../helper/useScreenSize.jsx";
 import ToggleSwitch from "../components/ToggleSwitch.jsx";
 
+
 const AirCon = ({ onClose }) => {
 
   const isTablet = useScreenSize();
@@ -303,7 +304,7 @@ const [isOn, setIsOn] = useState(false);
                style={[tabletStyles.button, !isCooling ? tabletStyles.activeButton : null]}
                onPress={handleHeating}
              >
-               <Text style={tabletStyles.buttonText}>Heating</Text>
+               <Text style={tabletStyles.buttonText}>Toe Kick</Text>
              </TouchableOpacity>
            </View>
 

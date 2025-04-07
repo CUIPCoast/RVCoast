@@ -7,7 +7,7 @@ import { Col, Row, Grid } from "react-native-easy-grid";
 
 import { RadialSlider } from 'react-native-radial-slider';
 import moment from 'moment';
-import { RVControlService } from '../API/rvAPI'; // Import the RV Control API service
+import { ClimateService } from '../API/RVControlServices.js';
 
 const ClimateControlScreenTablet = () => {
   const [activeButtons, setActiveButtons] = useState([]); // State for active buttons
@@ -18,6 +18,8 @@ const ClimateControlScreenTablet = () => {
   const [isCoolToggled, setIsCoolToggled] = useState(false);
   const [isToekickToggled, setIsToekickToggled] = useState(false);
   const [isFurnaceToggled, setIsFurnaceToggled] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(null);
   
   var now = moment().format();
   var currentDate = moment().format("MMMM Do, YYYY");
@@ -30,94 +32,96 @@ const ClimateControlScreenTablet = () => {
 
   const isTablet = useScreenSize(); // Check if the screen is large enough to be considered a tablet
 
-  // Function to send multiple CAN commands at once
-  const sendCommands = async (commands) => {
+  // Night Setting Toggle - Using service
+  const handleNightPress = async () => {
+    setIsLoading(true);
     try {
-      for (const command of commands) {
-        await RVControlService.executeRawCommand(command);
+      const result = await ClimateService.setNightMode();
+      if (result.success) {
+        setIsNightToggled(!isNightToggled);
+        setErrorMessage(null);
+      } else {
+        setErrorMessage(`Failed to set night mode: ${result.error}`);
       }
-      console.log('Commands executed successfully');
     } catch (error) {
-      console.error('Error executing commands:', error);
+      setErrorMessage(`Error: ${error.message}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Night Setting Toggle
-  const handleNightPress = async () => {
-    setIsNightToggled(!isNightToggled);
-    
-    // Night setting commands from paste.txt
-    const nightCommands = [
-      '19FEF99F#01C1FFFFFFFFFFFF',
-      '19FED99F#FF96AB0F0B00D1FF',
-      '19FFE298#010100BA24BA2400'
-    ];
-    
-    await sendCommands(nightCommands);
-  };
-
-  // Dehumid Setting Toggle
+  // Dehumid Setting Toggle - Using service
   const handleDehumidPress = async () => {
-    setIsDehumidToggled(!isDehumidToggled);
-    
-    // Dehumid setting commands from paste.txt
-    const dehumidCommands = [
-      '19FEF99F#01C1FFFFFFFFFFFF',
-      '19FED99F#FF96AB0F0A00D1FF',
-      '19FFE298#010164A924A92400'
-    ];
-    
-    await sendCommands(dehumidCommands);
+    setIsLoading(true);
+    try {
+      const result = await ClimateService.setDehumidifyMode();
+      if (result.success) {
+        setIsDehumidToggled(!isDehumidToggled);
+        setErrorMessage(null);
+      } else {
+        setErrorMessage(`Failed to set dehumidify mode: ${result.error}`);
+      }
+    } catch (error) {
+      setErrorMessage(`Error: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // Handle feature button press (Cool, Toe Kick, Furnace)
+  // Handle feature button press (Cool, Toe Kick, Furnace) - Using service
   const handleButtonPress = async (label) => {
+    setIsLoading(true);
+    
     // Check if the button is already active
     const isActive = activeButtons.includes(label);
     
-    // Update active buttons state
-    setActiveButtons((prev) =>
-      isActive
-        ? prev.filter((item) => item !== label) // Remove if already active
-        : [...prev, label] // Add if not active
-    );
-
-    // Execute corresponding commands based on the button label
-    switch (label) {
-      case "Cool":
-        setIsCoolToggled(!isCoolToggled);
-        // Cool setting commands from paste.txt
-        const coolCommands = [
-          '19FEF99F#01C1FFFFFFFFFFFF',
-          '19FED99F#FF96AB0F0100D1FF'
-        ];
-        await sendCommands(coolCommands);
-        break;
-        
-      case "Toe Kick":
-        setIsToekickToggled(!isToekickToggled);
-        // Toe Kick commands from paste.txt
-        const toeKickCommands = [
-          '19FEF99F#01C2FFFFFFFFFFFF',
-          '19FED99F#FF96AA0F0000D1FF',
-          '19FFE298#100264A924A92400'
-        ];
-        await sendCommands(toeKickCommands);
-        break;
-        
-      case "Furnace":
-        setIsFurnaceToggled(!isFurnaceToggled);
-        // Furnace commands from paste.txt
-        const furnaceCommands = [
-          '19FEF99F#01C0FFFFFFFFFFFF',
-          '19FED99F#FF96AA0F0000D1FF',
-          '19FFE298#0502008E24C42400'
-        ];
-        await sendCommands(furnaceCommands);
-        break;
-        
-      default:
-        console.log("Unknown feature:", label);
+    try {
+      let result;
+      
+      // Execute corresponding service methods based on the button label
+      switch (label) {
+        case "Cool":
+          result = await ClimateService.toggleCooling();
+          if (result.success) {
+            setIsCoolToggled(!isCoolToggled);
+          }
+          break;
+          
+        case "Toe Kick":
+          result = await ClimateService.toggleToeKick();
+          if (result.success) {
+            setIsToekickToggled(!isToekickToggled);
+          }
+          break;
+          
+        case "Furnace":
+          result = await ClimateService.toggleFurnace();
+          if (result.success) {
+            setIsFurnaceToggled(!isFurnaceToggled);
+          }
+          break;
+          
+        default:
+          setErrorMessage(`Unknown feature: ${label}`);
+          setIsLoading(false);
+          return;
+      }
+      
+      if (result && result.success) {
+        // Update active buttons state
+        setActiveButtons((prev) =>
+          isActive
+            ? prev.filter((item) => item !== label) // Remove if already active
+            : [...prev, label] // Add if not active
+        );
+        setErrorMessage(null);
+      } else if (result) {
+        setErrorMessage(`Error: ${result.error}`);
+      }
+    } catch (error) {
+      setErrorMessage(`Unexpected error: ${error.message}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -147,6 +151,20 @@ const ClimateControlScreenTablet = () => {
             </View>
           </Row>
         </Row>
+
+        {/* Error message display */}
+        {errorMessage && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{errorMessage}</Text>
+          </View>
+        )}
+
+        {/* Loading indicator */}
+        {isLoading && (
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>Processing command...</Text>
+          </View>
+        )}
 
         <View
           style={{
@@ -341,6 +359,7 @@ const ClimateControlScreenTablet = () => {
                       justifyContent: "center",
                     }}
                     onPress={handleNightPress}
+                    disabled={isLoading}
                   >
                     <Image
                       source={isNightToggled ? moonImage : sunImage}
@@ -360,6 +379,7 @@ const ClimateControlScreenTablet = () => {
                       justifyContent: "center",
                     }}
                     onPress={handleDehumidPress}
+                    disabled={isLoading}
                   >
                     <Image
                       source={require("../assets/drop.png")}
@@ -438,6 +458,32 @@ const styles = StyleSheet.create({
   high: {
     backgroundColor: "#100C08",
   },
+  errorContainer: {
+    backgroundColor: "rgba(255, 0, 0, 0.1)",
+    padding: 10,
+    margin: 10,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: "red",
+  },
+  errorText: {
+    color: "white",
+    textAlign: "center",
+  },
+  loadingContainer: {
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    transform: [{ translateX: -100 }, { translateY: -25 }],
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    padding: 20,
+    borderRadius: 10,
+    zIndex: 1000,
+  },
+  loadingText: {
+    color: "white",
+    fontSize: 16,
+  }
 });
 
 export default ClimateControlScreenTablet;
