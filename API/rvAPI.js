@@ -82,6 +82,18 @@ export const RVControls = {
   turnOffWaterPump: () => RVControlService.executeCommand('water_pump_off'),
   turnOnWaterHeater: () => RVControlService.executeCommand('water_heater_on'),
   turnOffWaterHeater: () => RVControlService.executeCommand('water_heater_off'),
+
+   // Add these thermostat controls
+   increaseTemperature: () => RVControlService.executeCommand('temp_increase'),
+   decreaseTemperature: () => RVControlService.executeCommand('temp_decrease'),
+   
+   // Climate presets
+   setCoolingMode: () => RVControlService.executeCommand('cool_setting'),
+   setFurnaceMode: () => RVControlService.executeCommand('furnace_setting'),
+   setNightMode: () => RVControlService.executeCommand('night_setting'),
+   setDehumidifyMode: () => RVControlService.executeCommand('dehumid_setting'),
+   setToeKickMode: () => RVControlService.executeCommand('toe_kick_setting'),
+   
 };
 
 export default RVControls;

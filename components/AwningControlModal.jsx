@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { StyleSheet, View, Text, Modal, Pressable, Button, Image, ActivityIndicator, ScrollView } from "react-native";
 import { Color } from "../GlobalStyles";
 import useScreenSize from "../helper/useScreenSize";
-import { RVControlService } from "../API/rvAPI.js"; // Make sure this path is correct
+import { AwningService } from "../services/rvControlServices"; // Import the service instead of the API
 
 const AwningControlModal = ({ isVisible, onClose }) => {
   const isTablet = useScreenSize();
@@ -19,27 +19,28 @@ const AwningControlModal = ({ isVisible, onClose }) => {
     setOperationLog(prev => [logEntry, ...prev.slice(0, 9)]); // Keep last 10 entries
   };
 
-  // Function to send raw CAN commands directly - similar to the working Climate Control example
-  const sendRawCommands = async (commands) => {
+  // Handler functions for each awning action using the service layer
+  const handleExtend = async () => {
+    setStatus('Extending awning...');
+    setActiveButton('extend'); // Set this button as active
     setLoading(true);
+    
     try {
-      // If it's a single command, convert to array
-      const commandArray = Array.isArray(commands) ? commands : [commands];
+      logOperation('Sending command to extend awning');
+      const result = await AwningService.extendAwning();
       
-      for (const command of commandArray) {
-        logOperation(`Sending raw CAN command: ${command}`);
-        await RVControlService.executeRawCommand(command);
+      if (result.success) {
+        logOperation('Awning extend command executed successfully');
+        setStatus('Awning extending');
+      } else {
+        logOperation(`Error executing extend command: ${result.error}`);
+        setStatus(`Error: ${result.error}`);
+        setActiveButton(null);
       }
-      
-      logOperation('Commands executed successfully');
-      setStatus('Commands executed successfully');
-      return true;
     } catch (error) {
-      logOperation(`Error executing commands: ${error.message}`);
+      logOperation(`Unexpected error: ${error.message}`);
       setStatus(`Error: ${error.message}`);
-      // Reset active button if there's an error
       setActiveButton(null);
-      return false;
     } finally {
       setLoading(false);
       // Clear status after 3 seconds
@@ -47,23 +48,60 @@ const AwningControlModal = ({ isVisible, onClose }) => {
     }
   };
 
-  // Handler functions for each awning action using the raw commands directly
-  const handleExtend = () => {
-    setStatus('Extending awning...');
-    setActiveButton('extend'); // Set this button as active
-    sendRawCommands('19FEDB9F#09FFC8012D00FFFF');
-  };
-
-  const handleRetract = () => {
+  const handleRetract = async () => {
     setStatus('Retracting awning...');
     setActiveButton('retract'); // Set this button as active
-    sendRawCommands('19FEDB9F#0AFFC8012D00FFFF');
+    setLoading(true);
+    
+    try {
+      logOperation('Sending command to retract awning');
+      const result = await AwningService.retractAwning();
+      
+      if (result.success) {
+        logOperation('Awning retract command executed successfully');
+        setStatus('Awning retracting');
+      } else {
+        logOperation(`Error executing retract command: ${result.error}`);
+        setStatus(`Error: ${result.error}`);
+        setActiveButton(null);
+      }
+    } catch (error) {
+      logOperation(`Unexpected error: ${error.message}`);
+      setStatus(`Error: ${error.message}`);
+      setActiveButton(null);
+    } finally {
+      setLoading(false);
+      // Clear status after 3 seconds
+      setTimeout(() => setStatus(null), 3000);
+    }
   };
 
-  const handleStop = () => {
+  const handleStop = async () => {
     setStatus('Stopping awning...');
     setActiveButton('stop'); // Set this button as active
-    sendRawCommands('19FEDB9F#0BFFC8010100FFFF');
+    setLoading(true);
+    
+    try {
+      logOperation('Sending command to stop awning');
+      const result = await AwningService.stopAwning();
+      
+      if (result.success) {
+        logOperation('Awning stop command executed successfully');
+        setStatus('Awning stopped');
+      } else {
+        logOperation(`Error executing stop command: ${result.error}`);
+        setStatus(`Error: ${result.error}`);
+        setActiveButton(null);
+      }
+    } catch (error) {
+      logOperation(`Unexpected error: ${error.message}`);
+      setStatus(`Error: ${error.message}`);
+      setActiveButton(null);
+    } finally {
+      setLoading(false);
+      // Clear status after 3 seconds
+      setTimeout(() => setStatus(null), 3000);
+    }
   };
 
   return (
