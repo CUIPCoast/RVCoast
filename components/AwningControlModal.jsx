@@ -1,44 +1,70 @@
 import React, { useState } from "react";
-import { StyleSheet, View, Text, Modal, Pressable, Button, Image, ActivityIndicator, Alert } from "react-native";
+import { StyleSheet, View, Text, Modal, Pressable, Button, Image, ActivityIndicator, ScrollView } from "react-native";
 import { Color } from "../GlobalStyles";
 import useScreenSize from "../helper/useScreenSize";
-import LatchLight from "../components/LatchLight";
+import { RVControlService } from "../API/rvAPI.js"; // Make sure this path is correct
 
 const AwningControlModal = ({ isVisible, onClose }) => {
   const isTablet = useScreenSize();
   const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState(null);
+  const [operationLog, setOperationLog] = useState([]);
+  const [activeButton, setActiveButton] = useState(null); // 'extend', 'retract', 'stop', or null
 
-  // Function to send command to API
-  const sendCommand = async (command) => {
+  // Log operations with timestamps
+  const logOperation = (message) => {
+    const timestamp = new Date().toLocaleTimeString();
+    const logEntry = `${timestamp}: ${message}`;
+    console.log(logEntry); // Console log for debugging
+    setOperationLog(prev => [logEntry, ...prev.slice(0, 9)]); // Keep last 10 entries
+  };
+
+  // Function to send raw CAN commands directly - similar to the working Climate Control example
+  const sendRawCommands = async (commands) => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:3000/api/execute', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ command }),
-      });
+      // If it's a single command, convert to array
+      const commandArray = Array.isArray(commands) ? commands : [commands];
       
-      const data = await response.json();
-      
-      if (data.status === 'success') {
-        console.log(`Command ${command} executed successfully`);
-      } else {
-        Alert.alert('Error', data.message || 'Failed to execute command');
+      for (const command of commandArray) {
+        logOperation(`Sending raw CAN command: ${command}`);
+        await RVControlService.executeRawCommand(command);
       }
+      
+      logOperation('Commands executed successfully');
+      setStatus('Commands executed successfully');
+      return true;
     } catch (error) {
-      console.error('Error sending command:', error);
-      Alert.alert('Error', 'Failed to connect to server');
+      logOperation(`Error executing commands: ${error.message}`);
+      setStatus(`Error: ${error.message}`);
+      // Reset active button if there's an error
+      setActiveButton(null);
+      return false;
     } finally {
       setLoading(false);
+      // Clear status after 3 seconds
+      setTimeout(() => setStatus(null), 3000);
     }
   };
 
-  // Handler functions for each awning action
-  const handleExtend = () => sendCommand('awning_extend');
-  const handleRetract = () => sendCommand('awning_retract');
-  const handleStop = () => sendCommand('awning_stop'); // You'll need to add this to your server.js commands
+  // Handler functions for each awning action using the raw commands directly
+  const handleExtend = () => {
+    setStatus('Extending awning...');
+    setActiveButton('extend'); // Set this button as active
+    sendRawCommands('19FEDB9F#09FFC8012D00FFFF');
+  };
+
+  const handleRetract = () => {
+    setStatus('Retracting awning...');
+    setActiveButton('retract'); // Set this button as active
+    sendRawCommands('19FEDB9F#0AFFC8012D00FFFF');
+  };
+
+  const handleStop = () => {
+    setStatus('Stopping awning...');
+    setActiveButton('stop'); // Set this button as active
+    sendRawCommands('19FEDB9F#0BFFC8010100FFFF');
+  };
 
   return (
     <Modal visible={isVisible} transparent={true} animationType="slide">
@@ -63,18 +89,21 @@ const AwningControlModal = ({ isVisible, onClose }) => {
             source={require("../assets/abpost61724photoroom-3.png")}
           />
           
-          <View
-            style={
-              isTablet ? styles.tabletLatchContainer : styles.phoneLatchContainer
-            }
-          >
-            
-          </View>
+          {/* Status indicator */}
+          {status && (
+            <View style={styles.statusContainer}>
+              <Text style={styles.statusText}>{status}</Text>
+            </View>
+          )}
 
           {/* Awning Control Buttons */}
           <View style={styles.controlButtonsContainer}>
             <Pressable
-              style={[styles.actionButton, styles.extendButton]}
+              style={[
+                styles.actionButton, 
+                styles.extendButton,
+                activeButton === 'extend' && styles.activeButton
+              ]}
               onPress={handleExtend}
               disabled={loading}
             >
@@ -82,7 +111,11 @@ const AwningControlModal = ({ isVisible, onClose }) => {
             </Pressable>
             
             <Pressable
-              style={[styles.actionButton, styles.stopButton]}
+              style={[
+                styles.actionButton, 
+                styles.stopButton,
+                activeButton === 'stop' && styles.activeButton
+              ]}
               onPress={handleStop}
               disabled={loading}
             >
@@ -90,12 +123,29 @@ const AwningControlModal = ({ isVisible, onClose }) => {
             </Pressable>
             
             <Pressable
-              style={[styles.actionButton, styles.retractButton]}
+              style={[
+                styles.actionButton, 
+                styles.retractButton,
+                activeButton === 'retract' && styles.activeButton
+              ]}
               onPress={handleRetract}
               disabled={loading}
             >
               <Text style={styles.buttonText}>Retract</Text>
             </Pressable>
+          </View>
+          
+          {/* Operation Log */}
+          <View style={styles.logContainer}>
+            <Text style={styles.logTitle}>Operation Log:</Text>
+            <ScrollView style={styles.logScrollView}>
+              {operationLog.map((entry, index) => (
+                <Text key={index} style={styles.logEntry}>{entry}</Text>
+              ))}
+              {operationLog.length === 0 && (
+                <Text style={styles.emptyLogMessage}>No operations logged yet</Text>
+              )}
+            </ScrollView>
           </View>
           
           {/* Loading indicator */}
@@ -150,7 +200,7 @@ const styles = StyleSheet.create({
     top: 30,
   },
   phoneModalContent: {
-    height: "80%", // Increased height for additional controls
+    height: "80%", 
   },
   phoneModalImage: {
     width: 200,
@@ -181,23 +231,23 @@ const styles = StyleSheet.create({
     fontSize: 18,
     marginTop: 15,
   },
-  phoneLatchContainer: {
+  statusContainer: {
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    padding: 10,
+    borderRadius: 8,
+    width: "100%",
     alignItems: "center",
     marginBottom: 10,
   },
-  tabletLatchContainer: {
-    alignItems: "center",
-    width: 170,
-    height: 110,
-  },
-  latchLightSpacing: {
-    marginBottom: 5,
+  statusText: {
+    color: "white",
+    fontWeight: "bold",
   },
   controlButtonsContainer: {
     flexDirection: "row",
     justifyContent: "space-around",
-    width: "60%",
-    marginVertical: 5,
+    width: "100%",
+    marginVertical: 15,
   },
   actionButton: {
     paddingVertical: 12,
@@ -206,6 +256,8 @@ const styles = StyleSheet.create({
     minWidth: 100,
     alignItems: "center",
     marginHorizontal: 5,
+    borderWidth: 2,
+    borderColor: "transparent", // Default transparent border
   },
   extendButton: {
     backgroundColor: "#4CAF50", // Green
@@ -216,10 +268,42 @@ const styles = StyleSheet.create({
   retractButton: {
     backgroundColor: "#F44336", // Red
   },
+  activeButton: {
+    borderColor: "white", // White border to indicate active state
+    opacity: 0.9, // Slightly dimmed to show active state
+  },
   buttonText: {
     color: "white",
     fontWeight: "bold",
     fontSize: 16,
+  },
+  logContainer: {
+    width: "100%",
+    height: 150,
+    backgroundColor: "rgba(0, 0, 0, 0.2)",
+    borderRadius: 8,
+    padding: 10,
+    marginVertical: 10,
+  },
+  logTitle: {
+    color: "white",
+    fontWeight: "bold",
+    marginBottom: 5,
+  },
+  logScrollView: {
+    flex: 1,
+  },
+  logEntry: {
+    color: "white",
+    fontSize: 12,
+    fontFamily: "monospace",
+    marginBottom: 2,
+  },
+  emptyLogMessage: {
+    color: "rgba(255, 255, 255, 0.5)",
+    fontStyle: "italic",
+    textAlign: "center",
+    marginTop: 20,
   },
   loadingContainer: {
     position: "absolute",
@@ -245,7 +329,7 @@ const styles = StyleSheet.create({
   tabletButtonContainer: {
     width: "50%",
     marginTop: 20,
-    left:10,
+    left: 10,
   },
 });
 
