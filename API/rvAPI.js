@@ -67,6 +67,11 @@ export const RVControls = {
   turnOnBathroomLight: () => RVControlService.executeCommand('bathroom_light_on'),
   turnOffBathroomLight: () => RVControlService.executeCommand('bathroom_light_off'),
 
+  setHighFanSpeed: () => RVControlService.executeCommand('high_fan'),
+  setMediumFanSpeed: () => RVControlService.executeCommand('medium_fan'),
+  // Low fan speed placeholder - will be updated when commands are available
+  setLowFanSpeed: () => console.log('Low fan speed commands not yet available'),
+
   // Awning
   extendAwning: () => RVControlService.executeCommand('awning_extend'),
   retractAwning: () => RVControlService.executeCommand('awning_retract'),

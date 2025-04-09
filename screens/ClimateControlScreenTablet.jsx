@@ -18,6 +18,7 @@ const ClimateControlScreenTablet = () => {
   const [isCoolToggled, setIsCoolToggled] = useState(false);
   const [isToekickToggled, setIsToekickToggled] = useState(false);
   const [isFurnaceToggled, setIsFurnaceToggled] = useState(false);
+  
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
   
@@ -28,7 +29,13 @@ const ClimateControlScreenTablet = () => {
   // Preload images
   const moonImage = require("../assets/moon.png");
   const sunImage = require("../assets/sun.png");
-  const features = ["Cool", "Toe Kick", "Furnace"];
+  
+  // Features with their corresponding fan speeds
+  const features = [
+    { label: "Cool", fanSpeed: "High" },
+    { label: "Toe Kick", fanSpeed: "Med" },
+    { label: "Furnace", fanSpeed: "Low" }
+  ];
 
   const isTablet = useScreenSize(); // Check if the screen is large enough to be considered a tablet
 
@@ -117,6 +124,44 @@ const ClimateControlScreenTablet = () => {
         setErrorMessage(null);
       } else if (result) {
         setErrorMessage(`Error: ${result.error}`);
+      }
+    } catch (error) {
+      setErrorMessage(`Unexpected error: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle fan speed button press
+  const handleFanSpeedPress = async (speed) => {
+    setIsLoading(true);
+    try {
+      let result;
+      
+      switch (speed) {
+        case "Low":
+          result = await ClimateService.setLowFanSpeed();
+          // Show a warning message for low speed since it's not implemented yet
+          if (result.message) {
+            console.warn(result.message);
+          }
+          break;
+        case "Med":
+          result = await ClimateService.setMediumFanSpeed();
+          break;
+        case "High":
+          result = await ClimateService.setHighFanSpeed();
+          break;
+        default:
+          setErrorMessage(`Unknown fan speed: ${speed}`);
+          setIsLoading(false);
+          return;
+      }
+      
+      if (result && result.success) {
+        setErrorMessage(null);
+      } else if (result) {
+        setErrorMessage(`Error setting fan speed: ${result.error}`);
       }
     } catch (error) {
       setErrorMessage(`Unexpected error: ${error.message}`);
@@ -292,7 +337,7 @@ const ClimateControlScreenTablet = () => {
                     }}
                   />
                   <View style={{ flex: 1, justifyContent: "flex-start", alignItems: "flex-start" }}>
-                    {features.map((label, index) => (
+                    {features.map((feature, index) => (
                       <View
                         key={index}
                         style={{
@@ -305,11 +350,11 @@ const ClimateControlScreenTablet = () => {
                       >
                         {/* Feature Button */}
                         <TouchableOpacity
-                          onPress={() => handleButtonPress(label)}
+                          onPress={() => handleButtonPress(feature.label)}
                           style={{
                             flexDirection: "row",
                             alignItems: "center",
-                            backgroundColor: activeButtons.includes(label) ? "#444" : "#1B1B1B",
+                            backgroundColor: activeButtons.includes(feature.label) ? "#444" : "#1B1B1B",
                             borderRadius: 5,
                             paddingVertical: 10,
                             paddingHorizontal: 15,
@@ -317,7 +362,7 @@ const ClimateControlScreenTablet = () => {
                           }}
                         >
                           <Image
-                            source={getImageForLabel(label)}
+                            source={getImageForLabel(feature.label)}
                             style={{ width: 30, height: 30, marginRight: 5 }}
                           />
                           <Text
@@ -326,12 +371,16 @@ const ClimateControlScreenTablet = () => {
                               fontSize: 16,
                             }}
                           >
-                            {label}
+                            {feature.label}
                           </Text>
                         </TouchableOpacity>
 
-                        {/* Toggle Button */}
-                        <ToggleButton />
+                        {/* Fan Speed Button for this row */}
+                        <FanSpeedButton 
+                          speed={feature.fanSpeed} 
+                          onPress={() => handleFanSpeedPress(feature.fanSpeed)} 
+                          isLoading={isLoading}
+                        />
                       </View>
                     ))}
                   </View>
@@ -407,26 +456,37 @@ const getImageForLabel = (label) => {
   return images[label] || require("../assets/questionmark.png");
 };
 
-// Helper component for toggle button functionality
-const ToggleButton = () => {
-  const [state, setState] = React.useState("Low");
-
-  const toggleState = () => {
-    const nextState = {
-      Low: "Med",
-      Med: "High",
-      High: "Low",
-    };
-    setState(nextState[state]);
+// Individual fan speed button component
+const FanSpeedButton = ({ speed, onPress, isLoading }) => {
+  // Set background color based on fan speed
+  const getBackgroundColor = () => {
+    switch (speed) {
+      case "High":
+        return "#100C08"; // Dark for High
+      case "Med":
+        return "#242124"; // Medium for Med
+      case "Low":
+        return "#848482"; // Light for Low
+      default:
+        return "#333";
+    }
   };
-
+  
   return (
     <TouchableOpacity
-      onPress={toggleState}
-      style={[styles.button, styles[state.toLowerCase()]]}
+      onPress={onPress}
+      disabled={isLoading}
+      style={{
+        padding: 10,
+        borderRadius: 5,
+        alignItems: "center",
+        justifyContent: "center",
+        width: 80,
+        backgroundColor: getBackgroundColor(),
+      }}
       activeOpacity={0.7}
     >
-      <Text style={styles.buttonText}>{state}</Text>
+      <Text style={{ color: "white", fontSize: 16 }}>{speed}</Text>
     </TouchableOpacity>
   );
 };
@@ -448,15 +508,6 @@ const styles = StyleSheet.create({
   buttonText: {
     color: "white",
     fontSize: 16,
-  },
-  low: {
-    backgroundColor: "#848482",
-  },
-  med: {
-    backgroundColor: "#242124",
-  },
-  high: {
-    backgroundColor: "#100C08",
   },
   errorContainer: {
     backgroundColor: "rgba(255, 0, 0, 0.1)",
