@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { StyleSheet, View, Text, TouchableOpacity, Switch, TextInput, Keyboard, TouchableWithoutFeedback } from "react-native";
+import { StyleSheet, View, Text, TouchableOpacity, Switch, Keyboard, TouchableWithoutFeedback } from "react-native";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Color,
@@ -12,343 +12,249 @@ import {
 } from "../GlobalStyles";
 import { RadialSlider } from 'react-native-radial-slider';
 import useScreenSize from "../helper/useScreenSize.jsx";
-import ToggleSwitch from "../components/ToggleSwitch.jsx";
-
+// Import the API services
+import { RVControlService, RVControls } from "../API/rvAPI";
+import { ClimateService } from "../API/RVControlServices";
 
 const AirCon = ({ onClose }) => {
-
   const isTablet = useScreenSize();
-  const [timerDuration, setTimerDuration] = useState(0);
-  const [timerUnit, setTimerUnit] = useState("hours");
-  const [timerRunning, setTimerRunning] = useState(false);
-  const [remainingTime, setRemainingTime] = useState(0);
-  const [showTimer, setShowTimer] = useState(false);
-  const [startTime, setStartTime] = useState(null);
-
-  //sets changes between heating and cooling
-  const [isCooling, setIsCooling] = useState(true);
-  const handleCooling = () => {
-    setIsCooling(true);
-    AsyncStorage.setItem('isCooling', JSON.stringify(true));
-  };
-
-  const handleHeating = () => {
-    setIsCooling(false);
-    AsyncStorage.setItem('isCooling', JSON.stringify(false));
-  };
-
-   // AC SWITCH
-  //turn on/off
-  // const [ACSwitch, setACSwitch] = useState(true);
-  // const toggleAC = async () => {
-  //   const newState = !ACSwitch;
-  //   setACSwitch(newState);
-  //   await AsyncStorage.setItem('ACSwitch', JSON.stringify(newState));
-  //   if (!newState && timerRunning) {
-  //     stopTimer();
-  //   }
-  // };
-  //remembers state next time page is open
-  // useEffect(() => {
-  //   const loadACSwitch = async () => {
-  //     const savedACSwitch = await AsyncStorage.getItem('ACSwitch');
-  //     setACSwitch(savedACSwitch ? JSON.parse(savedACSwitch) : true);
-  //   };
-  //   loadACSwitch();
-  // }, []);
-
-  // RADIAL TEMP CHANGE
-  //remembers state from last change
-  const [temp, setTemp] = useState(null);
+  
+  // State for cooling and heating (toe kick) - both can be on at the same time now
+  const [coolingOn, setCoolingOn] = useState(false);
+  const [toeKickOn, setToeKickOn] = useState(false);
+  
+  // Temperature state
+  const [temp, setTemp] = useState(72);
+  const [lastTemp, setLastTemp] = useState(72);
+  
+  // Status message for user feedback
+  const [statusMessage, setStatusMessage] = useState('');
+  const [showStatus, setShowStatus] = useState(false);
+  
+  // Load saved temperature
   useEffect(() => {
     const getTemp = async () => {
       const savedTemp = await AsyncStorage.getItem('temperature');
       if (savedTemp) {
         setTemp(parseInt(savedTemp, 10));
+        setLastTemp(parseInt(savedTemp, 10));
       } else {
         setTemp(72);
+        setLastTemp(72);
       }
     };
     getTemp();
   }, []);
- //saves temp from last change 
+  
+  // Save temperature changes
   useEffect(() => {
     if (temp !== null) {
       AsyncStorage.setItem('temperature', temp.toString());
     }
   }, [temp]);
-//set temp
+  
+  // Load cooling state
+  useEffect(() => {
+    const loadCoolingState = async () => {
+      const savedCoolingState = await AsyncStorage.getItem('coolingState');
+      setCoolingOn(savedCoolingState ? JSON.parse(savedCoolingState) : false);
+    };
+    loadCoolingState();
+  }, []);
+  
+  // Load toe kick state
+  useEffect(() => {
+    const loadToeKickState = async () => {
+      const savedToeKickState = await AsyncStorage.getItem('toeKickState');
+      setToeKickOn(savedToeKickState ? JSON.parse(savedToeKickState) : false);
+    };
+    loadToeKickState();
+  }, []);
+  
+  // Handle cooling toggle
+  const handleCoolingToggle = async () => {
+    const newCoolingState = !coolingOn;
+    setCoolingOn(newCoolingState);
+    await AsyncStorage.setItem('coolingState', JSON.stringify(newCoolingState));
+    
+    try {
+      await ClimateService.toggleCooling();
+      console.log(`Cooling ${newCoolingState ? 'turned on' : 'turned off'}`);
+      
+      // Show status message
+      setStatusMessage(`Cooling ${newCoolingState ? 'turned on' : 'turned off'}`);
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
+    } catch (error) {
+      console.error('Error toggling cooling:', error);
+      // Revert the UI state if the API call fails
+      setCoolingOn(!newCoolingState);
+      await AsyncStorage.setItem('coolingState', JSON.stringify(!newCoolingState));
+      
+      // Show error message
+      setStatusMessage('Failed to toggle cooling');
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
+    }
+  };
+  
+  // Handle toe kick toggle
+  const handleToeKickToggle = async () => {
+    const newToeKickState = !toeKickOn;
+    setToeKickOn(newToeKickState);
+    await AsyncStorage.setItem('toeKickState', JSON.stringify(newToeKickState));
+    
+    try {
+      await ClimateService.toggleToeKick();
+      console.log(`Toe Kick ${newToeKickState ? 'turned on' : 'turned off'}`);
+      
+      // Show status message
+      setStatusMessage(`Toe Kick ${newToeKickState ? 'turned on' : 'turned off'}`);
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
+    } catch (error) {
+      console.error('Error toggling toe kick:', error);
+      // Revert the UI state if the API call fails
+      setToeKickOn(!newToeKickState);
+      await AsyncStorage.setItem('toeKickState', JSON.stringify(!newToeKickState));
+      
+      // Show error message
+      setStatusMessage('Failed to toggle toe kick');
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
+    }
+  };
+
+  // Handle temperature change with debounce
   const handleTempChange = (newTemp) => {
     setTemp(newTemp);
-    //this would be sent to the raspberry pi (MQTT?)
-    
   };
-
-  // HEATING/COOLING SWITCH
   
-//remembers last  setting of heating and cooling.
+  // Send temperature changes to API when temp changes
   useEffect(() => {
-    const loadIsCooling = async () => {
-      const savedIsCooling = await AsyncStorage.getItem('isCooling');
-      setIsCooling(savedIsCooling ? JSON.parse(savedIsCooling) : true);
-    };
-    loadIsCooling();
-  }, []);
-
-
-
-
-//runs conversions for timer to display hours, minutes and seconds
-const formatRemainingTime = () => {
-  const hours = Math.floor(remainingTime / 3600);
-  const minutes = Math.floor((remainingTime % 3600) / 60);
-  const seconds = remainingTime % 60;
-  return `${hours} hrs ${minutes} min ${seconds} sec`;
-};
-
-const [displayTime, setDisplayTime] = useState(formatRemainingTime());
-
-//remembers timer status if window is closed
-useEffect(() => {
-  const loadTimerState = async () => {
-    try {
-      const timerData = await AsyncStorage.getItem('timerData');
-      if (timerData) {
-        const { 
-          timerRunning: savedTimerRunning, 
-          startTime: savedStartTime, 
-          duration: savedDuration,
-          timerUnit: savedTimerUnit,
-          timerDuration: savedTimerDuration 
-        } = JSON.parse(timerData);
-
-        setTimerUnit(savedTimerUnit);
-        setTimerDuration(savedTimerDuration);
-
-        if (savedTimerRunning) {
-          const currentTime = Date.now();
-          const elapsedSeconds = Math.floor((currentTime - savedStartTime) / 1000);
-          const remainingSeconds = Math.max(0, savedDuration - elapsedSeconds);
-
-          if (remainingSeconds > 0) {
-            setTimerRunning(true);
-            setRemainingTime(remainingSeconds);
-            setStartTime(savedStartTime);
-            setShowTimer(true);
-          } else {
-            // Timer reached 0 turn off timer, hider counter, turn off ACSwitch
-            setTimerRunning(false);
-            setRemainingTime(0);
-            setShowTimer(false);
-            setACSwitch(false);
-            await AsyncStorage.setItem('ACSwitch', JSON.stringify(false));
-            await AsyncStorage.removeItem('timerData');
+    const sendTempChange = async () => {
+      if (temp === lastTemp || (!coolingOn && !toeKickOn)) return;
+      
+      try {
+        // Determine if we need to increase or decrease temperature
+        if (temp > lastTemp) {
+          // Send temperature increase command based on the difference
+          const steps = temp - lastTemp;
+          for (let i = 0; i < steps; i++) {
+            await RVControlService.executeCommand('temp_increase');
+            // Short delay to avoid overwhelming the CAN bus
+            await new Promise(resolve => setTimeout(resolve, 100));
           }
+          console.log(`Temperature increased to ${temp}°F`);
+          
+          // Show status message
+          setStatusMessage(`Temperature set to ${temp}°F`);
+          setShowStatus(true);
+          setTimeout(() => setShowStatus(false), 2000);
+        } else {
+          // Send temperature decrease command based on the difference
+          const steps = lastTemp - temp;
+          for (let i = 0; i < steps; i++) {
+            await RVControlService.executeCommand('temp_decrease');
+            // Short delay to avoid overwhelming the CAN bus
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+          console.log(`Temperature decreased to ${temp}°F`);
+          
+          // Show status message
+          setStatusMessage(`Temperature set to ${temp}°F`);
+          setShowStatus(true);
+          setTimeout(() => setShowStatus(false), 2000);
         }
+        
+        setLastTemp(temp);
+      } catch (error) {
+        console.error('Failed to change temperature:', error);
+        // Revert to last successful temperature
+        setTemp(lastTemp);
+        
+        // Show error message
+        setStatusMessage('Failed to change temperature');
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
       }
-    } catch (error) {
-      console.error('Error loading timer state:', error);
-    }
-  };
+    };
+    
+    // Debounce the temperature change to avoid too many API calls
+    const timeoutId = setTimeout(sendTempChange, 800);
+    return () => clearTimeout(timeoutId);
+  }, [temp, lastTemp, coolingOn, toeKickOn]);
 
-  loadTimerState();
-}, []);
-
-useEffect(() => {
-  const saveTimerState = async () => {
-    if (timerRunning) {
-      const timerState = {
-        timerRunning,
-        startTime,
-        duration: remainingTime,
-        timerUnit,
-        timerDuration
-      };
-      await AsyncStorage.setItem('timerData', JSON.stringify(timerState));
-    } else {
-      await AsyncStorage.removeItem('timerData');
-    }
-  };
-
-  saveTimerState();
-}, [timerRunning, startTime, remainingTime, timerUnit, timerDuration]);
-
-//turns off timer and AC switch 
-useEffect(() => {
-  let interval;
-  if (timerRunning && remainingTime > 0) {
-    interval = setInterval(() => {
-      setRemainingTime((prevTime) => {
-        if (prevTime <= 1) {
-          setTimerRunning(false);
-          setACSwitch(false);
-          setShowTimer(false);
-          AsyncStorage.setItem('ACSwitch', JSON.stringify(false));
-          AsyncStorage.removeItem('timerData');
-          return 0;
-        }
-        return prevTime - 1;
-      });
-    }, 1000);
-  }
-
-  return () => clearInterval(interval);
-}, [timerRunning, remainingTime]);
-//updates the count down using hours minutes seconds
-useEffect(() => {
-  const updateDisplayTime = () => {
-    setDisplayTime(formatRemainingTime());
-  };
-
-  updateDisplayTime();
-}, [remainingTime]);
-//begins the timer or restarts it will fail if ACSwitch is already off
-const startTimer = () => {
-  if (ACSwitch) {
-    const duration = timerDuration * getMultiplierForUnit();
-    setTimerRunning(true);
-    setRemainingTime(duration);
-    setStartTime(Date.now());
-    setShowTimer(true);
-  } else {
-    alert('Air Conditioner needs to be turned on first.');
-  }
-};
-//if switch is turned off or reaches 0 stops counting down
-const stopTimer = async () => {
-  setTimerRunning(false);
-  setShowTimer(false);
-  await AsyncStorage.removeItem('timerData');
-};
-//separates hours and minutes from timer
-const getMultiplierForUnit = () => {
-  if (timerUnit === "hours") {
-    return 3600;
-  } else if (timerUnit === "minutes") {
-    return 60;
-  } else {
-    return 1;
-  }
-};
-
-const handleHoursSelection = () => {
-  setTimerUnit("hours");
-};
-
-const handleMinutesSelection = () => {
-  setTimerUnit("minutes");
-};
-
-const [isOn, setIsOn] = useState(false);
-
-//if tapping outside of keyboard when setting number of hours/minutes the keyboard is hidden
   const dismissKeyboard = () => {
     Keyboard.dismiss();
   };
+  
+  // Tablet view
   if (isTablet) {
-     return (
-     <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
-        
+    return (
+      <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
         <View style={tabletStyles.container}>
+          <RadialSlider
+            value={temp}
+            min={60}
+            max={85}
+            thumbColor={"#FFFFFF"}
+            thumbBorderColor={"#848482"}
+            sliderTrackColor={"#E5E5E5"}
+            linearGradient={[ { offset: '0%', color:'#ffaca6' }, { offset: '100%', color: '#FF8200' }]}
+            onChange={handleTempChange}
+            subTitle={'Degrees'}
+            subTitleStyle={{ color: isDarkMode ? 'white' : 'black', paddingBottom: 25 }}
+            unitStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5 }}
+            valueStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5}}
+            style={{
+              backgroundColor: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
+            }}
+            buttonContainerStyle={{
+              color:"FFFFFF",
+            }}
+            leftIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginRight: 10, top:20, height: 40, width: 50, paddingLeft: 4 }}
+            rightIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginLeft: 10, top:20, height: 40, width: 50, paddingLeft: 5 }}
+            isHideTailText={true}
+            unit={'°F'}
+          />
+
+          <View style={tabletStyles.buttonsContainer}>
+            <TouchableOpacity
+              style={[tabletStyles.button, coolingOn ? tabletStyles.activeButton : null]}
+              onPress={handleCoolingToggle}
+            >
+              <Text style={tabletStyles.buttonText}>Cooling</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[tabletStyles.button, toeKickOn ? tabletStyles.activeButton : null]}
+              onPress={handleToeKickToggle}
+            >
+              <Text style={tabletStyles.buttonText}>Toe Kick</Text>
+            </TouchableOpacity>
+          </View>
           
-        <View style={tabletStyles.toggleContainer}>
-         <ToggleSwitch isOn={isOn} setIsOn={setIsOn} />
-       </View>
-          
-   
-
-         <RadialSlider
-   value={temp}
-  min={60}
-  max={85}
-  thumbColor={"#FFFFFF"}
-        thumbBorderColor={"#848482"}
-        sliderTrackColor={"#E5E5E5"}
-        linearGradient={[ { offset: '0%', color:'#ffaca6' }, { offset: '100%', color: '#FF8200' }]}
-  onChange={handleTempChange}
-   subTitle={'Degrees'}
-   subTitleStyle={{ color: isDarkMode ? 'white' : 'black', paddingBottom: 25 }}
-   unitStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5 }}
-   valueStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5}}
-   style={{
-     backgroundColor: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
-    
-    
-   }}
-   buttonContainerStyle={{
-    color:"FFFFFF",
-   }}
-  
-   leftIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginRight: 10, top:20, height: 40, width: 50, paddingLeft: 4 }}
-   rightIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginLeft: 10, top:20, height: 40, width: 50, paddingLeft: 5 }}
-  
-  
-  
-  
-   isHideTailText={true}
-   unit={'°F'}
- />
-
-
-
-
-
-           <View style={tabletStyles.buttonsContainer}>
-             <TouchableOpacity
-               style={[tabletStyles.button, isCooling ? tabletStyles.activeButton : null]}
-               onPress={handleCooling}
-             >
-               <Text style={tabletStyles.buttonText}>Cooling</Text>
-             </TouchableOpacity>
-             <TouchableOpacity
-               style={[tabletStyles.button, !isCooling ? tabletStyles.activeButton : null]}
-               onPress={handleHeating}
-             >
-               <Text style={tabletStyles.buttonText}>Toe Kick</Text>
-             </TouchableOpacity>
-           </View>
-
-           <View style={tabletStyles.timerControls}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            
-
-              
-             </View>
-             
-             {timerRunning && (
-               <Text style={tabletStyles.countdownText}>
-                 Remaining: {formatRemainingTime()}
-              </Text>
-            )}
-             {showTimer && (
-               <Text style={tabletStyles.timerText}>{displayTime}</Text>
-             )}
-           </View>
+          {/* Status message */}
+          {showStatus && (
+            <View style={tabletStyles.statusContainer}>
+              <Text style={tabletStyles.statusText}>{statusMessage}</Text>
+            </View>
+          )}
         </View>
-       </TouchableWithoutFeedback>
-     );
-   }
+      </TouchableWithoutFeedback>
+    );
+  }
  
-
+  // Mobile view
   return (
     <TouchableWithoutFeedback onPress={dismissKeyboard}>
-
       <View style={styles.container}>
         {/*Closes the AC Window */}
         <TouchableOpacity style={styles.closeButton} onPress={onClose}>
           <Text style={styles.closeText}>X</Text>
         </TouchableOpacity>
 
-        {/* AC Toggle style */}
         <Text style={styles.label}>Air Conditioning</Text>
-        {/* <Switch
-          trackColor={{ false: "white", true: "#008ABC" }}
-          thumbColor={ACSwitch ? "white" : "white"}
-          ios_backgroundColor="#E5E5E5"
-          onValueChange={toggleAC}
-          value={ACSwitch}
-          style={{ marginBottom: 30 }}
-        /> */}
 
         {/* Radial Slider for Temperature Control */}
         <RadialSlider
@@ -368,63 +274,28 @@ const [isOn, setIsOn] = useState(false);
           unit={'°F'}
         />
 
-        {/* Heating/Cooling Switch Buttons */}
+        {/* Cooling and Toe Kick Switch Buttons */}
         <View style={styles.buttonsContainer}>
           <TouchableOpacity
-            style={[styles.button, isCooling ? styles.activeButton : null]}
-            onPress={handleCooling}
+            style={[styles.button, coolingOn ? styles.activeButton : null]}
+            onPress={handleCoolingToggle}
           >
             <Text style={styles.buttonText}>Cooling</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.button, !isCooling ? styles.activeButton : null]}
-            onPress={handleHeating}
+            style={[styles.button, toeKickOn ? styles.activeButton : null]}
+            onPress={handleToeKickToggle}
           >
-            <Text style={styles.buttonText}>Heating</Text>
+            <Text style={styles.buttonText}>Toe Kick</Text>
           </TouchableOpacity>
         </View>
-
-        {/* Timer Controls */}
-        <View style={styles.timerControls}>
-
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            
+        
+        {/* Status message */}
+        {showStatus && (
+          <View style={styles.statusContainer}>
+            <Text style={styles.statusText}>{statusMessage}</Text>
           </View>
-          <View style={styles.timerInputContainer}>
-            <TextInput
-              style={styles.timerInput}
-              value={timerDuration.toString()}
-              onChangeText={(text) => setTimerDuration(parseInt(text) || 0)}
-              keyboardType="numeric"
-              placeholder="Time"
-            />
-            <View style={styles.timerButtonsContainer}>
-              <TouchableOpacity
-                style={[styles.timerButton, timerUnit === "hours" ? styles.activeTimerButton : null]}
-                onPress={handleHoursSelection}
-              >
-                <Text style={styles.timerButtonText}>Hours</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={{ color: "white"}}
-                onPress={handleMinutesSelection}
-              >
-                <Text style={{color: "white", paddingRight: 5, marginTop: 5,
-                }}>Minutes</Text>
-              </TouchableOpacity>
-            </View>
-            <TouchableOpacity onPress={startTimer}>
-              <Text style={{ color: "white", marginTop: 8,}}>Start</Text>
-            </TouchableOpacity>
-
-          </View>
-          {timerRunning && (
-            <Text style={styles.countdownText}>
-              Remaining: {formatRemainingTime()}
-            </Text>
-          )}
-          
-        </View>
+        )}
       </View>
     </TouchableWithoutFeedback>
   );
@@ -435,14 +306,8 @@ const tabletStyles = StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',
-    marginTop: 30,
+    marginTop: 50,
     backgroundColor: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
-    opacity: 0.90
-  },
-  toggleContainer: {
-    position: 'absolute',
-    bottom: 445, // Move the toggle switch to 100px from the top
-    left: 200, // Move the toggle switch 50px from the left
   },
   closeButton: {
     position: 'absolute',
@@ -469,7 +334,7 @@ const tabletStyles = StyleSheet.create({
   },
   buttonsContainer: {
     flexDirection: 'row',
-    marginTop: 10,
+    marginTop: 30,
   },
   button: {
     paddingHorizontal: 20,
@@ -485,58 +350,18 @@ const tabletStyles = StyleSheet.create({
   buttonText: {
     fontSize: 16,
   },
-  timerControls: {
-    flexDirection: 'column',
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  timerLabel: {
-    color:  isDarkMode ? Color.white0 : Color.colorDarkslategray_200,
-    fontSize: 16,
-    marginBottom: 30,
-  },
-  timerInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    bottom: 15,
-  },
-  timerInput: {
-    borderWidth: 1,
-    color:  isDarkMode ? Color.white0 : Color.colorDarkslategray_200,
-    padding: 5,
-    fontSize: 18,
-    width: 80,
-    marginRight: 10,
-  },
-  startTimerButton: {
-    color: '#008ABC',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  countdownText: {
-    color:  isDarkMode ? Color.white0 : Color.colorDarkslategray_200,
-    fontSize: 16,
-    marginTop: 10,
-  },
-  timerButtonsContainer: {
-    flexDirection: 'row',
-    marginTop: 10,
-  },
-  timerButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+  statusContainer: {
+    position: 'absolute',
+    bottom: 100,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
     borderRadius: 5,
-    marginHorizontal: 5,
-    bottom: 5,
-    backgroundcolor:  isDarkMode ? Color.white0 : Color.colorDarkslategray_200,
+    alignSelf: 'center',
   },
-  activeTimerButton: {
-    backgroundColor: '#FFB267',
-  },
-  timerButtonText: {
-    fontSize: 16,
-    color: "#FFF",
+  statusText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 });
 
@@ -547,7 +372,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 50,
     backgroundColor: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
-    // opacity: 0.90
   },
   closeButton: {
     position: 'absolute',
@@ -565,19 +389,17 @@ const styles = StyleSheet.create({
     fontSize: 20,
     marginTop: -4,
     fontWeight: "bold",
-    // marginBottom:2
   },
   label: {
     color:  isDarkMode ? Color.white0 : Color.colorDarkslategray_200,
-    fontSize:20,
+    fontSize: 20,
     fontWeight: 'bold',
     backgroundColor: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
-
     margin: 10,
   },
   buttonsContainer: {
     flexDirection: 'row',
-    marginTop: 10,
+    marginTop: 20,
   },
   button: {
     paddingHorizontal: 20,
@@ -593,64 +415,18 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: 16,
   },
-  timerControls: {
-    flexDirection: 'column',
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  timerLabel: {
-    color:  isDarkMode ? Color.white0 : Color.colorDarkslategray_200,
-
-    fontSize: 16,
-    marginBottom: 5,
-  },
-  timerInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-  },
-  timerInput: {
-    borderWidth: 1,
-    color:  isDarkMode ? Color.white0 : Color.colorDarkslategray_200,
-
-    // color:  isDarkMode ? Color.white0 : Color.colorDarkslategray_200,
-
-    padding: 5,
-
-    fontSize: 18,
-    width: 80,
-    marginRight: 10,
-  },
-  startTimerButton: {
-    color: '#008ABC',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  countdownText: {
-    color:  isDarkMode ? Color.white0 : Color.colorDarkslategray_200,
-
-    fontSize: 16,
-    marginTop: 10,
-  },
-  timerButtonsContainer: {
-    flexDirection: 'row',
-    marginTop: 10,
-  },
-  timerButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+  statusContainer: {
+    position: 'absolute',
+    bottom: 50,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
     borderRadius: 5,
-    marginHorizontal: 5,
-    backgroundcolor:  "white",
-    color: "white",
-
+    alignSelf: 'center',
   },
-  activeTimerButton: {
-    backgroundColor: '#FFB267',
-  },
-  timerButtonText: {
-    fontSize: 16,
+  statusText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 });
 

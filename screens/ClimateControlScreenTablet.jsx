@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, Image, TouchableOpacity } from "react-native";
 
 import { Border, Color, Gap, FontSize, FontFamily, isDarkMode } from "../GlobalStyles";
@@ -8,11 +8,12 @@ import { Col, Row, Grid } from "react-native-easy-grid";
 import { RadialSlider } from 'react-native-radial-slider';
 import moment from 'moment';
 import { ClimateService } from '../API/RVControlServices.js';
+import { RVControlService } from "../API/rvAPI";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ClimateControlScreenTablet = () => {
   const [activeButtons, setActiveButtons] = useState([]); // State for active buttons
   const [speed, setSpeed] = useState(0);
-  const [isOn, setIsOn] = useState(false);
   const [isNightToggled, setIsNightToggled] = useState(false);
   const [isDehumidToggled, setIsDehumidToggled] = useState(false);
   const [isCoolToggled, setIsCoolToggled] = useState(false);
@@ -21,6 +22,10 @@ const ClimateControlScreenTablet = () => {
   
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
+
+  // Temperature state with loading from AsyncStorage
+  const [temp, setTemp] = useState(72);
+  const [lastTemp, setLastTemp] = useState(72);
   
   var now = moment().format();
   var currentDate = moment().format("MMMM Do, YYYY");
@@ -38,6 +43,86 @@ const ClimateControlScreenTablet = () => {
   ];
 
   const isTablet = useScreenSize(); // Check if the screen is large enough to be considered a tablet
+
+  // Load saved temperature from AsyncStorage
+  useEffect(() => {
+    const getTemp = async () => {
+      const savedTemp = await AsyncStorage.getItem('temperature');
+      if (savedTemp) {
+        setTemp(parseInt(savedTemp, 10));
+        setLastTemp(parseInt(savedTemp, 10));
+      } else {
+        setTemp(72);
+        setLastTemp(72);
+      }
+    };
+    getTemp();
+  }, []);
+  
+  // Save temperature changes to AsyncStorage
+  useEffect(() => {
+    if (temp !== null) {
+      AsyncStorage.setItem('temperature', temp.toString());
+    }
+  }, [temp]);
+
+  // Handle temperature change from RadialSlider
+  const handleTempChange = (newTemp) => {
+    setTemp(newTemp);
+  };
+  
+  // Handle temperature API changes with debounce
+  useEffect(() => {
+    const sendTempChange = async () => {
+      if (temp === lastTemp || (!isCoolToggled && !isToekickToggled && !isFurnaceToggled)) return;
+      
+      try {
+        setIsLoading(true);
+        
+        // Determine if we need to increase or decrease temperature
+        if (temp > lastTemp) {
+          // Send temperature increase command based on the difference
+          const steps = temp - lastTemp;
+          for (let i = 0; i < steps; i++) {
+            await RVControlService.executeCommand('temp_increase');
+            // Short delay to avoid overwhelming the CAN bus
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+          console.log(`Temperature increased to ${temp}°F`);
+          
+          // Show success message
+          setErrorMessage(null);
+        } else {
+          // Send temperature decrease command based on the difference
+          const steps = lastTemp - temp;
+          for (let i = 0; i < steps; i++) {
+            await RVControlService.executeCommand('temp_decrease');
+            // Short delay to avoid overwhelming the CAN bus
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+          console.log(`Temperature decreased to ${temp}°F`);
+          
+          // Show success message
+          setErrorMessage(null);
+        }
+        
+        setLastTemp(temp);
+      } catch (error) {
+        console.error('Failed to change temperature:', error);
+        // Revert to last successful temperature
+        setTemp(lastTemp);
+        
+        // Show error message
+        setErrorMessage(`Failed to change temperature: ${error.message}`);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    // Debounce the temperature change to avoid too many API calls
+    const timeoutId = setTimeout(sendTempChange, 800);
+    return () => clearTimeout(timeoutId);
+  }, [temp, lastTemp, isCoolToggled, isToekickToggled, isFurnaceToggled]);
 
   // Night Setting Toggle - Using service
   const handleNightPress = async () => {
@@ -254,34 +339,28 @@ const ClimateControlScreenTablet = () => {
             />
             <View style={styles.container}>
               <RadialSlider
-                variant={"radial-circle-slider"}
-                value={speed}
-                unit={"º"}
-                unitStyle={{
-                  color: "#FFFFFF",
-                  fontSize: 24,
-                }}
-                subTitle={"Degrees"}
-                min={62}
-                max={78}
+                value={temp}
+                min={60}
+                max={85}
                 thumbColor={"#FFFFFF"}
                 thumbBorderColor={"#848482"}
                 sliderTrackColor={"#E5E5E5"}
-                linearGradient={[
-                  { offset: "0%", color: "#ffaca6" },
-                  { offset: "100%", color: "#FF8200" },
-                ]}
-                onChange={setSpeed}
-                subTitleStyle={{
-                  color: "#FFFFFF",
-                  fontSize: 24,
-                  fontWeight: "bold",
+                linearGradient={[ { offset: '0%', color:'#ffaca6' }, { offset: '100%', color: '#FF8200' }]}
+                onChange={handleTempChange}
+                subTitle={'Degrees'}
+                subTitleStyle={{ color: isDarkMode ? 'white' : 'black', paddingBottom: 25 }}
+                unitStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5 }}
+                valueStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5}}
+                style={{
+                  backgroundColor: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
                 }}
-                valueStyle={{
-                  color: "#FFFFFF",
-                  fontSize: 38,
-                  fontWeight: "bold",
+                buttonContainerStyle={{
+                  color:"FFFFFF",
                 }}
+                leftIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginRight: 10, top:20, height: 40, width: 50, paddingLeft: 4 }}
+                rightIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginLeft: 10, top:20, height: 40, width: 50, paddingLeft: 5 }}
+                isHideTailText={true}
+                unit={'°F'}
               />
             </View>
           </Col>
