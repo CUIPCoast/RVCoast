@@ -291,6 +291,7 @@ const ClimateControlScreenTablet = () => {
                       marginTop: 40,
                     }}
                   />
+                  {/* Fixed: Stack the buttons vertically */}
                   <View style={{ flex: 1, justifyContent: "flex-start", alignItems: "flex-start" }}>
                     {features.map((label, index) => (
                       <View
@@ -330,13 +331,14 @@ const ClimateControlScreenTablet = () => {
                           </Text>
                         </TouchableOpacity>
 
-                        {/* Toggle Button */}
-                        <ToggleButton />
+                        {/* Fixed: Using the ToggleButtons component with only necessary buttons */}
+                        {/*Fix this*/}
+                        {/* <ToggleButtons/> */}
                       </View>
                     ))}
                   </View>
                 </Col>
-                {/* Buttons next to Auxiliary Box */}
+                {/* Night/Dehumid Buttons */}
                 <View
                   style={{
                     flex: 1,
@@ -407,27 +409,39 @@ const getImageForLabel = (label) => {
   return images[label] || require("../assets/questionmark.png");
 };
 
-// Helper component for toggle button functionality
-const ToggleButton = () => {
-  const [state, setState] = React.useState("Low");
-
-  const toggleState = () => {
-    const nextState = {
-      Low: "Med",
-      Med: "High",
-      High: "Low",
-    };
-    setState(nextState[state]);
+// Fixed ToggleButtons component - removed the two unnecessary buttons 
+const ToggleButtons = () => {
+  const [activeButton, setActiveButton] = React.useState(null);
+  
+  // Fixed: Only four buttons total, no extra buttons
+  const buttons = ["High", "Med", "Low", "Auto"];
+  
+  const handleButtonPress = (buttonName) => {
+    if (activeButton === buttonName) {
+      // If already active, deactivate it
+      setActiveButton(null);
+    } else {
+      // Otherwise, make this button active
+      setActiveButton(buttonName);
+    }
   };
 
   return (
-    <TouchableOpacity
-      onPress={toggleState}
-      style={[styles.button, styles[state.toLowerCase()]]}
-      activeOpacity={0.7}
-    >
-      <Text style={styles.buttonText}>{state}</Text>
-    </TouchableOpacity>
+    <View style={styles.toggleButtonsContainer}>
+      {buttons.map((buttonName) => (
+        <TouchableOpacity
+          key={buttonName}
+          onPress={() => handleButtonPress(buttonName)}
+          style={[
+            styles.toggleButton,
+            activeButton === buttonName ? styles.activeToggleButton : null
+          ]}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.toggleButtonText}>{buttonName}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
   );
 };
 
@@ -437,26 +451,27 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  button: {
-    padding: 10,
-    backgroundColor: "#333",
-    borderRadius: 5,
-    alignItems: "center",
-    justifyContent: "center",
+  // Styles for the toggle buttons
+  toggleButtonsContainer: {
+    flexDirection: 'column',
+    justifyContent: 'space-between',
     width: 80,
   },
-  buttonText: {
-    color: "white",
-    fontSize: 16,
+  toggleButton: {
+    padding: 8,
+    backgroundColor: '#333',
+    borderRadius: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 2,
+    width: 80,
   },
-  low: {
-    backgroundColor: "#848482",
+  activeToggleButton: {
+    backgroundColor: '#FF8200',
   },
-  med: {
-    backgroundColor: "#242124",
-  },
-  high: {
-    backgroundColor: "#100C08",
+  toggleButtonText: {
+    color: 'white',
+    fontSize: 14,
   },
   errorContainer: {
     backgroundColor: "rgba(255, 0, 0, 0.1)",

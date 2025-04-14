@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { StyleSheet, View, Text, Modal, Pressable, Button, Image, ActivityIndicator, ScrollView } from "react-native";
 import { Color } from "../GlobalStyles";
 import useScreenSize from "../helper/useScreenSize";
-import { AwningService } from "../services/rvControlServices"; // Import the service instead of the API
+import { AwningService } from "../API/RVControlServices"; // Import the service instead of the API
 
 const AwningControlModal = ({ isVisible, onClose }) => {
   const isTablet = useScreenSize();
