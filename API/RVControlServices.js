@@ -54,11 +54,9 @@ export const AwningService = {
 /**
  * Service module for Climate control functionality
  */
+// Updated ClimateService with fan control functions
 export const ClimateService = {
-  /**
-   * Set night mode
-   * @returns {Promise} Promise that resolves when commands are sent
-   */
+  // Existing methods stay the same
   setNightMode: async () => {
     try {
       const commands = [
@@ -77,10 +75,6 @@ export const ClimateService = {
     }
   },
 
-  /**
-   * Set dehumidify mode
-   * @returns {Promise} Promise that resolves when commands are sent
-   */
   setDehumidifyMode: async () => {
     try {
       const commands = [
@@ -99,10 +93,6 @@ export const ClimateService = {
     }
   },
 
-  /**
-   * Toggle cooling
-   * @returns {Promise} Promise that resolves when commands are sent
-   */
   toggleCooling: async () => {
     try {
       const commands = [
@@ -120,10 +110,6 @@ export const ClimateService = {
     }
   },
 
-  /**
-   * Toggle toe kick heat
-   * @returns {Promise} Promise that resolves when commands are sent
-   */
   toggleToeKick: async () => {
     try {
       const commands = [
@@ -142,10 +128,6 @@ export const ClimateService = {
     }
   },
 
-  /**
-   * Toggle furnace
-   * @returns {Promise} Promise that resolves when commands are sent
-   */
   toggleFurnace: async () => {
     try {
       const commands = [
@@ -162,95 +144,55 @@ export const ClimateService = {
       console.error('Failed to toggle furnace:', error);
       return { success: false, error: error.message };
     }
-  }
-};
-
-/**
- * Service module for Water system control
- */
-export const WaterService = {
-  /**
-   * Toggle water pump
-   * @returns {Promise} Promise that resolves when command is sent
-   */
-  toggleWaterPump: async () => {
-    try {
-      const result = await RVControlService.executeRawCommand('19FEDB9F#2CFFC805FF00FFFF');
-      return { success: true, result };
-    } catch (error) {
-      console.error('Failed to toggle water pump:', error);
-      return { success: false, error: error.message };
-    }
   },
 
-  /**
-   * Toggle water heater
-   * @returns {Promise} Promise that resolves when command is sent
-   */
-  toggleWaterHeater: async () => {
+  setHighFanSpeed: async () => {
     try {
-      const result = await RVControlService.executeRawCommand('19FEDB9F#2BFFC805FF00FFFF');
-      return { success: true, result };
-    } catch (error) {
-      console.error('Failed to toggle water heater:', error);
-      return { success: false, error: error.message };
-    }
-  }
-};
-
-/**
- * Service module for lighting control
- */
-export const LightingService = {
-  /**
-   * Toggle a specific light
-   * @param {string} light - The light to toggle (e.g., 'kitchen', 'bedroom')
-   * @returns {Promise} Promise that resolves when command is sent
-   */
-  toggleLight: async (light) => {
-    try {
-      // Map of lights to their respective command IDs
-      const lightCommands = {
-        kitchen: '19FEDB9F#01FFC8010100FFFF',
-        bedroom: '19FEDB9F#02FFC8010100FFFF',
-        bathroom: '19FEDB9F#03FFC8010100FFFF',
-        // Add more lights as needed
-      };
+      // Execute all three high fan speed commands in sequence
+      const commands = [
+        '19FED99F#FF96AA0FC800D1FF',
+        '195FCE98#AA00C80000000000',
+        '19FEF998#A110C88A24AE19FF'
+      ];
       
-      if (!lightCommands[light]) {
-        throw new Error(`Unknown light: ${light}`);
+      for (const command of commands) {
+        await RVControlService.executeRawCommand(command);
       }
-      
-      const result = await RVControlService.executeRawCommand(lightCommands[light]);
-      return { success: true, result };
+      return { success: true };
     } catch (error) {
-      console.error(`Failed to toggle ${light} light:`, error);
+      console.error('Failed to set high fan speed:', error);
       return { success: false, error: error.message };
     }
   },
-
-  /**
-   * Set light brightness
-   * @param {string} light - The light to adjust
-   * @param {number} brightness - Brightness value (0-100)
-   * @returns {Promise} Promise that resolves when command is sent
-   */
-  setLightBrightness: async (light, brightness) => {
+  
+  setMediumFanSpeed: async () => {
     try {
-      // Example implementation - actual command would depend on your system
-      // This would need to be adapted to your specific CAN bus protocol
+      // Execute all three medium fan speed commands in sequence
+      const commands = [
+        '19FED99F#FF96AA0F6400D1FF',
+        '195FCE98#AA00640000000000',
+        '19FEF998#A110328A24AE19FF'
+      ];
       
-      // Convert 0-100 brightness to hex value (0-FF)
-      const hexBrightness = Math.floor((brightness / 100) * 255).toString(16).padStart(2, '0').toUpperCase();
-      
-      // Placeholder for a command that sets brightness
-      // Format would be specific to your system
-      const command = `19FEDB9F#04FFC801${hexBrightness}00FFFF`;
-      
-      const result = await RVControlService.executeRawCommand(command);
-      return { success: true, result };
+      for (const command of commands) {
+        await RVControlService.executeRawCommand(command);
+      }
+      return { success: true };
     } catch (error) {
-      console.error(`Failed to set ${light} brightness:`, error);
+      console.error('Failed to set medium fan speed:', error);
+      return { success: false, error: error.message };
+    }
+  },
+  
+  setLowFanSpeed: async () => {
+    try {
+      // Placeholder for low fan speed commands - these will need to be updated when available
+      console.log('Low fan speed commands not yet available');
+      
+      // Return success for now, but this is a placeholder
+      return { success: true, message: 'Low fan speed commands not yet implemented' };
+    } catch (error) {
+      console.error('Failed to set low fan speed:', error);
       return { success: false, error: error.message };
     }
   }

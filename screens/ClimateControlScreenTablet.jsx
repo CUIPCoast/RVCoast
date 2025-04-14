@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, Image, TouchableOpacity } from "react-native";
 
 import { Border, Color, Gap, FontSize, FontFamily, isDarkMode } from "../GlobalStyles";
@@ -8,18 +8,24 @@ import { Col, Row, Grid } from "react-native-easy-grid";
 import { RadialSlider } from 'react-native-radial-slider';
 import moment from 'moment';
 import { ClimateService } from '../API/RVControlServices.js';
+import { RVControlService } from "../API/rvAPI";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ClimateControlScreenTablet = () => {
   const [activeButtons, setActiveButtons] = useState([]); // State for active buttons
   const [speed, setSpeed] = useState(0);
-  const [isOn, setIsOn] = useState(false);
   const [isNightToggled, setIsNightToggled] = useState(false);
   const [isDehumidToggled, setIsDehumidToggled] = useState(false);
   const [isCoolToggled, setIsCoolToggled] = useState(false);
   const [isToekickToggled, setIsToekickToggled] = useState(false);
   const [isFurnaceToggled, setIsFurnaceToggled] = useState(false);
+  
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
+
+  // Temperature state with loading from AsyncStorage
+  const [temp, setTemp] = useState(72);
+  const [lastTemp, setLastTemp] = useState(72);
   
   var now = moment().format();
   var currentDate = moment().format("MMMM Do, YYYY");
@@ -28,9 +34,95 @@ const ClimateControlScreenTablet = () => {
   // Preload images
   const moonImage = require("../assets/moon.png");
   const sunImage = require("../assets/sun.png");
-  const features = ["Cool", "Toe Kick", "Furnace"];
+  
+  // Features with their corresponding fan speeds
+  const features = [
+    { label: "Cool", fanSpeed: "High" },
+    { label: "Toe Kick", fanSpeed: "Med" },
+    { label: "Furnace", fanSpeed: "Low" }
+  ];
 
   const isTablet = useScreenSize(); // Check if the screen is large enough to be considered a tablet
+
+  // Load saved temperature from AsyncStorage
+  useEffect(() => {
+    const getTemp = async () => {
+      const savedTemp = await AsyncStorage.getItem('temperature');
+      if (savedTemp) {
+        setTemp(parseInt(savedTemp, 10));
+        setLastTemp(parseInt(savedTemp, 10));
+      } else {
+        setTemp(72);
+        setLastTemp(72);
+      }
+    };
+    getTemp();
+  }, []);
+  
+  // Save temperature changes to AsyncStorage
+  useEffect(() => {
+    if (temp !== null) {
+      AsyncStorage.setItem('temperature', temp.toString());
+    }
+  }, [temp]);
+
+  // Handle temperature change from RadialSlider
+  const handleTempChange = (newTemp) => {
+    setTemp(newTemp);
+  };
+  
+  // Handle temperature API changes with debounce
+  useEffect(() => {
+    const sendTempChange = async () => {
+      if (temp === lastTemp || (!isCoolToggled && !isToekickToggled && !isFurnaceToggled)) return;
+      
+      try {
+        setIsLoading(true);
+        
+        // Determine if we need to increase or decrease temperature
+        if (temp > lastTemp) {
+          // Send temperature increase command based on the difference
+          const steps = temp - lastTemp;
+          for (let i = 0; i < steps; i++) {
+            await RVControlService.executeCommand('temp_increase');
+            // Short delay to avoid overwhelming the CAN bus
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+          console.log(`Temperature increased to ${temp}°F`);
+          
+          // Show success message
+          setErrorMessage(null);
+        } else {
+          // Send temperature decrease command based on the difference
+          const steps = lastTemp - temp;
+          for (let i = 0; i < steps; i++) {
+            await RVControlService.executeCommand('temp_decrease');
+            // Short delay to avoid overwhelming the CAN bus
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+          console.log(`Temperature decreased to ${temp}°F`);
+          
+          // Show success message
+          setErrorMessage(null);
+        }
+        
+        setLastTemp(temp);
+      } catch (error) {
+        console.error('Failed to change temperature:', error);
+        // Revert to last successful temperature
+        setTemp(lastTemp);
+        
+        // Show error message
+        setErrorMessage(`Failed to change temperature: ${error.message}`);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    // Debounce the temperature change to avoid too many API calls
+    const timeoutId = setTimeout(sendTempChange, 800);
+    return () => clearTimeout(timeoutId);
+  }, [temp, lastTemp, isCoolToggled, isToekickToggled, isFurnaceToggled]);
 
   // Night Setting Toggle - Using service
   const handleNightPress = async () => {
@@ -125,6 +217,44 @@ const ClimateControlScreenTablet = () => {
     }
   };
 
+  // Handle fan speed button press
+  const handleFanSpeedPress = async (speed) => {
+    setIsLoading(true);
+    try {
+      let result;
+      
+      switch (speed) {
+        case "Low":
+          result = await ClimateService.setLowFanSpeed();
+          // Show a warning message for low speed since it's not implemented yet
+          if (result.message) {
+            console.warn(result.message);
+          }
+          break;
+        case "Med":
+          result = await ClimateService.setMediumFanSpeed();
+          break;
+        case "High":
+          result = await ClimateService.setHighFanSpeed();
+          break;
+        default:
+          setErrorMessage(`Unknown fan speed: ${speed}`);
+          setIsLoading(false);
+          return;
+      }
+      
+      if (result && result.success) {
+        setErrorMessage(null);
+      } else if (result) {
+        setErrorMessage(`Error setting fan speed: ${result.error}`);
+      }
+    } catch (error) {
+      setErrorMessage(`Unexpected error: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // If the screen is a tablet, render the climate control interface
   if (isTablet) {
     return (
@@ -209,34 +339,28 @@ const ClimateControlScreenTablet = () => {
             />
             <View style={styles.container}>
               <RadialSlider
-                variant={"radial-circle-slider"}
-                value={speed}
-                unit={"º"}
-                unitStyle={{
-                  color: "#FFFFFF",
-                  fontSize: 24,
-                }}
-                subTitle={"Degrees"}
-                min={62}
-                max={78}
+                value={temp}
+                min={60}
+                max={85}
                 thumbColor={"#FFFFFF"}
                 thumbBorderColor={"#848482"}
                 sliderTrackColor={"#E5E5E5"}
-                linearGradient={[
-                  { offset: "0%", color: "#ffaca6" },
-                  { offset: "100%", color: "#FF8200" },
-                ]}
-                onChange={setSpeed}
-                subTitleStyle={{
-                  color: "#FFFFFF",
-                  fontSize: 24,
-                  fontWeight: "bold",
+                linearGradient={[ { offset: '0%', color:'#ffaca6' }, { offset: '100%', color: '#FF8200' }]}
+                onChange={handleTempChange}
+                subTitle={'Degrees'}
+                subTitleStyle={{ color: isDarkMode ? 'white' : 'black', paddingBottom: 25 }}
+                unitStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5 }}
+                valueStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5}}
+                style={{
+                  backgroundColor: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
                 }}
-                valueStyle={{
-                  color: "#FFFFFF",
-                  fontSize: 38,
-                  fontWeight: "bold",
+                buttonContainerStyle={{
+                  color:"FFFFFF",
                 }}
+                leftIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginRight: 10, top:20, height: 40, width: 50, paddingLeft: 4 }}
+                rightIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginLeft: 10, top:20, height: 40, width: 50, paddingLeft: 5 }}
+                isHideTailText={true}
+                unit={'°F'}
               />
             </View>
           </Col>
@@ -293,7 +417,7 @@ const ClimateControlScreenTablet = () => {
                   />
                   {/* Fixed: Stack the buttons vertically */}
                   <View style={{ flex: 1, justifyContent: "flex-start", alignItems: "flex-start" }}>
-                    {features.map((label, index) => (
+                    {features.map((feature, index) => (
                       <View
                         key={index}
                         style={{
@@ -306,11 +430,11 @@ const ClimateControlScreenTablet = () => {
                       >
                         {/* Feature Button */}
                         <TouchableOpacity
-                          onPress={() => handleButtonPress(label)}
+                          onPress={() => handleButtonPress(feature.label)}
                           style={{
                             flexDirection: "row",
                             alignItems: "center",
-                            backgroundColor: activeButtons.includes(label) ? "#444" : "#1B1B1B",
+                            backgroundColor: activeButtons.includes(feature.label) ? "#444" : "#1B1B1B",
                             borderRadius: 5,
                             paddingVertical: 10,
                             paddingHorizontal: 15,
@@ -318,7 +442,7 @@ const ClimateControlScreenTablet = () => {
                           }}
                         >
                           <Image
-                            source={getImageForLabel(label)}
+                            source={getImageForLabel(feature.label)}
                             style={{ width: 30, height: 30, marginRight: 5 }}
                           />
                           <Text
@@ -327,13 +451,20 @@ const ClimateControlScreenTablet = () => {
                               fontSize: 16,
                             }}
                           >
-                            {label}
+                            {feature.label}
                           </Text>
                         </TouchableOpacity>
 
-                        {/* Fixed: Using the ToggleButtons component with only necessary buttons */}
-                        {/*Fix this*/}
-                        {/* <ToggleButtons/> */}
+
+                        
+
+                        {/* Fan Speed Button for this row */}
+                        <FanSpeedButton 
+                          speed={feature.fanSpeed} 
+                          onPress={() => handleFanSpeedPress(feature.fanSpeed)} 
+                          isLoading={isLoading}
+                        />
+
                       </View>
                     ))}
                   </View>
@@ -409,24 +540,26 @@ const getImageForLabel = (label) => {
   return images[label] || require("../assets/questionmark.png");
 };
 
-// Fixed ToggleButtons component - removed the two unnecessary buttons 
-const ToggleButtons = () => {
-  const [activeButton, setActiveButton] = React.useState(null);
-  
-  // Fixed: Only four buttons total, no extra buttons
-  const buttons = ["High", "Med", "Low", "Auto"];
-  
-  const handleButtonPress = (buttonName) => {
-    if (activeButton === buttonName) {
-      // If already active, deactivate it
-      setActiveButton(null);
-    } else {
-      // Otherwise, make this button active
-      setActiveButton(buttonName);
+
+// Individual fan speed button component
+const FanSpeedButton = ({ speed, onPress, isLoading }) => {
+  // Set background color based on fan speed
+  const getBackgroundColor = () => {
+    switch (speed) {
+      case "High":
+        return "#100C08"; // Dark for High
+      case "Med":
+        return "#242124"; // Medium for Med
+      case "Low":
+        return "#848482"; // Light for Low
+      default:
+        return "#333";
+
     }
   };
-
+  
   return (
+
     <View style={styles.toggleButtonsContainer}>
       {buttons.map((buttonName) => (
         <TouchableOpacity
@@ -442,6 +575,23 @@ const ToggleButtons = () => {
         </TouchableOpacity>
       ))}
     </View>
+
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={isLoading}
+      style={{
+        padding: 10,
+        borderRadius: 5,
+        alignItems: "center",
+        justifyContent: "center",
+        width: 80,
+        backgroundColor: getBackgroundColor(),
+      }}
+      activeOpacity={0.7}
+    >
+      <Text style={{ color: "white", fontSize: 16 }}>{speed}</Text>
+    </TouchableOpacity>
+
   );
 };
 
@@ -457,6 +607,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     width: 80,
   },
+
   toggleButton: {
     padding: 8,
     backgroundColor: '#333',
@@ -472,6 +623,11 @@ const styles = StyleSheet.create({
   toggleButtonText: {
     color: 'white',
     fontSize: 14,
+
+  buttonText: {
+    color: "white",
+    fontSize: 16,
+
   },
   errorContainer: {
     backgroundColor: "rgba(255, 0, 0, 0.1)",

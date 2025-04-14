@@ -134,7 +134,7 @@ const AwningControlModal = ({ isVisible, onClose }) => {
             </View>
           )}
 
-          {/* Awning Control Buttons */}
+          {/* Awning Control Buttons - Now centered below image */}
           <View style={styles.controlButtonsContainer}>
             <Pressable
               style={[
@@ -173,7 +173,7 @@ const AwningControlModal = ({ isVisible, onClose }) => {
             </Pressable>
           </View>
           
-          {/* Operation Log */}
+          {/* Operation Log - Now moved below control buttons */}
           <View style={styles.logContainer}>
             <Text style={styles.logTitle}>Operation Log:</Text>
             <ScrollView style={styles.logScrollView}>
@@ -219,7 +219,8 @@ const styles = StyleSheet.create({
   tabletContent: {
     paddingLeft: 120,
     paddingRight: 120,
-    paddingBottom: 60,
+    paddingBottom: 30,
+    
     top: 30,
     backgroundColor: Color.colorGray_200,
     borderRadius: 20,
@@ -250,7 +251,7 @@ const styles = StyleSheet.create({
     width: 200,
     height: 200,
     resizeMode: "contain",
-    top: 60,
+    marginBottom: 30, // Increased for better spacing
   },
   modalText: {
     color: Color.white0,
@@ -275,7 +276,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     width: "100%",
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: 15, // Increased spacing
   },
   statusText: {
     color: "white",
@@ -283,9 +284,11 @@ const styles = StyleSheet.create({
   },
   controlButtonsContainer: {
     flexDirection: "row",
-    justifyContent: "space-around",
+    justifyContent: "center", // Changed from space-around to center
+    alignItems: "center",     // Added to ensure vertical centering
     width: "100%",
     marginVertical: 15,
+    right: 100,
   },
   actionButton: {
     paddingVertical: 12,
@@ -293,7 +296,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     minWidth: 100,
     alignItems: "center",
-    marginHorizontal: 5,
+    marginHorizontal: 8, // Increased from 5 to 8 for more spacing between buttons
     borderWidth: 2,
     borderColor: "transparent", // Default transparent border
   },
@@ -317,11 +320,12 @@ const styles = StyleSheet.create({
   },
   logContainer: {
     width: "100%",
-    height: 150,
+    height:10,
     backgroundColor: "rgba(0, 0, 0, 0.2)",
     borderRadius: 8,
     padding: 10,
-    marginVertical: 10,
+    marginTop: 5,   // Adjusted margin
+    marginBottom: 15, // Adjusted margin
   },
   logTitle: {
     color: "white",
@@ -362,11 +366,11 @@ const styles = StyleSheet.create({
   phoneButtonContainer: {
     width: "100%",
     paddingHorizontal: 20,
-    marginTop: 20,
+    marginTop: 5, // Reduced from 20 to better fit the layout
   },
   tabletButtonContainer: {
     width: "50%",
-    marginTop: 20,
+    marginTop: 10, // Reduced from 20
     left: 10,
   },
 });
