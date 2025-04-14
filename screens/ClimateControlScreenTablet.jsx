@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, Image, TouchableOpacity } from "react-native";
+import { StyleSheet, View, Text, Image, TouchableOpacity, TouchableWithoutFeedback, Keyboard } from "react-native";
 
 import { Border, Color, Gap, FontSize, FontFamily, isDarkMode } from "../GlobalStyles";
 import useScreenSize from "../helper/useScreenSize.jsx";
@@ -22,6 +22,14 @@ const ClimateControlScreenTablet = () => {
   
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
+  
+  // Status message for user feedback - added from AirCon
+  const [statusMessage, setStatusMessage] = useState('');
+  const [showStatus, setShowStatus] = useState(false);
+  
+  // Weather data state and error handling
+  const [weatherData, setWeatherData] = useState(null);
+  const [weatherError, setWeatherError] = useState(false);
 
   // Temperature state with loading from AsyncStorage
   const [temp, setTemp] = useState(72);
@@ -71,7 +79,77 @@ const ClimateControlScreenTablet = () => {
     setTemp(newTemp);
   };
   
-  // Handle temperature API changes with debounce
+  // Add a new useEffect for handling weather data
+  useEffect(() => {
+    const fetchWeatherData = async () => {
+      try {
+        // Reset weather error state
+        setWeatherError(false);
+        
+        // Check if any network connectivity is available
+        // This is just a simple check - you might need to use a more robust method like NetInfo
+        const checkNetworkBeforeRequest = async () => {
+          return new Promise((resolve) => {
+            // Use a timeout to simulate network check
+            setTimeout(() => resolve(true), 100);
+          });
+        };
+        
+        const isNetworkAvailable = await checkNetworkBeforeRequest();
+        if (!isNetworkAvailable) {
+          throw new Error('No network connection available');
+        }
+        
+        // Add a timeout to the API call to avoid hanging if network is unstable
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Request timeout')), 10000);
+        });
+        
+        // This should be replaced with your actual weather API call
+        // For example: const weatherResponse = await ClimateService.getWeatherData();
+        const weatherResponse = await Promise.race([
+          // Your actual weather API call would go here
+          // For now, using a placeholder promise that resolves successfully
+          new Promise(resolve => setTimeout(() => resolve({ success: true, data: { temp: 75 } }), 500)),
+          timeoutPromise
+        ]);
+        
+        if (weatherResponse && weatherResponse.success) {
+          setWeatherData(weatherResponse.data);
+        } else {
+          throw new Error('Failed to fetch weather data');
+        }
+      } catch (error) {
+        console.error('Error fetching weather data:', error);
+        setWeatherError(true);
+        
+        // Only show network error message if it's actually a network error
+        if (error.message.includes('Network') || error.name === 'AxiosError') {
+          setErrorMessage('Unable to connect to weather service. Using saved temperature settings.');
+          
+          // Show status message for network error
+          setStatusMessage('Network error: Using offline mode');
+          setShowStatus(true);
+          setTimeout(() => setShowStatus(false), 3000);
+        }
+      }
+    };
+    
+    // Call the function to fetch weather data
+    fetchWeatherData();
+    
+    // Set up a timer to retry fetching every 5 minutes if there was an error
+    let retryTimer;
+    if (weatherError) {
+      retryTimer = setTimeout(fetchWeatherData, 300000); // 5 minutes
+    }
+    
+    return () => {
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [weatherError]);
+
+  // Temperature change implementation from AirCon.jsx
   useEffect(() => {
     const sendTempChange = async () => {
       if (temp === lastTemp || (!isCoolToggled && !isToekickToggled && !isFurnaceToggled)) return;
@@ -90,8 +168,10 @@ const ClimateControlScreenTablet = () => {
           }
           console.log(`Temperature increased to ${temp}°F`);
           
-          // Show success message
-          setErrorMessage(null);
+          // Show status message
+          setStatusMessage(`Temperature set to ${temp}°F`);
+          setShowStatus(true);
+          setTimeout(() => setShowStatus(false), 2000);
         } else {
           // Send temperature decrease command based on the difference
           const steps = lastTemp - temp;
@@ -102,18 +182,51 @@ const ClimateControlScreenTablet = () => {
           }
           console.log(`Temperature decreased to ${temp}°F`);
           
-          // Show success message
-          setErrorMessage(null);
+          // Show status message
+          setStatusMessage(`Temperature set to ${temp}°F`);
+          setShowStatus(true);
+          setTimeout(() => setShowStatus(false), 2000);
         }
         
         setLastTemp(temp);
+        // Clear any error messages
+        setErrorMessage(null);
       } catch (error) {
         console.error('Failed to change temperature:', error);
         // Revert to last successful temperature
         setTemp(lastTemp);
         
-        // Show error message
-        setErrorMessage(`Failed to change temperature: ${error.message}`);
+        // Check if it's a network error
+        const isNetworkError = error.message.includes('Network') || 
+                              error.name === 'AxiosError' || 
+                              !navigator.onLine;
+                              
+        if (isNetworkError) {
+          // Show specific network error message
+          setStatusMessage('Network error: Temperature change stored locally');
+          setShowStatus(true);
+          setTimeout(() => setShowStatus(false), 3000);
+          
+          // Store the intended temperature change in AsyncStorage to sync later
+          try {
+            AsyncStorage.setItem('pendingTempChange', JSON.stringify({
+              targetTemp: temp,
+              timestamp: Date.now()
+            }));
+            
+            // Let the user know we've saved their preference
+            setErrorMessage('Network unavailable. Your temperature preference has been saved and will be applied when connection is restored.');
+          } catch (storageError) {
+            console.error('Failed to store pending temperature change:', storageError);
+          }
+        } else {
+          // Show generic error message for non-network errors
+          setStatusMessage('Failed to change temperature');
+          setShowStatus(true);
+          setTimeout(() => setShowStatus(false), 3000);
+          
+          setErrorMessage(`Failed to change temperature: ${error.message}`);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -124,6 +237,11 @@ const ClimateControlScreenTablet = () => {
     return () => clearTimeout(timeoutId);
   }, [temp, lastTemp, isCoolToggled, isToekickToggled, isFurnaceToggled]);
 
+  // Dismiss keyboard when tapping anywhere - Added from AirCon
+  const dismissKeyboard = () => {
+    Keyboard.dismiss();
+  };
+
   // Night Setting Toggle - Using service
   const handleNightPress = async () => {
     setIsLoading(true);
@@ -131,12 +249,28 @@ const ClimateControlScreenTablet = () => {
       const result = await ClimateService.setNightMode();
       if (result.success) {
         setIsNightToggled(!isNightToggled);
+        
+        // Add status message - from AirCon
+        setStatusMessage(`Night mode ${!isNightToggled ? 'enabled' : 'disabled'}`);
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+        
         setErrorMessage(null);
       } else {
         setErrorMessage(`Failed to set night mode: ${result.error}`);
+        
+        // Add status message - from AirCon
+        setStatusMessage('Failed to toggle night mode');
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
       }
     } catch (error) {
       setErrorMessage(`Error: ${error.message}`);
+      
+      // Add status message - from AirCon
+      setStatusMessage('Failed to toggle night mode');
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
     } finally {
       setIsLoading(false);
     }
@@ -149,18 +283,34 @@ const ClimateControlScreenTablet = () => {
       const result = await ClimateService.setDehumidifyMode();
       if (result.success) {
         setIsDehumidToggled(!isDehumidToggled);
+        
+        // Add status message - from AirCon
+        setStatusMessage(`Dehumidify mode ${!isDehumidToggled ? 'enabled' : 'disabled'}`);
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+        
         setErrorMessage(null);
       } else {
         setErrorMessage(`Failed to set dehumidify mode: ${result.error}`);
+        
+        // Add status message - from AirCon
+        setStatusMessage('Failed to toggle dehumidify mode');
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
       }
     } catch (error) {
       setErrorMessage(`Error: ${error.message}`);
+      
+      // Add status message - from AirCon
+      setStatusMessage('Failed to toggle dehumidify mode');
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Handle feature button press (Cool, Toe Kick, Furnace) - Using service
+  // Handle feature button press (Cool, Toe Kick, Furnace) with improved implementation from AirCon
   const handleButtonPress = async (label) => {
     setIsLoading(true);
     
@@ -176,6 +326,14 @@ const ClimateControlScreenTablet = () => {
           result = await ClimateService.toggleCooling();
           if (result.success) {
             setIsCoolToggled(!isCoolToggled);
+            
+            // Update AsyncStorage to match AirCon implementation
+            await AsyncStorage.setItem('coolingState', JSON.stringify(!isCoolToggled));
+            
+            // Add status message - from AirCon
+            setStatusMessage(`Cooling ${!isCoolToggled ? 'turned on' : 'turned off'}`);
+            setShowStatus(true);
+            setTimeout(() => setShowStatus(false), 3000);
           }
           break;
           
@@ -183,6 +341,14 @@ const ClimateControlScreenTablet = () => {
           result = await ClimateService.toggleToeKick();
           if (result.success) {
             setIsToekickToggled(!isToekickToggled);
+            
+            // Update AsyncStorage to match AirCon implementation
+            await AsyncStorage.setItem('toeKickState', JSON.stringify(!isToekickToggled));
+            
+            // Add status message - from AirCon
+            setStatusMessage(`Toe Kick ${!isToekickToggled ? 'turned on' : 'turned off'}`);
+            setShowStatus(true);
+            setTimeout(() => setShowStatus(false), 3000);
           }
           break;
           
@@ -190,6 +356,11 @@ const ClimateControlScreenTablet = () => {
           result = await ClimateService.toggleFurnace();
           if (result.success) {
             setIsFurnaceToggled(!isFurnaceToggled);
+            
+            // Add status message - from AirCon
+            setStatusMessage(`Furnace ${!isFurnaceToggled ? 'turned on' : 'turned off'}`);
+            setShowStatus(true);
+            setTimeout(() => setShowStatus(false), 3000);
           }
           break;
           
@@ -209,9 +380,19 @@ const ClimateControlScreenTablet = () => {
         setErrorMessage(null);
       } else if (result) {
         setErrorMessage(`Error: ${result.error}`);
+        
+        // Add status message - from AirCon
+        setStatusMessage(`Failed to toggle ${label}`);
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
       }
     } catch (error) {
       setErrorMessage(`Unexpected error: ${error.message}`);
+      
+      // Add status message - from AirCon
+      setStatusMessage(`Failed to toggle ${label}`);
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
     } finally {
       setIsLoading(false);
     }
@@ -245,232 +426,375 @@ const ClimateControlScreenTablet = () => {
       
       if (result && result.success) {
         setErrorMessage(null);
+        
+        // Add status message - from AirCon
+        setStatusMessage(`Fan speed set to ${speed}`);
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
       } else if (result) {
         setErrorMessage(`Error setting fan speed: ${result.error}`);
+        
+        // Add status message - from AirCon
+        setStatusMessage(`Failed to set fan speed to ${speed}`);
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
       }
     } catch (error) {
       setErrorMessage(`Unexpected error: ${error.message}`);
+      
+      // Add status message - from AirCon
+      setStatusMessage(`Failed to set fan speed to ${speed}`);
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Load saved states on component mount - taken from AirCon implementation
+  useEffect(() => {
+    const loadSavedStates = async () => {
+      try {
+        // Load cooling state
+        const savedCoolingState = await AsyncStorage.getItem('coolingState');
+        if (savedCoolingState !== null) {
+          const coolingState = JSON.parse(savedCoolingState);
+          setIsCoolToggled(coolingState);
+          
+          // Update active buttons if needed
+          if (coolingState && !activeButtons.includes("Cool")) {
+            setActiveButtons(prev => [...prev, "Cool"]);
+          }
+        }
+        
+        // Load toe kick state
+        const savedToeKickState = await AsyncStorage.getItem('toeKickState');
+        if (savedToeKickState !== null) {
+          const toeKickState = JSON.parse(savedToeKickState);
+          setIsToekickToggled(toeKickState);
+          
+          // Update active buttons if needed
+          if (toeKickState && !activeButtons.includes("Toe Kick")) {
+            setActiveButtons(prev => [...prev, "Toe Kick"]);
+          }
+        }
+        
+        // Load night mode and dehumidify states if they exist
+        const savedNightMode = await AsyncStorage.getItem('nightMode');
+        if (savedNightMode !== null) {
+          setIsNightToggled(JSON.parse(savedNightMode));
+        }
+        
+        const savedDehumidMode = await AsyncStorage.getItem('dehumidMode');
+        if (savedDehumidMode !== null) {
+          setIsDehumidToggled(JSON.parse(savedDehumidMode));
+        }
+      } catch (error) {
+        console.error('Error loading saved states:', error);
+      }
+    };
+    
+    loadSavedStates();
+  }, []);
+
+  // Add useEffect to check for and apply pending temperature changes
+  useEffect(() => {
+    const checkPendingChanges = async () => {
+      try {
+        // Skip if we're currently loading or if there's no active climate control
+        if (isLoading || (!isCoolToggled && !isToekickToggled && !isFurnaceToggled)) return;
+        
+        // Check for pending temperature changes
+        const pendingChangesString = await AsyncStorage.getItem('pendingTempChange');
+        
+        if (pendingChangesString) {
+          const pendingChanges = JSON.parse(pendingChangesString);
+          const pendingTemp = pendingChanges.targetTemp;
+          const timestamp = pendingChanges.timestamp;
+          
+          // Only apply changes that are less than 24 hours old
+          const isRecent = (Date.now() - timestamp) < 24 * 60 * 60 * 1000;
+          
+          if (isRecent && pendingTemp !== temp) {
+            // Show user we're applying their saved preference
+            setStatusMessage('Applying saved temperature setting...');
+            setShowStatus(true);
+            
+            // Update UI temperature immediately
+            setTemp(pendingTemp);
+            
+            // Clear the pending change since we're applying it now
+            await AsyncStorage.removeItem('pendingTempChange');
+            
+            setTimeout(() => setShowStatus(false), 3000);
+          } else if (!isRecent) {
+            // Clear old pending changes
+            await AsyncStorage.removeItem('pendingTempChange');
+          }
+        }
+      } catch (error) {
+        console.error('Error checking pending temperature changes:', error);
+      }
+    };
+    
+    // Run on mount and when climate control mode changes
+    checkPendingChanges();
+  }, [isCoolToggled, isToekickToggled, isFurnaceToggled, isLoading]);
+
+  // Function to check if network is available - can be called before API requests
+  const isNetworkAvailable = async () => {
+    // This is a simplified check - in a real app, you would use NetInfo or similar
+    return new Promise((resolve) => {
+      // Simple check - if we can get a response in reasonable time
+      const fetchTimeout = setTimeout(() => resolve(false), 3000);
+      
+      fetch('https://www.google.com', { method: 'HEAD', mode: 'no-cors' })
+        .then(() => {
+          clearTimeout(fetchTimeout);
+          resolve(true);
+        })
+        .catch(() => {
+          clearTimeout(fetchTimeout);
+          resolve(false);
+        });
+    });
+  };
+
   // If the screen is a tablet, render the climate control interface
   if (isTablet) {
     return (
-      <Grid className="bg-black">
-        <Row size={10}>
-          <Row className="bg-black" size={9}>
-            <Col className="m-1 ml-3">
-              <Text className="text-3xl text-white">{DayOfTheWeek}</Text>
-              <Text className="text-lg text-white">{currentDate}</Text>
-            </Col>
+      <TouchableWithoutFeedback onPress={dismissKeyboard}>
+        <Grid className="bg-black">
+          <Row size={10}>
+            <Row className="bg-black" size={9}>
+              <Col className="m-1 ml-3">
+                <Text className="text-3xl text-white">{DayOfTheWeek}</Text>
+                <Text className="text-lg text-white">{currentDate}</Text>
+              </Col>
+            </Row>
+            <Row className="bg-black" size={1}>
+              <View className="pt-3 pl-3">
+                <Image
+                  source={require("../assets/images/icon.png")}
+                  style={{
+                    width: 70,
+                    height: 45,
+                    right: 0,
+                    paddingTop: 10,
+                    backgroundColor: "white"
+                  }}
+                />
+              </View>
+            </Row>
           </Row>
-          <Row className="bg-black" size={1}>
-            <View className="pt-3 pl-3">
-              <Image
-                source={require("../assets/images/icon.png")}
-                style={{
-                  width: 70,
-                  height: 45,
-                  right: 0,
-                  paddingTop: 10,
-                  backgroundColor: "white"
-                }}
-              />
+
+          {/* Weather error indicator */}
+          {weatherError && (
+            <View style={styles.weatherErrorIndicator}>
+              <Text style={styles.weatherErrorText}>Offline Mode</Text>
             </View>
-          </Row>
-        </Row>
+          )}
 
-        {/* Error message display */}
-        {errorMessage && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{errorMessage}</Text>
-          </View>
-        )}
-
-        {/* Loading indicator */}
-        {isLoading && (
-          <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>Processing command...</Text>
-          </View>
-        )}
-
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "center",
-            alignItems: "center",
-            marginHorizontal: 20,
-            flexWrap: "wrap",
-            right: 40,
-          }}
-        >
-          <Col
-            style={{
-              width: "30%",
-              height: 380,
-              backgroundColor: "#1B1B1B",
-              borderRadius: 10,
-              justifyContent: "flex-start",
-              padding: 20,
-              margin: 50,
-            }}
-          >
-            <Text
-              style={{
-                color: "white",
-                fontSize: 16,
-                position: "absolute",
-                top: 20,
-                left: 10,
-              }}
-            >
-              Main (Front)
-            </Text>
-            {/* Divider */}
-            <View
-              style={{
-                height: 1,
-                backgroundColor: "white",
-                width: "100%",
-                marginTop: 50,
-              }}
-            />
-            <View style={styles.container}>
-              <RadialSlider
-                value={temp}
-                min={60}
-                max={85}
-                thumbColor={"#FFFFFF"}
-                thumbBorderColor={"#848482"}
-                sliderTrackColor={"#E5E5E5"}
-                linearGradient={[ { offset: '0%', color:'#ffaca6' }, { offset: '100%', color: '#FF8200' }]}
-                onChange={handleTempChange}
-                subTitle={'Degrees'}
-                subTitleStyle={{ color: isDarkMode ? 'white' : 'black', paddingBottom: 25 }}
-                unitStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5 }}
-                valueStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5}}
-                style={{
-                  backgroundColor: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
-                }}
-                buttonContainerStyle={{
-                  color:"FFFFFF",
-                }}
-                leftIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginRight: 10, top:20, height: 40, width: 50, paddingLeft: 4 }}
-                rightIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginLeft: 10, top:20, height: 40, width: 50, paddingLeft: 5 }}
-                isHideTailText={true}
-                unit={'°F'}
-              />
+          {/* Error message display */}
+          {errorMessage && (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{errorMessage}</Text>
+              {/* Add dismiss button for errors */}
+              <TouchableOpacity 
+                style={styles.dismissButton}
+                onPress={() => setErrorMessage(null)}
+              >
+                <Text style={styles.dismissButtonText}>Dismiss</Text>
+              </TouchableOpacity>
             </View>
-          </Col>
+          )}
+
+          {/* Loading indicator */}
+          {isLoading && (
+            <View style={styles.loadingContainer}>
+              <Text style={styles.loadingText}>Processing command...</Text>
+            </View>
+          )}
+          
+          {/* Status message - Added from AirCon */}
+          {showStatus && (
+            <View style={styles.statusContainer}>
+              <Text style={styles.statusText}>{statusMessage}</Text>
+            </View>
+          )}
+
           <View
             style={{
               flexDirection: "row",
               justifyContent: "center",
-              alignItems: "flex-start",
+              alignItems: "center",
               marginHorizontal: 20,
               flexWrap: "wrap",
+              right: 40,
             }}
           >
-            {/* Truma Logo and Auxiliary Box */}
-            <View style={{ width: "50%", height: "100px", alignItems: "center" }}>
-              <Image
-                source={require("../assets/truma-logo-333-100.png")}
-                className="h-30 w-30 left-3"
-                style={{ resizeMode: "contain", marginBottom: 20 }}
+            <Col
+              style={{
+                width: "30%",
+                height: 380,
+                backgroundColor: "#1B1B1B",
+                borderRadius: 10,
+                justifyContent: "flex-start",
+                padding: 20,
+                margin: 50,
+              }}
+            >
+              <Text
+                style={{
+                  color: "white",
+                  fontSize: 16,
+                  position: "absolute",
+                  top: 20,
+                  left: 10,
+                }}
+              >
+                Main (Front)
+              </Text>
+              {/* Divider */}
+              <View
+                style={{
+                  height: 1,
+                  backgroundColor: "white",
+                  width: "100%",
+                  marginTop: 50,
+                }}
               />
-
-              <View style={{ flexDirection: "row", alignItems: "flex-start", marginTop: 10 }}>
-                {/* Auxiliary Box */}
-                <Col
+              <View style={styles.container}>
+                <RadialSlider
+                  value={temp}
+                  min={60}
+                  max={85}
+                  thumbColor={"#FFFFFF"}
+                  thumbBorderColor={"#848482"}
+                  sliderTrackColor={"#E5E5E5"}
+                  linearGradient={[ { offset: '0%', color:'#ffaca6' }, { offset: '100%', color: '#FF8200' }]}
+                  onChange={handleTempChange}
+                  subTitle={'Degrees'}
+                  subTitleStyle={{ color: isDarkMode ? 'white' : 'black', paddingBottom: 25 }}
+                  unitStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5 }}
+                  valueStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5}}
                   style={{
-                    width: 380,
-                    height: 270,
-                    backgroundColor: "#1B1B1B",
-                    borderRadius: 10,
-                    justifyContent: "flex-start",
-                    padding: 20,
-                    margin: 25,
-                    right: 80,
-                    bottom: 10,
+                    backgroundColor: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
                   }}
-                >
-                  <Text
+                  buttonContainerStyle={{
+                    color:"FFFFFF",
+                  }}
+                  leftIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginRight: 10, top:20, height: 40, width: 50, paddingLeft: 4 }}
+                  rightIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginLeft: 10, top:20, height: 40, width: 50, paddingLeft: 5 }}
+                  isHideTailText={true}
+                  unit={'°F'}
+                />
+              </View>
+            </Col>
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "center",
+                alignItems: "flex-start",
+                marginHorizontal: 20,
+                flexWrap: "wrap",
+              }}
+            >
+              {/* Truma Logo and Auxiliary Box */}
+              <View style={{ width: "50%", height: "100px", alignItems: "center" }}>
+                <Image
+                  source={require("../assets/truma-logo-333-100.png")}
+                  className="h-30 w-30 left-3"
+                  style={{ resizeMode: "contain", marginBottom: 20 }}
+                />
+
+                <View style={{ flexDirection: "row", alignItems: "flex-start", marginTop: 10 }}>
+                  {/* Auxiliary Box */}
+                  <Col
                     style={{
-                      color: "white",
-                      fontSize: 16,
-                      position: "absolute",
-                      top: 20,
-                      left: 10,
+                      width: 380,
+                      height: 270,
+                      backgroundColor: "#1B1B1B",
+                      borderRadius: 10,
+                      justifyContent: "flex-start",
+                      padding: 20,
+                      margin: 25,
+                      right: 80,
+                      bottom: 10,
                     }}
                   >
-                    Auxiliary (Back)
-                  </Text>
-                  <View
-                    style={{
-                      height: 1,
-                      backgroundColor: "white",
-                      width: "100%",
-                      marginTop: 40,
-                    }}
-                  />
-                  {/* Fixed: Stack the buttons vertically */}
-                  <View style={{ flex: 1, justifyContent: "flex-start", alignItems: "flex-start" }}>
-                    {features.map((feature, index) => (
-                      <View
-                        key={index}
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          marginVertical: 10,
-                          width: "100%",
-                        }}
-                      >
-                        {/* Feature Button */}
-                        <TouchableOpacity
-                          onPress={() => handleButtonPress(feature.label)}
+                    <Text
+                      style={{
+                        color: "white",
+                        fontSize: 16,
+                        position: "absolute",
+                        top: 20,
+                        left: 10,
+                      }}
+                    >
+                      Auxiliary (Back)
+                    </Text>
+                    <View
+                      style={{
+                        height: 1,
+                        backgroundColor: "white",
+                        width: "100%",
+                        marginTop: 40,
+                      }}
+                    />
+                    {/* Fixed: Stack the buttons vertically */}
+                    <View style={{ flex: 1, justifyContent: "flex-start", alignItems: "flex-start" }}>
+                      {features.map((feature, index) => (
+                        <View
+                          key={index}
                           style={{
                             flexDirection: "row",
                             alignItems: "center",
-                            backgroundColor: activeButtons.includes(feature.label) ? "#444" : "#1B1B1B",
-                            borderRadius: 5,
-                            paddingVertical: 10,
-                            paddingHorizontal: 15,
-                            width: 220,
+                            justifyContent: "space-between",
+                            marginVertical: 10,
+                            width: "100%",
                           }}
                         >
-                          <Image
-                            source={getImageForLabel(feature.label)}
-                            style={{ width: 30, height: 30, marginRight: 5 }}
-                          />
-                          <Text
+                          {/* Feature Button */}
+                          <TouchableOpacity
+                            onPress={() => handleButtonPress(feature.label)}
                             style={{
-                              color: "white",
-                              fontSize: 16,
+                              flexDirection: "row",
+                              alignItems: "center",
+                              backgroundColor: activeButtons.includes(feature.label) ? "#444" : "#1B1B1B",
+                              borderRadius: 5,
+                              paddingVertical: 10,
+                              paddingHorizontal: 15,
+                              width: 220,
                             }}
                           >
-                            {feature.label}
-                          </Text>
-                        </TouchableOpacity>
+                            <Image
+                              source={getImageForLabel(feature.label)}
+                              style={{ width: 30, height: 30, marginRight: 5 }}
+                            />
+                            <Text
+                              style={{
+                                color: "white",
+                                fontSize: 16,
+                              }}
+                            >
+                              {feature.label}
+                            </Text>
+                          </TouchableOpacity>
 
+                          {/* Fan Speed Button for this row */}
+                          <FanSpeedButton 
+                            speed={feature.fanSpeed} 
+                            onPress={() => handleFanSpeedPress(feature.fanSpeed)} 
+                            isLoading={isLoading}
+                          />
 
-                        
-
-                        {/* Fan Speed Button for this row */}
-                        <FanSpeedButton 
-                          speed={feature.fanSpeed} 
-                          onPress={() => handleFanSpeedPress(feature.fanSpeed)} 
-                          isLoading={isLoading}
-                        />
-
-                      </View>
-                    ))}
-                  </View>
-                </Col>
-                {/* Night/Dehumid Buttons */}
-                <View
+                        </View>
+                      ))}
+                    </View>
+                  </Col>
+                  {/* Night/Dehumid Buttons */}
+                  <View
                   style={{
                     flex: 1,
                     justifyContent: "space-evenly",
@@ -521,11 +845,12 @@ const ClimateControlScreenTablet = () => {
                     <Text style={{ color: "white", fontSize: 16 }}>Dehumid</Text>
                   </TouchableOpacity>
                 </View>
+                </View>
               </View>
             </View>
           </View>
-        </View>
-      </Grid>
+        </Grid>
+      </TouchableWithoutFeedback>
     );
   }
   return null; // Return null if not tablet
@@ -540,7 +865,6 @@ const getImageForLabel = (label) => {
   return images[label] || require("../assets/questionmark.png");
 };
 
-
 // Individual fan speed button component
 const FanSpeedButton = ({ speed, onPress, isLoading }) => {
   // Set background color based on fan speed
@@ -554,28 +878,11 @@ const FanSpeedButton = ({ speed, onPress, isLoading }) => {
         return "#848482"; // Light for Low
       default:
         return "#333";
-
     }
   };
   
+  // FIX: Removed the extra view and wrapped everything in a single TouchableOpacity
   return (
-
-    <View style={styles.toggleButtonsContainer}>
-      {buttons.map((buttonName) => (
-        <TouchableOpacity
-          key={buttonName}
-          onPress={() => handleButtonPress(buttonName)}
-          style={[
-            styles.toggleButton,
-            activeButton === buttonName ? styles.activeToggleButton : null
-          ]}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.toggleButtonText}>{buttonName}</Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-
     <TouchableOpacity
       onPress={onPress}
       disabled={isLoading}
@@ -591,7 +898,6 @@ const FanSpeedButton = ({ speed, onPress, isLoading }) => {
     >
       <Text style={{ color: "white", fontSize: 16 }}>{speed}</Text>
     </TouchableOpacity>
-
   );
 };
 
@@ -607,7 +913,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     width: 80,
   },
-
   toggleButton: {
     padding: 8,
     backgroundColor: '#333',
@@ -623,23 +928,37 @@ const styles = StyleSheet.create({
   toggleButtonText: {
     color: 'white',
     fontSize: 14,
-
+  },
   buttonText: {
     color: "white",
     fontSize: 16,
-
   },
   errorContainer: {
     backgroundColor: "rgba(255, 0, 0, 0.1)",
-    padding: 10,
+    padding: 15,
     margin: 10,
     borderRadius: 5,
     borderWidth: 1,
     borderColor: "red",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    zIndex: 1000,
   },
   errorText: {
     color: "white",
-    textAlign: "center",
+    textAlign: "left",
+    flex: 1,
+  },
+  dismissButton: {
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    padding: 5,
+    borderRadius: 3,
+    marginLeft: 10,
+  },
+  dismissButtonText: {
+    color: "white",
+    fontSize: 12,
   },
   loadingContainer: {
     position: "absolute",
@@ -654,6 +973,50 @@ const styles = StyleSheet.create({
   loadingText: {
     color: "white",
     fontSize: 16,
+  },
+  // Added status container style from AirCon
+  statusContainer: {
+    position: "absolute",
+    bottom: 100,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 5,
+    alignSelf: "center",
+    zIndex: 1000,
+  },
+  statusText: {
+    color: "white",
+    fontWeight: "bold",
+  },
+  // New styles for weather error indicator
+  weatherErrorIndicator: {
+    position: "absolute",
+    top: 10,
+    right: 85,
+    backgroundColor: "rgba(255, 165, 0, 0.8)",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 15,
+    zIndex: 1000,
+  },
+  weatherErrorText: {
+    color: "white",
+    fontSize: 12,
+    fontWeight: "bold",
+  },
+  // Retry button styles
+  retryButton: {
+    backgroundColor: "#FFB267",
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 5,
+    marginTop: 10,
+    alignSelf: "center",
+  },
+  retryButtonText: {
+    color: "white",
+    fontWeight: "bold",
   }
 });
 
