@@ -415,6 +415,7 @@ const ClimateControlScreenTablet = () => {
                       marginTop: 40,
                     }}
                   />
+                  {/* Fixed: Stack the buttons vertically */}
                   <View style={{ flex: 1, justifyContent: "flex-start", alignItems: "flex-start" }}>
                     {features.map((feature, index) => (
                       <View
@@ -454,17 +455,21 @@ const ClimateControlScreenTablet = () => {
                           </Text>
                         </TouchableOpacity>
 
+
+                        
+
                         {/* Fan Speed Button for this row */}
                         <FanSpeedButton 
                           speed={feature.fanSpeed} 
                           onPress={() => handleFanSpeedPress(feature.fanSpeed)} 
                           isLoading={isLoading}
                         />
+
                       </View>
                     ))}
                   </View>
                 </Col>
-                {/* Buttons next to Auxiliary Box */}
+                {/* Night/Dehumid Buttons */}
                 <View
                   style={{
                     flex: 1,
@@ -535,6 +540,7 @@ const getImageForLabel = (label) => {
   return images[label] || require("../assets/questionmark.png");
 };
 
+
 // Individual fan speed button component
 const FanSpeedButton = ({ speed, onPress, isLoading }) => {
   // Set background color based on fan speed
@@ -548,10 +554,28 @@ const FanSpeedButton = ({ speed, onPress, isLoading }) => {
         return "#848482"; // Light for Low
       default:
         return "#333";
+
     }
   };
   
   return (
+
+    <View style={styles.toggleButtonsContainer}>
+      {buttons.map((buttonName) => (
+        <TouchableOpacity
+          key={buttonName}
+          onPress={() => handleButtonPress(buttonName)}
+          style={[
+            styles.toggleButton,
+            activeButton === buttonName ? styles.activeToggleButton : null
+          ]}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.toggleButtonText}>{buttonName}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+
     <TouchableOpacity
       onPress={onPress}
       disabled={isLoading}
@@ -567,6 +591,7 @@ const FanSpeedButton = ({ speed, onPress, isLoading }) => {
     >
       <Text style={{ color: "white", fontSize: 16 }}>{speed}</Text>
     </TouchableOpacity>
+
   );
 };
 
@@ -576,17 +601,33 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  button: {
-    padding: 10,
-    backgroundColor: "#333",
-    borderRadius: 5,
-    alignItems: "center",
-    justifyContent: "center",
+  // Styles for the toggle buttons
+  toggleButtonsContainer: {
+    flexDirection: 'column',
+    justifyContent: 'space-between',
     width: 80,
   },
+
+  toggleButton: {
+    padding: 8,
+    backgroundColor: '#333',
+    borderRadius: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 2,
+    width: 80,
+  },
+  activeToggleButton: {
+    backgroundColor: '#FF8200',
+  },
+  toggleButtonText: {
+    color: 'white',
+    fontSize: 14,
+
   buttonText: {
     color: "white",
     fontSize: 16,
+
   },
   errorContainer: {
     backgroundColor: "rgba(255, 0, 0, 0.1)",
