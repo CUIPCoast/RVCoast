@@ -8,7 +8,7 @@ import ToggleSwitch from "../components/ToggleSwitch.jsx";
 import moment from 'moment'; 
 
 
-import LightControl from '../TestingAPI/LightControl.jsx';
+
 
 
 const Settings = () => {
