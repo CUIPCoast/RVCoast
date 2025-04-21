@@ -1,208 +1,186 @@
-import React, { useState } from "react";
-import { StyleSheet, View, Text, Modal, Pressable, Button, Image, ActivityIndicator, ScrollView } from "react-native";
-import { Color } from "../GlobalStyles";
-import useScreenSize from "../helper/useScreenSize";
-import { AwningService } from "../API/RVControlServices"; // Import the service instead of the API
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, Text, Modal, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Color } from '../GlobalStyles';
+import { AwningService } from '../API/RVControlServices';
 
+/**
+ * Modal for controlling the RV's awning
+ * 
+ * @param {Object} props Component props
+ * @param {boolean} props.isVisible Controls whether the modal is visible
+ * @param {Function} props.onClose Callback when modal is closed
+ */
 const AwningControlModal = ({ isVisible, onClose }) => {
-  const isTablet = useScreenSize();
-  const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState(null);
-  const [operationLog, setOperationLog] = useState([]);
-  const [activeButton, setActiveButton] = useState(null); // 'extend', 'retract', 'stop', or null
+  const [isLoading, setIsLoading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
+  const [showStatus, setShowStatus] = useState(false);
+  const [isExtending, setIsExtending] = useState(false);
+  const [isRetracting, setIsRetracting] = useState(false);
 
-  // Log operations with timestamps
-  const logOperation = (message) => {
-    const timestamp = new Date().toLocaleTimeString();
-    const logEntry = `${timestamp}: ${message}`;
-    console.log(logEntry); // Console log for debugging
-    setOperationLog(prev => [logEntry, ...prev.slice(0, 9)]); // Keep last 10 entries
-  };
-
-  // Handler functions for each awning action using the service layer
+  // Handle extending the awning
   const handleExtend = async () => {
-    setStatus('Extending awning...');
-    setActiveButton('extend'); // Set this button as active
-    setLoading(true);
+    setIsLoading(true);
+    setIsExtending(true);
+    setIsRetracting(false);
     
     try {
-      logOperation('Sending command to extend awning');
       const result = await AwningService.extendAwning();
       
       if (result.success) {
-        logOperation('Awning extend command executed successfully');
-        setStatus('Awning extending');
+        setStatusMessage('Awning extending...');
       } else {
-        logOperation(`Error executing extend command: ${result.error}`);
-        setStatus(`Error: ${result.error}`);
-        setActiveButton(null);
+        setStatusMessage('Failed to extend awning');
       }
+      
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
     } catch (error) {
-      logOperation(`Unexpected error: ${error.message}`);
-      setStatus(`Error: ${error.message}`);
-      setActiveButton(null);
+      console.error('Error extending awning:', error);
+      setStatusMessage('Error: ' + error.message);
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
     } finally {
-      setLoading(false);
-      // Clear status after 3 seconds
-      setTimeout(() => setStatus(null), 3000);
+      setIsLoading(false);
     }
   };
 
+  // Handle retracting the awning
   const handleRetract = async () => {
-    setStatus('Retracting awning...');
-    setActiveButton('retract'); // Set this button as active
-    setLoading(true);
+    setIsLoading(true);
+    setIsRetracting(true);
+    setIsExtending(false);
     
     try {
-      logOperation('Sending command to retract awning');
       const result = await AwningService.retractAwning();
       
       if (result.success) {
-        logOperation('Awning retract command executed successfully');
-        setStatus('Awning retracting');
+        setStatusMessage('Awning retracting...');
       } else {
-        logOperation(`Error executing retract command: ${result.error}`);
-        setStatus(`Error: ${result.error}`);
-        setActiveButton(null);
+        setStatusMessage('Failed to retract awning');
       }
+      
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
     } catch (error) {
-      logOperation(`Unexpected error: ${error.message}`);
-      setStatus(`Error: ${error.message}`);
-      setActiveButton(null);
+      console.error('Error retracting awning:', error);
+      setStatusMessage('Error: ' + error.message);
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
     } finally {
-      setLoading(false);
-      // Clear status after 3 seconds
-      setTimeout(() => setStatus(null), 3000);
+      setIsLoading(false);
     }
   };
 
+  // Handle stopping the awning
   const handleStop = async () => {
-    setStatus('Stopping awning...');
-    setActiveButton('stop'); // Set this button as active
-    setLoading(true);
+    setIsLoading(true);
     
     try {
-      logOperation('Sending command to stop awning');
       const result = await AwningService.stopAwning();
       
       if (result.success) {
-        logOperation('Awning stop command executed successfully');
-        setStatus('Awning stopped');
+        setStatusMessage('Awning stopped');
+        setIsExtending(false);
+        setIsRetracting(false);
       } else {
-        logOperation(`Error executing stop command: ${result.error}`);
-        setStatus(`Error: ${result.error}`);
-        setActiveButton(null);
+        setStatusMessage('Failed to stop awning');
       }
+      
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
     } catch (error) {
-      logOperation(`Unexpected error: ${error.message}`);
-      setStatus(`Error: ${error.message}`);
-      setActiveButton(null);
+      console.error('Error stopping awning:', error);
+      setStatusMessage('Error: ' + error.message);
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
     } finally {
-      setLoading(false);
-      // Clear status after 3 seconds
-      setTimeout(() => setStatus(null), 3000);
+      setIsLoading(false);
     }
   };
 
-  return (
-    <Modal visible={isVisible} transparent={true} animationType="slide">
-      <View style={styles.modalContainer}>
-        <View
-          style={[
-            isTablet ? styles.tabletContent : styles.modalContent,
-            isTablet ? styles.tabletModalContent : styles.phoneModalContent,
-          ]}
-        >
-          <Text
-            style={[
-              styles.modalText,
-              isTablet ? styles.tabletModalText : styles.phoneModalText,
-            ]}
-          >
-            Awning Control Settings
-          </Text>
-          
-          <Image
-            style={isTablet ? styles.tabletModalImage : styles.phoneModalImage}
-            source={require("../assets/abpost61724photoroom-3.png")}
-          />
-          
-          {/* Status indicator */}
-          {status && (
-            <View style={styles.statusContainer}>
-              <Text style={styles.statusText}>{status}</Text>
-            </View>
-          )}
+  // Reset state when modal closes
+  useEffect(() => {
+    if (!isVisible) {
+      setIsExtending(false);
+      setIsRetracting(false);
+      setShowStatus(false);
+    }
+  }, [isVisible]);
 
-          {/* Awning Control Buttons - Now centered below image */}
-          <View style={styles.controlButtonsContainer}>
-            <Pressable
+  return (
+    <Modal
+      visible={isVisible}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalContainer}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Awning Control</Text>
+
+          {/* Control Buttons */}
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
               style={[
-                styles.actionButton, 
-                styles.extendButton,
-                activeButton === 'extend' && styles.activeButton
+                styles.actionButton,
+                isExtending ? styles.activeButton : null,
+                isLoading ? styles.disabledButton : null
               ]}
               onPress={handleExtend}
-              disabled={loading}
+              disabled={isLoading}
             >
               <Text style={styles.buttonText}>Extend</Text>
-            </Pressable>
-            
-            <Pressable
+            </TouchableOpacity>
+
+            <TouchableOpacity
               style={[
-                styles.actionButton, 
+                styles.actionButton,
                 styles.stopButton,
-                activeButton === 'stop' && styles.activeButton
+                isLoading ? styles.disabledButton : null
               ]}
               onPress={handleStop}
-              disabled={loading}
+              disabled={isLoading}
             >
               <Text style={styles.buttonText}>Stop</Text>
-            </Pressable>
-            
-            <Pressable
+            </TouchableOpacity>
+
+            <TouchableOpacity
               style={[
-                styles.actionButton, 
-                styles.retractButton,
-                activeButton === 'retract' && styles.activeButton
+                styles.actionButton,
+                isRetracting ? styles.activeButton : null,
+                isLoading ? styles.disabledButton : null
               ]}
               onPress={handleRetract}
-              disabled={loading}
+              disabled={isLoading}
             >
               <Text style={styles.buttonText}>Retract</Text>
-            </Pressable>
+            </TouchableOpacity>
           </View>
-          
-          {/* Operation Log - Now moved below control buttons */}
-          <View style={styles.logContainer}>
-            <Text style={styles.logTitle}>Operation Log:</Text>
-            <ScrollView style={styles.logScrollView}>
-              {operationLog.map((entry, index) => (
-                <Text key={index} style={styles.logEntry}>{entry}</Text>
-              ))}
-              {operationLog.length === 0 && (
-                <Text style={styles.emptyLogMessage}>No operations logged yet</Text>
-              )}
-            </ScrollView>
-          </View>
-          
-          {/* Loading indicator */}
-          {loading && (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#ffffff" />
-              <Text style={styles.loadingText}>Sending command...</Text>
+
+          {/* Loading Indicator */}
+          {isLoading && (
+            <ActivityIndicator 
+              size="large" 
+              color="#FF8200" 
+              style={styles.loadingIndicator} 
+            />
+          )}
+
+          {/* Status Message */}
+          {showStatus && (
+            <View style={styles.statusContainer}>
+              <Text style={styles.statusText}>{statusMessage}</Text>
             </View>
           )}
 
-          <View
-            style={
-              isTablet
-                ? styles.tabletButtonContainer
-                : styles.phoneButtonContainer
-            }
+          {/* Close Button */}
+          <TouchableOpacity 
+            style={styles.closeButton}
+            onPress={onClose}
+            disabled={isLoading}
           >
-            <Button title="Close" onPress={onClose} color="gray" />
-          </View>
+            <Text style={styles.closeButtonText}>Close</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </Modal>
@@ -212,167 +190,78 @@ const AwningControlModal = ({ isVisible, onClose }) => {
 const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  tabletContent: {
-    paddingLeft: 120,
-    paddingRight: 120,
-    paddingBottom: 30,
-    
-    top: 30,
-    backgroundColor: Color.colorGray_200,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
-    width: "90%",
-    padding: 20,
+    width: '90%',
+    maxWidth: 500,
     backgroundColor: Color.colorGray_200,
     borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "space-between",
+    padding: 25,
+    alignItems: 'center',
   },
-  tabletModalContent: {
-    top: 30,
-  },
-  phoneModalContent: {
-    height: "80%", 
-  },
-  phoneModalImage: {
-    width: 200,
-    height: 200,
-    resizeMode: "contain",
-    marginBottom: 20,
-  },
-  tabletModalImage: {
-    width: 200,
-    height: 200,
-    resizeMode: "contain",
-    marginBottom: 30, // Increased for better spacing
-  },
-  modalText: {
-    color: Color.white0,
-    fontSize: 18,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 0,
-  },
-  tabletModalText: {
-    color: "white",
+  modalTitle: {
     fontSize: 24,
-    marginTop: 15,
+    fontWeight: 'bold',
+    color: Color.white0,
+    marginBottom: 30,
   },
-  phoneModalText: {
-    color: "white",
-    fontSize: 18,
-    marginTop: 15,
-  },
-  statusContainer: {
-    backgroundColor: "rgba(0, 0, 0, 0.3)",
-    padding: 10,
-    borderRadius: 8,
-    width: "100%",
-    alignItems: "center",
-    marginBottom: 15, // Increased spacing
-  },
-  statusText: {
-    color: "white",
-    fontWeight: "bold",
-  },
-  controlButtonsContainer: {
-    flexDirection: "row",
-    justifyContent: "center", // Changed from space-around to center
-    alignItems: "center",     // Added to ensure vertical centering
-    width: "100%",
-    marginVertical: 15,
-    right: 100,
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginBottom: 30,
   },
   actionButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    minWidth: 100,
-    alignItems: "center",
-    marginHorizontal: 8, // Increased from 5 to 8 for more spacing between buttons
-    borderWidth: 2,
-    borderColor: "transparent", // Default transparent border
-  },
-  extendButton: {
-    backgroundColor: "#4CAF50", // Green
-  },
-  stopButton: {
-    backgroundColor: "#FF9800", // Orange
-  },
-  retractButton: {
-    backgroundColor: "#F44336", // Red
+    flex: 1,
+    backgroundColor: Color.white0,
+    paddingVertical: 15,
+    borderRadius: 10,
+    marginHorizontal: 5,
+    alignItems: 'center',
   },
   activeButton: {
-    borderColor: "white", // White border to indicate active state
-    opacity: 0.9, // Slightly dimmed to show active state
+    backgroundColor: '#FFB267',
+  },
+  stopButton: {
+    backgroundColor: '#FF6B6B',
+  },
+  disabledButton: {
+    opacity: 0.6,
   },
   buttonText: {
-    color: "white",
-    fontWeight: "bold",
     fontSize: 16,
+    fontWeight: 'bold',
+    color: Color.colorGray_200,
   },
-  logContainer: {
-    width: "100%",
-    height:10,
-    backgroundColor: "rgba(0, 0, 0, 0.2)",
+  closeButton: {
+    backgroundColor: '#333',
+    paddingVertical: 12,
+    paddingHorizontal: 30,
     borderRadius: 8,
-    padding: 10,
-    marginTop: 5,   // Adjusted margin
-    marginBottom: 15, // Adjusted margin
-  },
-  logTitle: {
-    color: "white",
-    fontWeight: "bold",
-    marginBottom: 5,
-  },
-  logScrollView: {
-    flex: 1,
-  },
-  logEntry: {
-    color: "white",
-    fontSize: 12,
-    fontFamily: "monospace",
-    marginBottom: 2,
-  },
-  emptyLogMessage: {
-    color: "rgba(255, 255, 255, 0.5)",
-    fontStyle: "italic",
-    textAlign: "center",
-    marginTop: 20,
-  },
-  loadingContainer: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
-    zIndex: 10,
-    borderRadius: 20,
-  },
-  loadingText: {
-    color: "white",
     marginTop: 10,
   },
-  phoneButtonContainer: {
-    width: "100%",
-    paddingHorizontal: 20,
-    marginTop: 5, // Reduced from 20 to better fit the layout
+  closeButtonText: {
+    color: Color.white0,
+    fontSize: 16,
+    fontWeight: 'bold',
   },
-  tabletButtonContainer: {
-    width: "50%",
-    marginTop: 10, // Reduced from 20
-    left: 10,
+  loadingIndicator: {
+    marginVertical: 20,
   },
+  statusContainer: {
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 5,
+    marginBottom: 20,
+  },
+  statusText: {
+    color: Color.white0,
+    fontWeight: 'bold',
+  }
 });
 
 export default AwningControlModal;

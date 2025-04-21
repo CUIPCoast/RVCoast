@@ -78,7 +78,13 @@ const AirCon = ({ onClose }) => {
     await AsyncStorage.setItem('coolingState', JSON.stringify(newCoolingState));
     
     try {
-      await ClimateService.toggleCooling();
+      // Use the appropriate service method based on the state
+      if (newCoolingState) {
+        await ClimateService.toggleCooling(); // Turn cooling on
+      } else {
+        await ClimateService.turnOffCooling(); // Turn cooling off
+      }
+      
       console.log(`Cooling ${newCoolingState ? 'turned on' : 'turned off'}`);
       
       // Show status message
@@ -105,7 +111,13 @@ const AirCon = ({ onClose }) => {
     await AsyncStorage.setItem('toeKickState', JSON.stringify(newToeKickState));
     
     try {
-      await ClimateService.toggleToeKick();
+      // Use the appropriate service method based on the state
+      if (newToeKickState) {
+        await ClimateService.toggleToeKick(); // Turn toe kick on
+      } else {
+        await ClimateService.turnOffToeKick(); // Turn toe kick off
+      }
+      
       console.log(`Toe Kick ${newToeKickState ? 'turned on' : 'turned off'}`);
       
       // Show status message
@@ -141,7 +153,7 @@ const AirCon = ({ onClose }) => {
           // Send temperature increase command based on the difference
           const steps = temp - lastTemp;
           for (let i = 0; i < steps; i++) {
-            await RVControlService.executeCommand('temp_increase');
+            await ClimateService.increaseTemperature();
             // Short delay to avoid overwhelming the CAN bus
             await new Promise(resolve => setTimeout(resolve, 100));
           }
@@ -155,7 +167,7 @@ const AirCon = ({ onClose }) => {
           // Send temperature decrease command based on the difference
           const steps = lastTemp - temp;
           for (let i = 0; i < steps; i++) {
-            await RVControlService.executeCommand('temp_decrease');
+            await ClimateService.decreaseTemperature();
             // Short delay to avoid overwhelming the CAN bus
             await new Promise(resolve => setTimeout(resolve, 100));
           }

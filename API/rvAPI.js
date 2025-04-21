@@ -59,46 +59,62 @@ export const RVControlService = {
 
 // Utility functions for common actions
 export const RVControls = {
-  // Lighting
-  turnOnKitchenLight: () => RVControlService.executeCommand('kitchen_light_on'),
-  turnOffKitchenLight: () => RVControlService.executeCommand('kitchen_light_off'),
-  turnOnBedroomLight: () => RVControlService.executeCommand('bedroom_light_on'),
-  turnOffBedroomLight: () => RVControlService.executeCommand('bedroom_light_off'),
-  turnOnBathroomLight: () => RVControlService.executeCommand('bathroom_light_on'),
-  turnOffBathroomLight: () => RVControlService.executeCommand('bathroom_light_off'),
+  // Lighting toggles
+  toggleKitchenLights: () => RVControlService.executeCommand('kitchen_lights_toggle'),
+  toggleBathroomLight: () => RVControlService.executeCommand('bath_light_toggle'),
+  toggleBedroomLight: () => RVControlService.executeCommand('bed_ovhd_light_toggle'),
+  toggleVibeLight: () => RVControlService.executeCommand('vibe_light_toggle'),
+  toggleVanityLight: () => RVControlService.executeCommand('vanity_light_toggle'),
+  toggleAwningLights: () => RVControlService.executeCommand('awning_lights_toggle'),
+  toggleShowerLights: () => RVControlService.executeCommand('shower_lights_toggle'),
+  toggleUnderCabinetLights: () => RVControlService.executeCommand('under_cab_lights_toggle'),
+  toggleHitchLights: () => RVControlService.executeCommand('hitch_lights_toggle'),
+  togglePorchLights: () => RVControlService.executeCommand('porch_lights_toggle'),
+  toggleLeftReadingLights: () => RVControlService.executeCommand('left_reading_lights_toggle'),
+  toggleRightReadingLights: () => RVControlService.executeCommand('right_reading_lights_toggle'),
+  toggleDinetteLights: () => RVControlService.executeCommand('dinette_lights_toggle'),
+  toggleStripLights: () => RVControlService.executeCommand('strip_lights_toggle'),
+  
+  // Main light controls
+  allLightsOn: () => RVControlService.executeCommand('all_lights_on'),
+  allLightsOff: () => RVControlService.executeCommand('all_lights_off'),
+  
+  // Fan controls
+  toggleBathroomFan: () => RVControlService.executeCommand('bath_fan_toggle'),
+  toggleBayVentFan: () => RVControlService.executeCommand('bay_vent_fan_toggle'),
 
+  // AC Fan speed controls
   setHighFanSpeed: () => RVControlService.executeCommand('high_fan'),
   setMediumFanSpeed: () => RVControlService.executeCommand('medium_fan'),
-  // Low fan speed placeholder - will be updated when commands are available
-  setLowFanSpeed: () => console.log('Low fan speed commands not yet available'),
+  setLowFanSpeed: () => RVControlService.executeCommand('low_fan'),
 
-  // Awning
+  // Awning controls
   extendAwning: () => RVControlService.executeCommand('awning_extend'),
   retractAwning: () => RVControlService.executeCommand('awning_retract'),
+  stopAwning: () => RVControlService.executeCommand('awning_stop'),
 
-  // Climate
-  turnOnAC: () => RVControlService.executeCommand('ac_on'),
-  turnOffAC: () => RVControlService.executeCommand('ac_off'),
-  turnOnHeater: () => RVControlService.executeCommand('heater_on'),
-  turnOffHeater: () => RVControlService.executeCommand('heater_off'),
+  // Bar lift controls
+  barLiftUp: () => RVControlService.executeCommand('bar_lift_up'),
+  barLiftDown: () => RVControlService.executeCommand('bar_lift_down'),
 
   // Water systems
-  turnOnWaterPump: () => RVControlService.executeCommand('water_pump_on'),
-  turnOffWaterPump: () => RVControlService.executeCommand('water_pump_off'),
-  turnOnWaterHeater: () => RVControlService.executeCommand('water_heater_on'),
-  turnOffWaterHeater: () => RVControlService.executeCommand('water_heater_off'),
+  toggleWaterPump: () => RVControlService.executeCommand('water_pump_toggle'),
+  toggleWaterHeater: () => RVControlService.executeCommand('water_heater_toggle'),
 
-   // Add these thermostat controls
-   increaseTemperature: () => RVControlService.executeCommand('temp_increase'),
-   decreaseTemperature: () => RVControlService.executeCommand('temp_decrease'),
+  // Thermostat controls
+  increaseTemperature: () => RVControlService.executeCommand('temp_increase'),
+  decreaseTemperature: () => RVControlService.executeCommand('temp_decrease'),
    
-   // Climate presets
-   setCoolingMode: () => RVControlService.executeCommand('cool_setting'),
-   setFurnaceMode: () => RVControlService.executeCommand('furnace_setting'),
-   setNightMode: () => RVControlService.executeCommand('night_setting'),
-   setDehumidifyMode: () => RVControlService.executeCommand('dehumid_setting'),
-   setToeKickMode: () => RVControlService.executeCommand('toe_kick_setting'),
-   
+  // Climate presets
+  setCoolingMode: () => RVControlService.executeCommand('cool_setting'),
+  turnOffCooling: () => RVControlService.executeCommand('complete_cool_off'),
+  setFurnaceOn: () => RVControlService.executeCommand('furnace_on'),
+  setFurnaceOff: () => RVControlService.executeCommand('furnace_off'),
+  setNightMode: () => RVControlService.executeCommand('night_setting'),
+  setDehumidifyMode: () => RVControlService.executeCommand('dehumid_setting'),
+  setToeKickMode: () => RVControlService.executeCommand('toe_kick'),
+  turnOffToeKick: () => RVControlService.executeCommand('toe_kick_off'),
+  setAutoMode: () => RVControlService.executeCommand('auto_setting'),
 };
 
 export default RVControls;
