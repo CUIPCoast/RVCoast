@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, Image, ScrollView, Alert, ActivityIndicator } from "react-native";
+import { View, Text, Image, ScrollView, Alert, ActivityIndicator, TouchableOpacity } from "react-native";
 import { Col, Row, Grid } from "react-native-easy-grid";
 import moment from "moment";
 import ToggleSwitch from "../components/ToggleSwitch.jsx";
 import EnhancedMainLight from "../components/EnhancedMainLight.jsx";
 import { LightControlService } from "../Service/LightControlService.js";
+import { CANBusMonitor } from "../Service/CANBusMonitor.js";
 
 const LightScreenTablet = () => {
   // Current date/time
@@ -41,6 +42,37 @@ const LightScreenTablet = () => {
     
     setLightStates(initialLightStates);
     setSliderValues(initialSliderValues);
+    
+    // Subscribe to CAN bus dimming updates
+    const subscription = CANBusMonitor.subscribeToDimmingUpdates((updates) => {
+      // Updates object will contain lightId: brightness pairs
+      
+      // Update light states based on brightness values
+      const newLightStates = { ...lightStates };
+      const newSliderValues = { ...sliderValues };
+      
+      // Process each update
+      Object.entries(updates).forEach(([lightId, brightness]) => {
+        // Light is on if brightness > 0
+        newLightStates[lightId] = brightness > 0;
+        
+        // Update slider value (scale 0-50 to 0-100 for UI)
+        newSliderValues[lightId] = brightness > 0 ? brightness * 2 : 0;
+      });
+      
+      // Update state
+      setLightStates(newLightStates);
+      setSliderValues(newSliderValues);
+      
+      // Check if any light is on to update master switch
+      const anyLightOn = Object.values(newLightStates).some(state => state);
+      setMasterLightOn(anyLightOn);
+    });
+    
+    // Clean up subscription when component unmounts
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Handler for slider value changes
@@ -57,6 +89,11 @@ const LightScreenTablet = () => {
       ...prev,
       [lightId]: isOn
     }));
+    
+    // Update master light state based on all lights
+    const updatedStates = { ...lightStates, [lightId]: isOn };
+    const anyLightOn = Object.values(updatedStates).some(state => state);
+    setMasterLightOn(anyLightOn);
   };
 
   // Master light toggle handler
@@ -67,12 +104,17 @@ const LightScreenTablet = () => {
       if (isOn) {
         const result = await LightControlService.allLightsOn();
         if (result.success) {
-          // Update all light states to on
+          // Update all light states to on and set brightness to 50
           const newLightStates = {};
+          const newSliderValues = {};
+          
           allLights.forEach(lightId => {
             newLightStates[lightId] = true;
+            newSliderValues[lightId] = 50;
           });
+          
           setLightStates(newLightStates);
+          setSliderValues(newSliderValues);
           setMasterLightOn(true);
         } else {
           Alert.alert("Error", "Failed to turn all lights on");
@@ -80,12 +122,17 @@ const LightScreenTablet = () => {
       } else {
         const result = await LightControlService.allLightsOff();
         if (result.success) {
-          // Update all light states to off
+          // Update all light states to off and set brightness to 0
           const newLightStates = {};
+          const newSliderValues = {};
+          
           allLights.forEach(lightId => {
             newLightStates[lightId] = false;
+            newSliderValues[lightId] = 0;
           });
+          
           setLightStates(newLightStates);
+          setSliderValues(newSliderValues);
           setMasterLightOn(false);
         } else {
           Alert.alert("Error", "Failed to turn all lights off");
@@ -93,6 +140,102 @@ const LightScreenTablet = () => {
       }
     } catch (error) {
       Alert.alert("Error", `Failed to control master lights: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Preset handler for mood lighting
+  const handleMoodLighting = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Set dimmer values for mood lighting
+      const moodSettings = {
+        'vibe_light': 30,
+        'strip_lights': 20,
+        'under_cab_lights': 15,
+        'dinette_lights': 25
+      };
+      
+      // Turn off all other lights first
+      await LightControlService.allLightsOff();
+      
+      // Update local state to reflect all lights off
+      const newLightStates = {};
+      const newSliderValues = {};
+      
+      allLights.forEach(lightId => {
+        newLightStates[lightId] = false;
+        newSliderValues[lightId] = 0;
+      });
+      
+      // Apply mood lighting settings
+      for (const [lightId, brightness] of Object.entries(moodSettings)) {
+        // Remember dimming on Firefly is limited to 1-50%
+        await LightControlService.setBrightness(lightId, brightness);
+        
+        // Update local state
+        newLightStates[lightId] = true;
+        newSliderValues[lightId] = brightness * 2; // Convert from 0-50 scale to 0-100 scale
+      }
+      
+      // Update state
+      setLightStates(newLightStates);
+      setSliderValues(newSliderValues);
+      setMasterLightOn(true);
+      
+    } catch (error) {
+      Alert.alert("Error", `Failed to set mood lighting: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Preset handler for evening lighting
+  const handleEveningLighting = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Set dimmer values for evening lighting
+      const eveningSettings = {
+        'kitchen_lights': 35,
+        'dinette_lights': 30,
+        'bath_light': 25,
+        'vibe_light': 20,
+        'left_reading_lights': 40,
+        'right_reading_lights': 40
+      };
+      
+      // Turn off all other lights first
+      await LightControlService.allLightsOff();
+      
+      // Update local state to reflect all lights off
+      const newLightStates = {};
+      const newSliderValues = {};
+      
+      allLights.forEach(lightId => {
+        newLightStates[lightId] = false;
+        newSliderValues[lightId] = 0;
+      });
+      
+      // Apply evening lighting settings
+      for (const [lightId, brightness] of Object.entries(eveningSettings)) {
+        // Remember dimming on Firefly is limited to 1-50%
+        await LightControlService.setBrightness(lightId, brightness);
+        
+        // Update local state
+        newLightStates[lightId] = true;
+        newSliderValues[lightId] = brightness * 2; // Convert from 0-50 scale to 0-100 scale
+      }
+      
+      // Update state
+      setLightStates(newLightStates);
+      setSliderValues(newSliderValues);
+      setMasterLightOn(true);
+      
+    } catch (error) {
+      Alert.alert("Error", `Failed to set evening lighting: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -208,11 +351,44 @@ const LightScreenTablet = () => {
               />
               <Text className="text-white">Light Master</Text>
             </View>
-            {isLoading ? (
-              <ActivityIndicator size="small" color="#FFB267" />
-            ) : (
-              <ToggleSwitch isOn={masterLightOn} setIsOn={handleMasterLightToggle} />
-            )}
+            
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              {/* Mood Lighting Button */}
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#222',
+                  paddingHorizontal: 15,
+                  paddingVertical: 8,
+                  borderRadius: 20,
+                  marginRight: 15,
+                }}
+                onPress={handleMoodLighting}
+                disabled={isLoading}
+              >
+                <Text style={{ color: '#FFB267' }}>Mood</Text>
+              </TouchableOpacity>
+              
+              {/* Evening Lighting Button */}
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#222',
+                  paddingHorizontal: 15,
+                  paddingVertical: 8,
+                  borderRadius: 20,
+                  marginRight: 15,
+                }}
+                onPress={handleEveningLighting}
+                disabled={isLoading}
+              >
+                <Text style={{ color: '#FFB267' }}>Evening</Text>
+              </TouchableOpacity>
+              
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#FFB267" />
+              ) : (
+                <ToggleSwitch isOn={masterLightOn} setIsOn={handleMasterLightToggle} />
+              )}
+            </View>
           </View>
         </Col>
       </Row>
@@ -277,7 +453,7 @@ const LightScreenTablet = () => {
                   lightId={lightId}
                   min={0}
                   max={100}
-                  value={sliderValues[lightId] || 50}
+                  value={sliderValues[lightId] || 0}
                   isOn={lightStates[lightId] || false}
                   onToggle={(isOn) => handleLightToggle(lightId, isOn)}
                   onValueChange={(value) => handleSliderChange(lightId, value)}
@@ -331,7 +507,7 @@ const LightScreenTablet = () => {
                   lightId={lightId}
                   min={0}
                   max={100}
-                  value={sliderValues[lightId] || 50}
+                  value={sliderValues[lightId] || 0}
                   isOn={lightStates[lightId] || false}
                   onToggle={(isOn) => handleLightToggle(lightId, isOn)}
                   onValueChange={(value) => handleSliderChange(lightId, value)}
@@ -385,7 +561,7 @@ const LightScreenTablet = () => {
                   lightId={lightId}
                   min={0}
                   max={100}
-                  value={sliderValues[lightId] || 50}
+                  value={sliderValues[lightId] || 0}
                   isOn={lightStates[lightId] || false}
                   onToggle={(isOn) => handleLightToggle(lightId, isOn)}
                   onValueChange={(value) => handleSliderChange(lightId, value)}
