@@ -1,13 +1,14 @@
 import React, { useState } from "react";
 import { StyleSheet, View, Text, Pressable, TouchableOpacity, Image, ScrollView, Modal, Button } from "react-native";
 import MainLight from "../components/MainLight";
+import EnhancedMainLight from "../components/EnhancedMainLight.jsx";
 import LatchLight from "../components/LatchLight";
 import useScreenSize from "../helper/useScreenSize.jsx";
 import AwningControlModal from "../components/AwningControlModal";
 import HeaterControlModal from "../components/HeaterControlModal";
-import ScheduleLightsModal from "../components/ScheduleLightsModal";
+
 import ToggleSwitch from "../components/ToggleSwitch.jsx";
-import Icon from 'react-native-vector-icons/FontAwesome';
+
 import {
   Padding,
   Border,
@@ -104,12 +105,9 @@ const Devices = () => {
           {/* Container for Porch Light slider positioned below the images */}
           <View style={styles.screenContainer}>
           <LatchLight name="Master Light" />
-  <View style={styles.porchLightContainer}>
-    
-    <LatchLight name="Awning Light" />
-    <LatchLight name="Porch Light" />
-    <LatchLight name="Hitch Light" />
-  </View>
+
+          <View style={{ height: 3, backgroundColor: '#696969', marginVertical: 16, marginHorizontal: 17 }} />
+  
 </View>
           <View>
             <MainLight
@@ -149,28 +147,7 @@ const Devices = () => {
         <><View>
 
 
-<View style={styles.porchLightContainer}>
-  <View style={styles.row}>
-    <View style={styles.iconTextContainer}>
-      <Icon name="icon-placeholder" size={24} color="#FFF" />
-      <Text style={styles.text}>Placeholder 1</Text>
-    </View>
-    <View style={styles.iconTextContainer}>
-      <Icon name="icon-placeholder" size={24} color="#FFF" />
-      <Text style={styles.text}>Placeholder 2</Text>
-    </View>
-  </View>
-  <View style={styles.row}>
-    <View style={styles.iconTextContainer}>
-      <Icon name="icon-placeholder" size={24} color="#FFF" />
-      <Text style={styles.text}>Placeholder 3</Text>
-    </View>
-    <View style={styles.iconTextContainer}>
-      <Icon name="icon-placeholder" size={24} color="#FFF" />
-      <Text style={styles.text}>Placeholder 4</Text>
-    </View>
-  </View>
-</View>
+
 
 
         </View>
@@ -235,49 +212,43 @@ const Devices = () => {
     } else if (selectedTab === TABS.BATHROOM) {
       return (
         <View className="">
-          <View className="flex-row justify-between">
-            <View className="items-center">
-              <TouchableOpacity style={[styles.fanButtonContainer, isFanOn ?  styles.fanOff:styles.fanOn]} className="ml-6" onPress={toggleFan}>
-              <Text className="text-white mb-1">Bathroom Fan</Text>
-              <Image
-                source={require("../assets/fan.png")}
-                style={{ width: 50, height: 43}}
-              />
-              <Text style={styles.fanControlsText}>
-                {isFanOn ? "Off" : "On"}
-              </Text>
-             
-              </TouchableOpacity>
-            </View>
-            
-            <View className="items-center">
-              <TouchableOpacity style={[styles.fanButtonContainer, IsWaterPump ? styles.waterPumpOff : styles.waterPumpOn]} onPress={toggleWaterPump}>
-              <Text className="text-white mb-1">Water Pump</Text>
-              <Image
-                source={require("../assets/waterpump (2).png")}
-                style={{ width: 50, height: 50 }}
-              />
+          <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
+  <TouchableOpacity
+    style={[
+      styles.fanButtonContainer,
+      IsWaterPump ? styles.waterPumpOff : styles.waterPumpOn,
+      { marginRight: 20 } // spacing between buttons
+    ]}
+    onPress={toggleWaterPump}
+  >
+    <Text className="text-white mb-1 text-center">Bay Vent</Text>
+    <Image
+      source={require("../assets/waterpump (2).png")}
+      style={{ width: 50, height: 50 }}
+    />
+    <Text className="text-white mt-1 text-center">
+      {IsWaterPump ? "Off" : "On"}
+    </Text>
+  </TouchableOpacity>
 
-              <Text className="text-white mt-1">
-                {IsWaterPump ? "Off" : "On"}
-              </Text>
-              
-              </TouchableOpacity>
-            </View>
-            <View className="items-center">
-              <TouchableOpacity style={[styles.fanButtonContainer, IsWaterHeater ?  styles.waterHeaterOff : styles.waterHeaterOn]}  className="mr-6" onPress={toggleWaterHeater}>
-              <Text className="text-white mb-1">Water Heater</Text>
-              <Image
-                source={require("../assets/waterheater.png")}
-                style={{ width: 50, height: 50 }}
-              />
-              <Text className="text-white mt-1">
-                {IsWaterHeater ? "Off" : "On"}
-              </Text>
-              
-              </TouchableOpacity>
-            </View>
-          </View>
+  <TouchableOpacity
+    style={[
+      styles.fanButtonContainer,
+      IsWaterHeater ? styles.waterHeaterOff : styles.waterHeaterOn,
+    ]}
+    onPress={toggleWaterHeater}
+  >
+    <Text className="text-white mb-1 text-center">Bath Fan</Text>
+    <Image
+      source={require("../assets/waterheater.png")}
+      style={{ width: 50, height: 50 }}
+    />
+    <Text className="text-white mt-1 text-center">
+      {IsWaterHeater ? "Off" : "On"}
+    </Text>
+  </TouchableOpacity>
+</View>
+
 
            {/* Divider */}
       <View style={{ height: 3, backgroundColor: '#696969', marginVertical: 16, marginHorizontal: 17 }} />
@@ -330,24 +301,24 @@ const Devices = () => {
   />;
 
   // If the screen is a tablet, render nothing (null) to hide the tab navigator
-  if (isTablet) {
-    return (
-      <View className="">
-        <View className="flex-row mt-4 p-2 justify-between "> 
-          <Text className="text-white pt-2">Wifi</Text>
-          <View className="pt-2">
-           <ToggleSwitch isOn={isOn} setIsOn={setIsOn} />
+  //if (isTablet) {
+   // return (
+    ///  <View className="">
+       // <View className="flex-row mt-4 p-2 justify-between "> 
+          //<Text className="text-white pt-2">Wifi</Text>
+         // <View className="pt-2">
+           //<ToggleSwitch isOn={isOn} setIsOn={setIsOn} />
 
-          </View>
-        </View>
+         // </View>
+       // </View>
 
-        <View>{logo}</View>
+       // <View>{logo}</View>
     
-      {/* {renderTabContent()} */}
+     // {/* {renderTabContent()} */}
 
-        {/* <Text className="text-white">Toggle is {isOn ? "ON" : "OFF"}</Text> */}
-      </View>);
-  }
+        //{/* <Text className="text-white">Toggle is {isOn ? "ON" : "OFF"}</Text> */}
+      //</View>);
+  //}
 
   return (
     <View>

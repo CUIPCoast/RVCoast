@@ -22,9 +22,11 @@ const HeaterControlModal = ({ isVisible, onClose }) => {
   };
 
   const items = [
+    { id: "Auto", name: "Auto" },
     { id: "low", name: "Low" },
     { id: "med", name: "Med" },
     { id: "high", name: "High" },
+    
   ];
 
   return (
@@ -55,7 +57,7 @@ const HeaterControlModal = ({ isVisible, onClose }) => {
               onPress={() => handleModeToggle("Heating")}
             >
               <Text style={mode === "Heating" ? styles.activeText : styles.inactiveText}>
-                Heating
+                Toe Kick
               </Text>
             </TouchableOpacity>
           </View>

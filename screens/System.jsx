@@ -81,7 +81,7 @@ const System = () => {
       <View className="mt-3">
 
       <TankHeaterControl
-  name="Fresh Water Tank Heater"
+  name="Water Pump"
   percentage={80}
   isOn={isOn}
   setIsOn={setIsOn}
@@ -89,7 +89,7 @@ const System = () => {
 />
 
 <TankHeaterControl
-  name="Gray Water Tank Heater"
+  name="Water Heater"
   percentage={40}
   isOn={isOnGray}
   setIsOn={setIsOnGray}
