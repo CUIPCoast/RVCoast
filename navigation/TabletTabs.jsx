@@ -3,6 +3,7 @@ import MainScreen from '../screens/MainScreen';
 import System from '../screens/System';
 import AirCon from '../screens/AirCon';
 import Settings from '../screens/Settings';
+import Vents from '../screens/Vents';
 import { View, StyleSheet } from 'react-native';
 import { Image } from 'react-native-svg';
 import Icon from 'react-native-vector-icons/AntDesign';
@@ -23,9 +24,13 @@ const screenOptions = (route, color) => {
     case 'Air Conditioning':
       iconName = 'API';
       break;
+    case 'Vents':
+      iconName = 'filter';
+      break;
     case 'Settings':
       iconName = 'setting';
       break;
+    
     default:
       iconName = 'question';
   }
@@ -61,6 +66,7 @@ const TabletTabs = () => {
         <Tab.Screen name="Home" component={MainScreen} />
         <Tab.Screen name="System" component={LightScreenTablet} />
         <Tab.Screen name="Air Conditioning" component={ClimateControl} />
+        <Tab.Screen name="Vents" component={Vents}/>
         <Tab.Screen name="Settings" component={Settings} />
       </Tab.Navigator>
     </View>
