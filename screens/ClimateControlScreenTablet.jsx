@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, Image, TouchableOpacity, TouchableWithoutFeedback, Keyboard } from "react-native";
-
+import { StyleSheet, View, Text, Image, TouchableOpacity, TouchableWithoutFeedback, Keyboard, ScrollView } from "react-native";
 import { Border, Color, Gap, FontSize, FontFamily, isDarkMode } from "../GlobalStyles";
 import useScreenSize from "../helper/useScreenSize.jsx";
 import { Col, Row, Grid } from "react-native-easy-grid";
-
 import { RadialSlider } from 'react-native-radial-slider';
 import moment from 'moment';
 import { ClimateService } from '../API/RVControlServices.js';
@@ -19,6 +17,7 @@ const ClimateControlScreenTablet = () => {
   const [isCoolToggled, setIsCoolToggled] = useState(false);
   const [isToekickToggled, setIsToekickToggled] = useState(false);
   const [isFurnaceToggled, setIsFurnaceToggled] = useState(false);
+  const [isAutoModeActive, setIsAutoModeActive] = useState(false);
   
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
@@ -399,103 +398,195 @@ const ClimateControlScreenTablet = () => {
   };
 
   // Handle fan speed button press
-  const handleFanSpeedPress = async (speed) => {
-    setIsLoading(true);
-    try {
-      let result;
+const handleFanSpeedPress = async (speed) => {
+  setIsLoading(true);
+  try {
+    let result;
+    
+    switch (speed) {
+      case "Low":
+        // Use the direct raw command approach that's working
+        result = await setLowFanSpeed();
+        break;
+      case "Med":
+        result = await ClimateService.setMediumFanSpeed();
+        break;
+      case "High":
+        result = await ClimateService.setHighFanSpeed();
+        break;
+      case "Auto":
+        // Use direct raw command approach for auto setting
+        result = await setAutoMode();
+        break;
+      default:
+        setErrorMessage(`Unknown fan speed: ${speed}`);
+        setIsLoading(false);
+        return;
+    }
+    
+    if (result && result.success) {
+      // Update fan speed state
+      setSpeed(speed);
       
-      switch (speed) {
-        case "Low":
-          result = await ClimateService.setLowFanSpeed();
-          // Show a warning message for low speed since it's not implemented yet
-          if (result.message) {
-            console.warn(result.message);
-          }
-          break;
-        case "Med":
-          result = await ClimateService.setMediumFanSpeed();
-          break;
-        case "High":
-          result = await ClimateService.setHighFanSpeed();
-          break;
-        default:
-          setErrorMessage(`Unknown fan speed: ${speed}`);
-          setIsLoading(false);
-          return;
+      // Update auto mode state
+      if (speed === "Auto") {
+        setIsAutoModeActive(true);
+        // Store auto mode state
+        await AsyncStorage.setItem('autoModeState', JSON.stringify(true));
+      } else {
+        // If another speed was selected, auto mode is no longer active
+        setIsAutoModeActive(false);
+        await AsyncStorage.setItem('autoModeState', JSON.stringify(false));
       }
       
-      if (result && result.success) {
-        setErrorMessage(null);
-        
-        // Add status message - from AirCon
-        setStatusMessage(`Fan speed set to ${speed}`);
-        setShowStatus(true);
-        setTimeout(() => setShowStatus(false), 3000);
-      } else if (result) {
-        setErrorMessage(`Error setting fan speed: ${result.error}`);
-        
-        // Add status message - from AirCon
-        setStatusMessage(`Failed to set fan speed to ${speed}`);
-        setShowStatus(true);
-        setTimeout(() => setShowStatus(false), 3000);
-      }
-    } catch (error) {
-      setErrorMessage(`Unexpected error: ${error.message}`);
+      // Store the selected fan speed
+      await AsyncStorage.setItem('fanSpeed', speed);
+      
+      setErrorMessage(null);
+      
+      // Add status message - from AirCon
+      setStatusMessage(`Fan speed set to ${speed}`);
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
+    } else if (result) {
+      setErrorMessage(`Error setting fan speed: ${result.error}`);
       
       // Add status message - from AirCon
       setStatusMessage(`Failed to set fan speed to ${speed}`);
       setShowStatus(true);
       setTimeout(() => setShowStatus(false), 3000);
-    } finally {
-      setIsLoading(false);
+    }
+  } catch (error) {
+    setErrorMessage(`Unexpected error: ${error.message}`);
+    
+    // Add status message - from AirCon
+    setStatusMessage(`Failed to set fan speed to ${speed}`);
+    setShowStatus(true);
+    setTimeout(() => setShowStatus(false), 3000);
+  } finally {
+    setIsLoading(false);
+  }
+};
+  
+  // Direct implementation of low fan speed using raw commands
+  const setLowFanSpeed = async () => {
+    try {
+      // Attempt to execute the individual commands instead of the command group
+      // This is a workaround for the 400 error issue
+      const commands = [
+        '19FED99F#FF96AA0F3200D1FF', // low_fan_speed_1
+        '195FCE98#AA00320000000000', // low_fan_speed_2
+        '19FEF998#A110198A24AE19FF'  // low_fan_speed_3
+      ];
+      
+      // Send each command individually using the raw command API
+      for (const command of commands) {
+        await RVControlService.executeRawCommand(command);
+        // Short delay to avoid overwhelming the CAN bus
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to set low fan speed:', error);
+      
+      // Provide a more detailed error message for debugging
+      return { 
+        success: false, 
+        error: error.message,
+        details: 'Error sending raw fan speed commands. Check server logs for details.'
+      };
+    }
+  };
+  
+  // Direct implementation of auto mode using raw commands
+  const setAutoMode = async () => {
+    try {
+      // Auto setting commands from server.js
+      const commands = [
+        '19FEF99F#01C0FFFFFFFFFFFF', // auto_setting_on_1
+        '19FED99F#FF96AA0F0000D1FF', // auto_setting_on_2
+        '19FFE198#010064A924A92400'  // auto_setting_on_3
+      ];
+      
+      // Send each command individually using the raw command API
+      for (const command of commands) {
+        await RVControlService.executeRawCommand(command);
+        // Short delay to avoid overwhelming the CAN bus
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to set auto mode:', error);
+      
+      // Provide a more detailed error message for debugging
+      return { 
+        success: false, 
+        error: error.message,
+        details: 'Error sending raw auto mode commands. Check server logs for details.'
+      };
     }
   };
 
   // Load saved states on component mount - taken from AirCon implementation
-  useEffect(() => {
-    const loadSavedStates = async () => {
-      try {
-        // Load cooling state
-        const savedCoolingState = await AsyncStorage.getItem('coolingState');
-        if (savedCoolingState !== null) {
-          const coolingState = JSON.parse(savedCoolingState);
-          setIsCoolToggled(coolingState);
-          
-          // Update active buttons if needed
-          if (coolingState && !activeButtons.includes("Cool")) {
-            setActiveButtons(prev => [...prev, "Cool"]);
-          }
-        }
+  // Update the loadSavedStates function inside the useEffect
+useEffect(() => {
+  const loadSavedStates = async () => {
+    try {
+      // Load cooling state
+      const savedCoolingState = await AsyncStorage.getItem('coolingState');
+      if (savedCoolingState !== null) {
+        const coolingState = JSON.parse(savedCoolingState);
+        setIsCoolToggled(coolingState);
         
-        // Load toe kick state
-        const savedToeKickState = await AsyncStorage.getItem('toeKickState');
-        if (savedToeKickState !== null) {
-          const toeKickState = JSON.parse(savedToeKickState);
-          setIsToekickToggled(toeKickState);
-          
-          // Update active buttons if needed
-          if (toeKickState && !activeButtons.includes("Toe Kick")) {
-            setActiveButtons(prev => [...prev, "Toe Kick"]);
-          }
+        // Update active buttons if needed
+        if (coolingState && !activeButtons.includes("Cool")) {
+          setActiveButtons(prev => [...prev, "Cool"]);
         }
-        
-        // Load night mode and dehumidify states if they exist
-        const savedNightMode = await AsyncStorage.getItem('nightMode');
-        if (savedNightMode !== null) {
-          setIsNightToggled(JSON.parse(savedNightMode));
-        }
-        
-        const savedDehumidMode = await AsyncStorage.getItem('dehumidMode');
-        if (savedDehumidMode !== null) {
-          setIsDehumidToggled(JSON.parse(savedDehumidMode));
-        }
-      } catch (error) {
-        console.error('Error loading saved states:', error);
       }
-    };
-    
-    loadSavedStates();
-  }, []);
+      
+      // Load toe kick state
+      const savedToeKickState = await AsyncStorage.getItem('toeKickState');
+      if (savedToeKickState !== null) {
+        const toeKickState = JSON.parse(savedToeKickState);
+        setIsToekickToggled(toeKickState);
+        
+        // Update active buttons if needed
+        if (toeKickState && !activeButtons.includes("Toe Kick")) {
+          setActiveButtons(prev => [...prev, "Toe Kick"]);
+        }
+      }
+      
+      // Load night mode and dehumidify states if they exist
+      const savedNightMode = await AsyncStorage.getItem('nightMode');
+      if (savedNightMode !== null) {
+        setIsNightToggled(JSON.parse(savedNightMode));
+      }
+      
+      const savedDehumidMode = await AsyncStorage.getItem('dehumidMode');
+      if (savedDehumidMode !== null) {
+        setIsDehumidToggled(JSON.parse(savedDehumidMode));
+      }
+      
+      // Load auto mode state
+      const savedAutoMode = await AsyncStorage.getItem('autoModeState');
+      if (savedAutoMode !== null) {
+        setIsAutoModeActive(JSON.parse(savedAutoMode));
+      }
+      
+      // Load fan speed state
+      const savedFanSpeed = await AsyncStorage.getItem('fanSpeed');
+      if (savedFanSpeed !== null) {
+        setSpeed(savedFanSpeed);
+      }
+    } catch (error) {
+      console.error('Error loading saved states:', error);
+    }
+  };
+  
+  loadSavedStates();
+}, []);
 
   // Add useEffect to check for and apply pending temperature changes
   useEffect(() => {
@@ -742,56 +833,105 @@ const ClimateControlScreenTablet = () => {
                         marginTop: 40,
                       }}
                     />
-                    {/* Fixed: Stack the buttons vertically */}
-                    <View style={{ flex: 1, justifyContent: "flex-start", alignItems: "flex-start" }}>
-                      {features.map((feature, index) => (
-                        <View
-                          key={index}
-                          style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            marginVertical: 10,
-                            width: "100%",
-                          }}
-                        >
-                          {/* Feature Button */}
-                          <TouchableOpacity
-                            onPress={() => handleButtonPress(feature.label)}
-                            style={{
-                              flexDirection: "row",
-                              alignItems: "center",
-                              backgroundColor: activeButtons.includes(feature.label) ? "#444" : "#1B1B1B",
-                              borderRadius: 5,
-                              paddingVertical: 10,
-                              paddingHorizontal: 15,
-                              width: 220,
-                            }}
-                          >
-                            <Image
-                              source={getImageForLabel(feature.label)}
-                              style={{ width: 30, height: 30, marginRight: 5 }}
-                            />
-                            <Text
-                              style={{
-                                color: "white",
-                                fontSize: 16,
-                              }}
-                            >
-                              {feature.label}
-                            </Text>
-                          </TouchableOpacity>
+     {/* Feature buttons and fan speed side by side layout */}
+<View style={{ 
+  flex: 1, 
+  flexDirection: "row", 
+  marginTop: 10
+}}>
+  {/* Left column: Feature buttons */}
+  <View style={{ 
+    flex: 0.75, 
+    justifyContent: "flex-start"
+  }}>
+    {features.map((feature, index) => (
+      <TouchableOpacity
+        key={index}
+        onPress={() => handleButtonPress(feature.label)}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          backgroundColor: activeButtons.includes(feature.label) ? "#444" : "#1B1B1B",
+          borderRadius: 5,
+          paddingVertical: 10,
+          paddingHorizontal: 15,
+          marginVertical: 8,
+          width: 220,
+        }}
+      >
+        <Image
+          source={getImageForLabel(feature.label)}
+          style={{ width: 30, height: 30, marginRight: 5 }}
+        />
+        <Text
+          style={{
+            color: "white",
+            fontSize: 16,
+          }}
+        >
+          {feature.label}
+        </Text>
+      </TouchableOpacity>
+    ))}
+  </View>
+  
+  {/* Right column: Fan Speed container */}
+  <View style={{ 
+    flex: 0.25, 
+    marginLeft: 10,
+    alignItems: "center"
+  }}>
+    <Text style={{ 
+      color: "white", 
+      fontSize: 14,
+      marginBottom: 5,
+      textAlign: "center"
+    }}>
+      Fan Speed
+    </Text>
+    <View style={styles.fanSpeedContainer}>
+      <ScrollView 
+        horizontal={false}
+        contentContainerStyle={styles.fanSpeedScrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* High Speed Button */}
+        <FanSpeedButton 
+          speed="High" 
+          onPress={() => handleFanSpeedPress("High")} 
+          isLoading={isLoading}
+          isActive={speed === "High"}
+        />
+        
+        {/* Med Speed Button */}
+        <FanSpeedButton 
+          speed="Med" 
+          onPress={() => handleFanSpeedPress("Med")} 
+          isLoading={isLoading}
+          isActive={speed === "Med"}
+        />
+        
+        {/* Low Speed Button */}
+        <FanSpeedButton 
+          speed="Low" 
+          onPress={() => handleFanSpeedPress("Low")} 
+          isLoading={isLoading}
+          isActive={speed === "Low"}
+        />
+        
+        {/* Auto Speed Button */}
+        <FanSpeedButton 
+          speed="Auto" 
+          onPress={() => handleFanSpeedPress("Auto")} 
+          isLoading={isLoading}
+          isActive={isAutoModeActive}
+        />
+      </ScrollView>
+    </View>
+  </View>
+</View>
 
-                          {/* Fan Speed Button for this row */}
-                          <FanSpeedButton 
-                            speed={feature.fanSpeed} 
-                            onPress={() => handleFanSpeedPress(feature.fanSpeed)} 
-                            isLoading={isLoading}
-                          />
 
-                        </View>
-                      ))}
-                    </View>
                   </Col>
                   {/* Night/Dehumid Buttons */}
                   <View
@@ -865,10 +1005,15 @@ const getImageForLabel = (label) => {
   return images[label] || require("../assets/questionmark.png");
 };
 
-// Individual fan speed button component
-const FanSpeedButton = ({ speed, onPress, isLoading }) => {
-  // Set background color based on fan speed
+// Update the FanSpeedButton component to handle active state:
+// Update the FanSpeedButton component to handle active state:
+const FanSpeedButton = ({ speed, onPress, isLoading, isActive, autoStyle }) => {
+  // Set background color based on active state
   const getBackgroundColor = () => {
+    if (isActive) {
+      return "#4CAF50"; // Green for any active button
+    }
+    
     switch (speed) {
       case "High":
         return "#100C08"; // Dark for High
@@ -876,24 +1021,22 @@ const FanSpeedButton = ({ speed, onPress, isLoading }) => {
         return "#242124"; // Medium for Med
       case "Low":
         return "#848482"; // Light for Low
+      case "Auto":
+        return "#333"; // Default for Auto
       default:
         return "#333";
     }
   };
   
-  // FIX: Removed the extra view and wrapped everything in a single TouchableOpacity
   return (
     <TouchableOpacity
       onPress={onPress}
       disabled={isLoading}
-      style={{
-        padding: 10,
-        borderRadius: 5,
-        alignItems: "center",
-        justifyContent: "center",
-        width: 80,
-        backgroundColor: getBackgroundColor(),
-      }}
+      style={[
+        styles.fanSpeedButton,
+        { backgroundColor: getBackgroundColor() },
+        autoStyle && styles.autoSpeedButton
+      ]}
       activeOpacity={0.7}
     >
       <Text style={{ color: "white", fontSize: 16 }}>{speed}</Text>
@@ -977,7 +1120,7 @@ const styles = StyleSheet.create({
   // Added status container style from AirCon
   statusContainer: {
     position: "absolute",
-    bottom: 100,
+    bottom: 80,
     backgroundColor: "rgba(0,0,0,0.7)",
     paddingHorizontal: 15,
     paddingVertical: 8,
@@ -1017,6 +1160,29 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: "white",
     fontWeight: "bold",
+  },
+  fanSpeedContainer: {
+    width: 80,
+    height: 150, // Height limit for the container
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderRadius: 5,
+    overflow: 'hidden',
+  },
+  fanSpeedScrollContent: {
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
+  fanSpeedButton: {
+    padding: 10,
+    borderRadius: 5,
+    alignItems: "center",
+    justifyContent: "center",
+    width: 76,
+    margin: 2,
+  },
+  autoSpeedButton: {
+    marginTop: 5,
+    marginBottom: 5,
   }
 });
 
