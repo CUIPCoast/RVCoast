@@ -5,7 +5,7 @@ import LatchLight from "../components/LatchLight";
 import useScreenSize from "../helper/useScreenSize.jsx";
 import AwningControlModal from "../components/AwningControlModal";
 import HeaterControlModal from "../components/HeaterControlModal";
-import { LightService } from "../API/RVControlServices";
+import { LightService, FanService } from "../API/RVControlServices"; // Add FanService import
 import ToggleSwitch from "../components/ToggleSwitch.jsx";
 
 import {
@@ -74,9 +74,14 @@ const Devices = () => {
   const [isLoading, setIsLoading] = useState(false);
   
   // Fan and water control states
-  const [isFanOn, setFanOn] = useState(false);
+  const [isBathroomFanOn, setBathroomFanOn] = useState(false);
+  const [isBayVentFanOn, setBayVentFanOn] = useState(false);
   const [IsWaterHeater, setWaterHeaterOn] = useState(false); 
   const [IsWaterPump, setWaterPumpOn] = useState(false); 
+  
+  // State for API operation status
+  const [statusMessage, setStatusMessage] = useState('');
+  const [showStatus, setShowStatus] = useState(false);
 
   // State for light toggling
   const [lightStates, setLightStates] = useState({});
@@ -111,8 +116,72 @@ const Devices = () => {
     setSliderValues(initialSliderValues);
   }, []);
 
-  const toggleFan = () => {
-    setFanOn((prevStatus) => !prevStatus);
+  // Handle bathroom fan toggle with API integration
+  const toggleBathroomFan = async () => {
+    try {
+      setIsLoading(true);
+      
+      const result = await FanService.toggleBathroomFan();
+      
+      if (result.success) {
+        setBathroomFanOn(!isBathroomFanOn);
+        
+        // Show status message
+        setStatusMessage(`Bathroom fan ${!isBathroomFanOn ? 'turned on' : 'turned off'}`);
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+      } else {
+        console.error('Failed to toggle bathroom fan:', result.error);
+        
+        // Show error message
+        setStatusMessage('Failed to toggle bathroom fan');
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+      }
+    } catch (error) {
+      console.error('Error toggling bathroom fan:', error);
+      
+      // Show error message
+      setStatusMessage(`Error: ${error.message}`);
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Handle bay vent fan toggle with API integration
+  const toggleBayVentFan = async () => {
+    try {
+      setIsLoading(true);
+      
+      const result = await FanService.toggleBayVentFan();
+      
+      if (result.success) {
+        setBayVentFanOn(!isBayVentFanOn);
+        
+        // Show status message
+        setStatusMessage(`Bay vent fan ${!isBayVentFanOn ? 'turned on' : 'turned off'}`);
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+      } else {
+        console.error('Failed to toggle bay vent fan:', result.error);
+        
+        // Show error message
+        setStatusMessage('Failed to toggle bay vent fan');
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+      }
+    } catch (error) {
+      console.error('Error toggling bay vent fan:', error);
+      
+      // Show error message
+      setStatusMessage(`Error: ${error.message}`);
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
+    } finally {
+      setIsLoading(false);
+    }
   };
   
   const toggleWaterHeater = () => {
@@ -312,10 +381,12 @@ const Devices = () => {
             <TouchableOpacity
               style={[
                 styles.fanButtonContainer,
-                IsWaterPump ? styles.waterPumpOff : styles.waterPumpOn,
-                { marginRight: 20 }
+                isBayVentFanOn ? styles.fanButtonOn : styles.fanButtonOff,
+                { marginRight: 20 },
+                isLoading && styles.disabledButton
               ]}
-              onPress={toggleWaterPump}
+              onPress={toggleBayVentFan}
+              disabled={isLoading}
             >
               <Text className="text-white mb-1 text-center">Bay Vent</Text>
               <Image
@@ -323,16 +394,18 @@ const Devices = () => {
                 style={{ width: 50, height: 50 }}
               />
               <Text className="text-white mt-1 text-center">
-                {IsWaterPump ? "Off" : "On"}
+                {isBayVentFanOn ? "On" : "Off"}
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[
                 styles.fanButtonContainer,
-                IsWaterHeater ? styles.waterHeaterOff : styles.waterHeaterOn,
+                isBathroomFanOn ? styles.fanButtonOn : styles.fanButtonOff,
+                isLoading && styles.disabledButton
               ]}
-              onPress={toggleWaterHeater}
+              onPress={toggleBathroomFan}
+              disabled={isLoading}
             >
               <Text className="text-white mb-1 text-center">Bath Fan</Text>
               <Image
@@ -340,7 +413,7 @@ const Devices = () => {
                 style={{ width: 50, height: 50 }}
               />
               <Text className="text-white mt-1 text-center">
-                {IsWaterHeater ? "Off" : "On"}
+                {isBathroomFanOn ? "On" : "Off"}
               </Text>
             </TouchableOpacity>
           </View>
@@ -425,6 +498,13 @@ const Devices = () => {
         
         {/* Heater Control Modal */}
         <HeaterControlModal isVisible={isHeaterModalVisible} onClose={() => setHeaterModalVisible(false)} />
+        
+        {/* Status message */}
+        {showStatus && (
+          <View style={styles.statusContainer}>
+            <Text style={styles.statusText}>{statusMessage}</Text>
+          </View>
+        )}
       </ScrollView>
       
       <View style={styles.buttonContainer} className="bg-brown py-5">
@@ -640,15 +720,18 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
-  fanOn: {
+  fanButtonOn: {
     backgroundColor: "#4CAF50",
     borderWidth: 2,
     borderColor: "#388E3C",
   },
-  fanOff: {
+  fanButtonOff: {
     backgroundColor: "#FF6B6B",
     borderWidth: 2,
     borderColor: "#D32F2F",
+  },
+  disabledButton: {
+    opacity: 0.7,
   },
   waterPumpOn: {
     backgroundColor: "#4CAF50",
@@ -681,6 +764,24 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 20,
+    textAlign: 'center',
+  },
+  statusContainer: {
+    position: 'absolute',
+    bottom: 120,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 5,
+    alignSelf: 'center',
+    marginHorizontal: 40,
+    zIndex: 1000,
+  },
+  statusText: {
+    color: 'white',
+    fontWeight: 'bold',
     textAlign: 'center',
   },
 });
