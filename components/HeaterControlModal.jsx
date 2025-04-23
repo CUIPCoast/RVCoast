@@ -354,27 +354,34 @@ const HeaterControlModal = ({ isVisible, onClose }) => {
           </View>
           
           <View style={styles.fanSpeedContainer}>
-            <FanSpeedButton
-              speed="Auto"
-              isActive={isAutoModeActive}
-              onPress={setFanSpeed}
-            />
-            <FanSpeedButton
-              speed="High"
-              isActive={selectedFanSpeed === 'High' && !isAutoModeActive}
-              onPress={setFanSpeed}
-            />
-            <FanSpeedButton
-              speed="Med"
-              isActive={selectedFanSpeed === 'Med' && !isAutoModeActive}
-              onPress={setFanSpeed}
-            />
-            <FanSpeedButton
-              speed="Low"
-              isActive={selectedFanSpeed === 'Low' && !isAutoModeActive}
-              onPress={setFanSpeed}
-            />
+            <View style={styles.fanSpeedRow}>
+              <FanSpeedButton
+                speed="Auto"
+                isActive={isAutoModeActive}
+                onPress={setFanSpeed}
+              />
+              <FanSpeedButton
+                speed="High"
+                isActive={selectedFanSpeed === 'High' && !isAutoModeActive}
+                onPress={setFanSpeed}
+              />
+            </View>
+            <View style={styles.fanSpeedRow}>
+              <FanSpeedButton
+                speed="Med"
+                isActive={selectedFanSpeed === 'Med' && !isAutoModeActive}
+                onPress={setFanSpeed}
+              />
+              <FanSpeedButton
+                speed="Low"
+                isActive={selectedFanSpeed === 'Low' && !isAutoModeActive}
+                onPress={setFanSpeed}
+              />
+            </View>
           </View>
+
+          {/* Bottom Spacing */}
+          <View style={styles.buttonSpacing} />
 
           {/* Close Button */}
           <TouchableOpacity
@@ -395,7 +402,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
   modalContent: {
     width: '90%',
@@ -455,9 +462,12 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   fanSpeedContainer: {
+    marginBottom: 10,
+  },
+  fanSpeedRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    flexWrap: 'wrap',
+    marginBottom: 10,
   },
   fanSpeedButton: {
     flex: 1,
@@ -466,8 +476,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#333',
     borderRadius: 10,
-    margin: 5,
-    minWidth: 70,
+    marginHorizontal: 5,
   },
   activeFanButton: {
     backgroundColor: '#4CAF50', // Green for active
@@ -484,12 +493,15 @@ const styles = StyleSheet.create({
   disabledButton: {
     opacity: 0.6,
   },
+  buttonSpacing: {
+    height: 10, // Add some space before the close button
+  },
   closeButton: {
     backgroundColor: '#FFB267',
     paddingVertical: 12,
     borderRadius: 10,
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 10,
   },
   closeButtonText: {
     color: '#000',

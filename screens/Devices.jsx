@@ -7,6 +7,7 @@ import AwningControlModal from "../components/AwningControlModal";
 import HeaterControlModal from "../components/HeaterControlModal";
 import { LightService, FanService } from "../API/RVControlServices"; // Add FanService import
 import ToggleSwitch from "../components/ToggleSwitch.jsx";
+import { Feather as Icon } from '@expo/vector-icons';
 
 import {
   Padding,
@@ -354,70 +355,75 @@ const Devices = () => {
           
           <View style={styles.divider} />
           
-          <ScrollView>
-            <View>
-              {lightGroups.bedroom.map((lightId) => (
-                <EnhancedMainLight
-                  key={lightId}
-                  name={lightDisplayNames[lightId] || lightId}
-                  lightId={lightId}
-                  min={0}
-                  max={100}
-                  value={sliderValues[lightId] || 0}
-                  isOn={lightStates[lightId] || false}
-                  onToggle={(isOn) => handleLightToggle(lightId, isOn)}
-                  onValueChange={(value) => handleSliderChange(lightId, value)}
-                  supportsDimming={true}
-                />
-              ))}
-            </View>
-          </ScrollView>
+          <ScrollView 
+  contentContainerStyle={{  paddingBottom: 80 }} // use your brown tone here
+>
+  <View>
+    {lightGroups.bedroom.map((lightId) => (
+      <EnhancedMainLight
+        key={lightId}
+        name={lightDisplayNames[lightId] || lightId}
+        lightId={lightId}
+        min={0}
+        max={100}
+        value={sliderValues[lightId] || 0}
+        isOn={lightStates[lightId] || false}
+        onToggle={(isOn) => handleLightToggle(lightId, isOn)}
+        onValueChange={(value) => handleSliderChange(lightId, value)}
+        supportsDimming={true}
+      />
+    ))}
+  </View>
+</ScrollView>
         </>
       );
     } else if (selectedTab === TABS.BATHROOM) {
       return (
         <View className="">
-          <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
+          {/* Modern Fan Controls */}
+          <View style={styles.fanControlsContainer}>
             <TouchableOpacity
               style={[
-                styles.fanButtonContainer,
-                isBayVentFanOn ? styles.fanButtonOn : styles.fanButtonOff,
-                { marginRight: 20 },
+                styles.modernFanButton,
+                isBayVentFanOn ? styles.fanButtonActive : styles.fanButtonInactive,
                 isLoading && styles.disabledButton
               ]}
               onPress={toggleBayVentFan}
               disabled={isLoading}
             >
-              <Text className="text-white mb-1 text-center">Bay Vent</Text>
-              <Image
-                source={require("../assets/waterpump (2).png")}
-                style={{ width: 50, height: 50 }}
-              />
-              <Text className="text-white mt-1 text-center">
-                {isBayVentFanOn ? "On" : "Off"}
-              </Text>
+              <View style={styles.fanIconContainer}>
+                <View style={[styles.fanIconCircle, isBayVentFanOn ? styles.iconCircleActive : styles.iconCircleInactive]}>
+                  <Icon name="sun" size={24} color={isBayVentFanOn ? "#FFF" : "#888"} />
+                </View>
+              </View>
+              <Text style={styles.fanButtonLabel}>Bay Vent</Text>
+              <View style={[styles.statusIndicator, isBayVentFanOn ? styles.statusActive : styles.statusInactive]}>
+                <Text style={styles.statusText}>{isBayVentFanOn ? "ON" : "OFF"}</Text>
+              </View>
             </TouchableOpacity>
-
+          
             <TouchableOpacity
               style={[
-                styles.fanButtonContainer,
-                isBathroomFanOn ? styles.fanButtonOn : styles.fanButtonOff,
+                styles.modernFanButton,
+                isBathroomFanOn ? styles.fanButtonActive : styles.fanButtonInactive,
                 isLoading && styles.disabledButton
               ]}
               onPress={toggleBathroomFan}
               disabled={isLoading}
             >
-              <Text className="text-white mb-1 text-center">Bath Fan</Text>
-              <Image
-                source={require("../assets/waterheater.png")}
-                style={{ width: 50, height: 50 }}
-              />
-              <Text className="text-white mt-1 text-center">
-                {isBathroomFanOn ? "On" : "Off"}
-              </Text>
+              <View style={styles.fanIconContainer}>
+                <View style={[styles.fanIconCircle, isBathroomFanOn ? styles.iconCircleActive : styles.iconCircleInactive]}>
+                  <Icon name="wind" size={24} color={isBathroomFanOn ? "#FFF" : "#888"} />
+                </View>
+              </View>
+              <Text style={styles.fanButtonLabel}>Bath Fan</Text>
+              <View style={[styles.statusIndicator, isBathroomFanOn ? styles.statusActive : styles.statusInactive]}>
+                <Text style={styles.statusText}>{isBathroomFanOn ? "ON" : "OFF"}</Text>
+              </View>
             </TouchableOpacity>
           </View>
-
+    
+          {/* Light Master Control */}
           <View style={styles.masterLightContainer}>
             <View style={styles.masterLightContent}>
               <View style={styles.masterLightLeft}>
@@ -437,9 +443,11 @@ const Devices = () => {
               </View>
             </View>
           </View>
-
+    
+          {/* Divider */}
           <View style={styles.divider} />
-
+    
+          {/* Light Controls */}
           {lightGroups.bathroom.map((lightId) => (
             <EnhancedMainLight
               key={lightId}
@@ -784,6 +792,87 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
   },
+
+  // Add these styles to your StyleSheet
+
+// Fan Controls - Modern Style
+fanControlsContainer: {
+  flexDirection: 'row',
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginVertical: 20,
+  paddingHorizontal: 10,
+},
+modernFanButton: {
+  width: 140,
+  height: 140,
+  borderRadius: 16,
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  padding: 15,
+  marginHorizontal: 10,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.2,
+  shadowRadius: 8,
+  elevation: 6,
+  borderWidth: 1,
+},
+fanButtonActive: {
+  backgroundColor: '#27303F',
+  borderColor: '#4F7BFA',
+},
+fanButtonInactive: {
+  backgroundColor: '#1E242E',
+  borderColor: '#323845',
+},
+fanIconContainer: {
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginBottom: 12,
+},
+fanIconCircle: {
+  width: 60,
+  height: 60,
+  borderRadius: 30,
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+iconCircleActive: {
+  backgroundColor: '#4F7BFA',
+},
+iconCircleInactive: {
+  backgroundColor: '#2D333F',
+  borderWidth: 1,
+  borderColor: '#3D4452',
+},
+fanButtonLabel: {
+  color: '#FFFFFF',
+  fontSize: 16,
+  fontWeight: '600',
+  marginBottom: 8,
+},
+statusIndicator: {
+  paddingHorizontal: 12,
+  paddingVertical: 4,
+  borderRadius: 12,
+  minWidth: 46,
+  alignItems: 'center',
+},
+statusActive: {
+  backgroundColor: '#4F7BFA',
+},
+statusInactive: {
+  backgroundColor: '#323845',
+},
+statusText: {
+  color: '#FFFFFF',
+  fontSize: 12,
+  fontWeight: '700',
+},
+disabledButton: {
+  opacity: 0.6,
+},
 });
 
 export default Devices;

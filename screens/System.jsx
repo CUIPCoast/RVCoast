@@ -45,61 +45,9 @@ const System = () => {
         <Map />
       </View>
 
-      <View className="items-center">
-        <View className="flex-row items-center mb-3">
-          <View className="bg-orange-300 p-4 rounded-lg items-center mx-3 h-22 w-32">
-            <Text className="text-black text-lg font-bold mb-1">Shore</Text>
-            <Text className="text-gray-700 text-2xl font-bold">965 W</Text>
-          </View>
-
-          <View className="bg-orange-300 p-4 rounded-lg items-center mx-3 h-22 w-32">
-            <Text className="text-black text-lg font-bold mb-1">Battery Life</Text>
-            <Text className="text-gray-700 text-2xl font-bold">61%</Text>
-          </View>
-        </View>
-        
-
-          <View className="flex-row justify-between mb-8">
-            <View className="bg-orange-300 p-4 rounded-lg items-center mx-3 h-22 w-32">
-              <Text className="text-black text-lg font-bold mb-1">AC Loads</Text>
-              <Text className="text-gray-700 text-2xl font-bold">662 W</Text>
-            </View>
-
-            <View className="bg-orange-300 p-4 rounded-lg items-center mx-3 h-22 w-32">
-              <Text className="text-black text-lg font-bold mb-1">PV Charger</Text>
-              <Text className="text-gray-700 text-2xl font-bold">0.0 W</Text>
-            </View>
-
-        </View>
-      </View>
-
-      <View className="items-center">
-        <BatteryGauge />
-        {/* <BatteryGauge /> */}
-      </View>
-
-      <View className="mt-3">
-
-      <TankHeaterControl
-  name="Water Pump"
-  percentage={80}
-  isOn={isOn}
-  setIsOn={setIsOn}
-  trackColor={{ minimum: "lightblue", maximum: "white" }}
-/>
-
-<TankHeaterControl
-  name="Water Heater"
-  percentage={40}
-  isOn={isOnGray}
-  setIsOn={setIsOnGray}
-  trackColor={{ minimum: "gray", maximum: "white" }}
-/>
+     
 
       
-
-      </View>
-
       
 
     </ScrollView>
