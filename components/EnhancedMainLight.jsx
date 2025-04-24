@@ -24,12 +24,11 @@ const EnhancedMainLight = ({
 
   // This useEffect syncs with parent component after initial render
   useEffect(() => {
-    // Only update if component is mounted and not currently changing
-    if (!isChanging) {
-      setLocalValue(isOn ? value : 0);
-      setLocalIsOn(isOn);
-    }
-  }, [value, isOn]);
+    console.log(`Update for ${lightId}: isOn=${isOn}, value=${value}`);
+    // Always update local state to match parent state
+    setLocalIsOn(isOn);
+    setLocalValue(isOn ? value : 0);
+  }, [isOn, value]);
 
   // Handle slider value changes
   const handleValueChange = (newValue) => {
