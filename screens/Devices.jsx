@@ -8,6 +8,7 @@ import HeaterControlModal from "../components/HeaterControlModal";
 import { LightService, FanService } from "../API/RVControlServices"; // Add FanService import
 import ToggleSwitch from "../components/ToggleSwitch.jsx";
 import { Feather as Icon } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import {
   Padding,
@@ -65,6 +66,61 @@ const lightGroups = {
   ]
 };
 
+const MasterLightControl = ({ isOn, onToggleOn, onToggleOff, isLoading }) => {
+  return (
+    <View style={styles.masterLightContainer}>
+      <View style={styles.masterLightContent}>
+        <View style={styles.masterLightLeft}>
+          <Image
+            source={require("../assets/lamplight.png")}
+            style={styles.masterLightIcon}
+          />
+          <Text style={styles.masterLightText}>Light Master</Text>
+        </View>
+        
+        <View style={styles.masterLightRight}>
+          {isLoading ? (
+            <ActivityIndicator size="small" color="#FFB267" />
+          ) : (
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              {/* ON Button */}
+              <TouchableOpacity
+                style={{
+                  backgroundColor: isOn ? '#FFB267' : '#444',
+                  paddingHorizontal: 15,
+                  paddingVertical: 8,
+                  borderTopLeftRadius: 20,
+                  borderBottomLeftRadius: 20,
+                  marginRight: 1,
+                }}
+                onPress={onToggleOn}
+                disabled={isLoading || isOn}
+              >
+                <Text style={{ color: isOn ? '#000' : '#FFF' }}>ON</Text>
+              </TouchableOpacity>
+              
+              {/* OFF Button */}
+              <TouchableOpacity
+                style={{
+                  backgroundColor: !isOn ? '#FFB267' : '#444',
+                  paddingHorizontal: 15,
+                  paddingVertical: 8,
+                  borderTopRightRadius: 20,
+                  borderBottomRightRadius: 20,
+                }}
+                onPress={onToggleOff}
+                disabled={isLoading || !isOn}
+              >
+                <Text style={{ color: !isOn ? '#000' : '#FFF' }}>OFF</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </View>
+    </View>
+  );
+};
+
 const Devices = () => {
   const [isOn, setIsOn] = useState(false);
   const isTablet = useScreenSize();
@@ -115,7 +171,49 @@ const Devices = () => {
     
     setLightStates(initialLightStates);
     setSliderValues(initialSliderValues);
+    
+    // Load saved light states from storage
+    const loadSavedLightStates = async () => {
+      try {
+        const savedLightStates = await AsyncStorage.getItem('lightStates');
+        const savedSliderValues = await AsyncStorage.getItem('sliderValues');
+        
+        if (savedLightStates) {
+          setLightStates(JSON.parse(savedLightStates));
+        }
+        
+        if (savedSliderValues) {
+          setSliderValues(JSON.parse(savedSliderValues));
+        }
+        
+        // Update master light state based on loaded light states
+        const loadedStates = savedLightStates ? JSON.parse(savedLightStates) : {};
+        const anyLightOn = Object.values(loadedStates).some(state => state);
+        setMasterLightOn(anyLightOn);
+      } catch (error) {
+        console.error('Error loading saved light states:', error);
+      }
+    };
+    
+    loadSavedLightStates();
   }, []);
+
+  // Add a useEffect to save light states when they change
+  useEffect(() => {
+    const saveLightStates = async () => {
+      try {
+        await AsyncStorage.setItem('lightStates', JSON.stringify(lightStates));
+        await AsyncStorage.setItem('sliderValues', JSON.stringify(sliderValues));
+      } catch (error) {
+        console.error('Error saving light states:', error);
+      }
+    };
+    
+    // Only save if states have been initialized (not empty objects)
+    if (Object.keys(lightStates).length > 0) {
+      saveLightStates();
+    }
+  }, [lightStates, sliderValues]);
 
   // Handle bathroom fan toggle with API integration
   const toggleBathroomFan = async () => {
@@ -202,62 +300,104 @@ const Devices = () => {
   };
   
   // Handler for light toggle
-  const handleLightToggle = (lightId, isOn) => {
-    setLightStates(prev => ({
-      ...prev,
-      [lightId]: isOn
-    }));
-    
-    // Update master light state based on all lights
-    const updatedStates = { ...lightStates, [lightId]: isOn };
-    const anyLightOn = Object.values(updatedStates).some(state => state);
-    setMasterLightOn(anyLightOn);
-  };
+ // Handler for light toggle
+const handleLightToggle = (lightId, isOn) => {
+  // Update just this specific light's state
+  setLightStates(prev => ({
+    ...prev,
+    [lightId]: isOn
+  }));
+  
+  // Update master light state ONLY if all lights are turned off
+  // or if this is the first light being turned on
+  const updatedStates = { ...lightStates, [lightId]: isOn };
+  
+  if (isOn) {
+    // Only set master light ON if it's currently OFF and we're turning a light ON
+    if (!masterLightOn) {
+      setMasterLightOn(true);
+    }
+  } else {
+    // Check if ALL lights are now off to set master light to OFF
+    const anyLightStillOn = Object.values(updatedStates).some(state => state);
+    if (!anyLightStillOn) {
+      setMasterLightOn(false);
+    }
+  }
+};
 
   // Master light toggle handler
-  const handleMasterLightToggle = async (isOn) => {
-    try {
-      setIsLoading(true);
+  // Master light toggle handler
+const handleMasterLightToggle = async (isOn) => {
+  try {
+    setIsLoading(true);
+    console.log(`Master light toggle called with isOn=${isOn}`);
+    
+    if (isOn) {
+      // Turn on all lights
+      const result = await LightService.allLightsOn();
+      console.log('allLightsOn result:', result);
       
-      if (isOn) {
-        const result = await LightService.allLightsOn();
-        if (result.success) {
-          // Update all light states to on and set brightness to 50
-          const newLightStates = {};
-          const newSliderValues = {};
-          
-          Object.keys(lightStates).forEach(lightId => {
-            newLightStates[lightId] = true;
-            newSliderValues[lightId] = 50;
-          });
-          
-          setLightStates(newLightStates);
-          setSliderValues(newSliderValues);
-          setMasterLightOn(true);
-        }
-      } else {
-        const result = await LightService.allLightsOff();
-        if (result.success) {
-          // Update all light states to off and set brightness to 0
-          const newLightStates = {};
-          const newSliderValues = {};
-          
-          Object.keys(lightStates).forEach(lightId => {
-            newLightStates[lightId] = false;
-            newSliderValues[lightId] = 0;
-          });
-          
-          setLightStates(newLightStates);
-          setSliderValues(newSliderValues);
-          setMasterLightOn(false);
-        }
+      if (result.success) {
+        // IMPORTANT: Update UI state FIRST to prevent flickering
+        setMasterLightOn(true);
+        
+        // Update all light states to ON and set brightness to 50
+        const newLightStates = {};
+        const newSliderValues = {};
+        
+        Object.keys(lightStates).forEach(lightId => {
+          newLightStates[lightId] = true;
+          newSliderValues[lightId] = 50;
+        });
+        
+        setLightStates(newLightStates);
+        setSliderValues(newSliderValues);
+        
+        // Save the new states to storage for synchronization
+        await AsyncStorage.setItem('lightStates', JSON.stringify(newLightStates));
+        await AsyncStorage.setItem('sliderValues', JSON.stringify(newSliderValues));
+        
+        console.log('Master light set to ON, all lights updated');
       }
-    } catch (error) {
-      console.error('Failed to control master lights:', error);
-    } finally {
-      setIsLoading(false);
+    } else {
+      // Turn off all lights
+      const result = await LightService.allLightsOff();
+      console.log('allLightsOff result:', result);
+      
+      if (result.success) {
+        // IMPORTANT: Update UI state FIRST to prevent flickering
+        setMasterLightOn(false);
+        
+        // Update all light states to OFF and set brightness to 0
+        const newLightStates = {};
+        const newSliderValues = {};
+        
+        Object.keys(lightStates).forEach(lightId => {
+          newLightStates[lightId] = false;
+          newSliderValues[lightId] = 0;
+        });
+        
+        // Update the states
+        setLightStates(newLightStates);
+        setSliderValues(newSliderValues);
+        
+        // Save the new states to storage for synchronization
+        await AsyncStorage.setItem('lightStates', JSON.stringify(newLightStates));
+        await AsyncStorage.setItem('sliderValues', JSON.stringify(newSliderValues));
+        
+        console.log('Master light set to OFF, all lights updated');
+      }
     }
-  };
+  } catch (error) {
+    console.error('Failed to control master lights:', error);
+    // If there's an error, revert the UI state to match reality
+    const anyLightOn = Object.values(lightStates).some(state => state);
+    setMasterLightOn(anyLightOn);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const renderTabContent = () => {
     if (selectedTab === TABS.MAIN) {
@@ -290,25 +430,88 @@ const Devices = () => {
           </View>
           
           {/* Master Light Toggle */}
-          <View style={styles.masterLightContainer}>
-            <View style={styles.masterLightContent}>
-              <View style={styles.masterLightLeft}>
-                <Image
-                  source={require("../assets/lamplight.png")}
-                  style={styles.masterLightIcon}
-                />
-                <Text style={styles.masterLightText}>Light Master</Text>
-              </View>
-              
-              <View style={styles.masterLightRight}>
-                {isLoading ? (
-                  <ActivityIndicator size="small" color="#FFB267" />
-                ) : (
-                  <ToggleSwitch isOn={masterLightOn} setIsOn={handleMasterLightToggle} />
-                )}
-              </View>
-            </View>
-          </View>
+          <MasterLightControl 
+  isOn={masterLightOn}
+  onToggleOn={async () => {
+    try {
+      setIsLoading(true);
+      const result = await LightService.allLightsOn();
+      console.log('allLightsOn result:', JSON.stringify(result));
+      
+      if (result.success) {
+        // Update all light states to on and set brightness to 50
+        const newLightStates = {};
+        const newSliderValues = {};
+        
+        Object.keys(lightStates).forEach(lightId => {
+          newLightStates[lightId] = true;
+          newSliderValues[lightId] = 50;
+        });
+        
+        setLightStates(newLightStates);
+        setSliderValues(newSliderValues);
+        setMasterLightOn(true);
+        
+        // Show status message
+        setStatusMessage('All lights turned ON');
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+      } else {
+        // Show error message
+        setStatusMessage('Failed to turn all lights ON');
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+      }
+    } catch (error) {
+      console.error('Failed to turn all lights on:', error);
+      setStatusMessage(`Error: ${error.message}`);
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
+    } finally {
+      setIsLoading(false);
+    }
+  }}
+  onToggleOff={async () => {
+    try {
+      setIsLoading(true);
+      const result = await LightService.allLightsOff();
+      console.log('allLightsOff result:', JSON.stringify(result));
+      
+      if (result.success) {
+        // Update all light states to off and set brightness to 0
+        const newLightStates = {};
+        const newSliderValues = {};
+        
+        Object.keys(lightStates).forEach(lightId => {
+          newLightStates[lightId] = false;
+          newSliderValues[lightId] = 0;
+        });
+        
+        setLightStates(newLightStates);
+        setSliderValues(newSliderValues);
+        setMasterLightOn(false);
+        
+        // Show status message
+        setStatusMessage('All lights turned OFF');
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+      } else {
+        // Show error message
+        setStatusMessage('Failed to turn all lights OFF');
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+      }
+    } catch (error) {
+      console.error('Failed to turn all lights off:', error);
+      setStatusMessage(`Error: ${error.message}`);
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
+    } finally {
+      setIsLoading(false);
+    }
+  }}
+  isLoading={isLoading}
+/>
           
           <View style={styles.divider} />
           
@@ -333,48 +536,111 @@ const Devices = () => {
     } else if (selectedTab === TABS.BEDROOM) {
       return (
         <>
-          <View style={styles.masterLightContainer}>
-            <View style={styles.masterLightContent}>
-              <View style={styles.masterLightLeft}>
-                <Image
-                  source={require("../assets/lamplight.png")}
-                  style={styles.masterLightIcon}
-                />
-                <Text style={styles.masterLightText}>Light Master</Text>
-              </View>
-              
-              <View style={styles.masterLightRight}>
-                {isLoading ? (
-                  <ActivityIndicator size="small" color="#FFB267" />
-                ) : (
-                  <ToggleSwitch isOn={masterLightOn} setIsOn={handleMasterLightToggle} />
-                )}
-              </View>
-            </View>
-          </View>
+          <MasterLightControl 
+  isOn={masterLightOn}
+  onToggleOn={async () => {
+    try {
+      setIsLoading(true);
+      const result = await LightService.allLightsOn();
+      console.log('allLightsOn result:', JSON.stringify(result));
+      
+      if (result.success) {
+        // Update all light states to on and set brightness to 50
+        const newLightStates = {};
+        const newSliderValues = {};
+        
+        Object.keys(lightStates).forEach(lightId => {
+          newLightStates[lightId] = true;
+          newSliderValues[lightId] = 50;
+        });
+        
+        setLightStates(newLightStates);
+        setSliderValues(newSliderValues);
+        setMasterLightOn(true);
+        
+        // Show status message
+        setStatusMessage('All lights turned ON');
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+      } else {
+        // Show error message
+        setStatusMessage('Failed to turn all lights ON');
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+      }
+    } catch (error) {
+      console.error('Failed to turn all lights on:', error);
+      setStatusMessage(`Error: ${error.message}`);
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
+    } finally {
+      setIsLoading(false);
+    }
+  }}
+  onToggleOff={async () => {
+    try {
+      setIsLoading(true);
+      const result = await LightService.allLightsOff();
+      console.log('allLightsOff result:', JSON.stringify(result));
+      
+      if (result.success) {
+        // Update all light states to off and set brightness to 0
+        const newLightStates = {};
+        const newSliderValues = {};
+        
+        Object.keys(lightStates).forEach(lightId => {
+          newLightStates[lightId] = false;
+          newSliderValues[lightId] = 0;
+        });
+        
+        setLightStates(newLightStates);
+        setSliderValues(newSliderValues);
+        setMasterLightOn(false);
+        
+        // Show status message
+        setStatusMessage('All lights turned OFF');
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+      } else {
+        // Show error message
+        setStatusMessage('Failed to turn all lights OFF');
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+      }
+    } catch (error) {
+      console.error('Failed to turn all lights off:', error);
+      setStatusMessage(`Error: ${error.message}`);
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
+    } finally {
+      setIsLoading(false);
+    }
+  }}
+  isLoading={isLoading}
+/>
           
           <View style={styles.divider} />
           
           <ScrollView 
-  contentContainerStyle={{  paddingBottom: 80 }} // use your brown tone here
->
-  <View>
-    {lightGroups.bedroom.map((lightId) => (
-      <EnhancedMainLight
-        key={lightId}
-        name={lightDisplayNames[lightId] || lightId}
-        lightId={lightId}
-        min={0}
-        max={100}
-        value={sliderValues[lightId] || 0}
-        isOn={lightStates[lightId] || false}
-        onToggle={(isOn) => handleLightToggle(lightId, isOn)}
-        onValueChange={(value) => handleSliderChange(lightId, value)}
-        supportsDimming={true}
-      />
-    ))}
-  </View>
-</ScrollView>
+            contentContainerStyle={{ paddingBottom: 80 }} // use your brown tone here
+          >
+            <View>
+              {lightGroups.bedroom.map((lightId) => (
+                <EnhancedMainLight
+                  key={lightId}
+                  name={lightDisplayNames[lightId] || lightId}
+                  lightId={lightId}
+                  min={0}
+                  max={100}
+                  value={sliderValues[lightId] || 0}
+                  isOn={lightStates[lightId] || false}
+                  onToggle={(isOn) => handleLightToggle(lightId, isOn)}
+                  onValueChange={(value) => handleSliderChange(lightId, value)}
+                  supportsDimming={true}
+                />
+              ))}
+            </View>
+          </ScrollView>
         </>
       );
     } else if (selectedTab === TABS.BATHROOM) {
@@ -424,25 +690,88 @@ const Devices = () => {
           </View>
     
           {/* Light Master Control */}
-          <View style={styles.masterLightContainer}>
-            <View style={styles.masterLightContent}>
-              <View style={styles.masterLightLeft}>
-                <Image
-                  source={require("../assets/lamplight.png")}
-                  style={styles.masterLightIcon}
-                />
-                <Text style={styles.masterLightText}>Light Master</Text>
-              </View>
-              
-              <View style={styles.masterLightRight}>
-                {isLoading ? (
-                  <ActivityIndicator size="small" color="#FFB267" />
-                ) : (
-                  <ToggleSwitch isOn={masterLightOn} setIsOn={handleMasterLightToggle} />
-                )}
-              </View>
-            </View>
-          </View>
+          <MasterLightControl 
+  isOn={masterLightOn}
+  onToggleOn={async () => {
+    try {
+      setIsLoading(true);
+      const result = await LightService.allLightsOn();
+      console.log('allLightsOn result:', JSON.stringify(result));
+      
+      if (result.success) {
+        // Update all light states to on and set brightness to 50
+        const newLightStates = {};
+        const newSliderValues = {};
+        
+        Object.keys(lightStates).forEach(lightId => {
+          newLightStates[lightId] = true;
+          newSliderValues[lightId] = 50;
+        });
+        
+        setLightStates(newLightStates);
+        setSliderValues(newSliderValues);
+        setMasterLightOn(true);
+        
+        // Show status message
+        setStatusMessage('All lights turned ON');
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+      } else {
+        // Show error message
+        setStatusMessage('Failed to turn all lights ON');
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+      }
+    } catch (error) {
+      console.error('Failed to turn all lights on:', error);
+      setStatusMessage(`Error: ${error.message}`);
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
+    } finally {
+      setIsLoading(false);
+    }
+  }}
+  onToggleOff={async () => {
+    try {
+      setIsLoading(true);
+      const result = await LightService.allLightsOff();
+      console.log('allLightsOff result:', JSON.stringify(result));
+      
+      if (result.success) {
+        // Update all light states to off and set brightness to 0
+        const newLightStates = {};
+        const newSliderValues = {};
+        
+        Object.keys(lightStates).forEach(lightId => {
+          newLightStates[lightId] = false;
+          newSliderValues[lightId] = 0;
+        });
+        
+        setLightStates(newLightStates);
+        setSliderValues(newSliderValues);
+        setMasterLightOn(false);
+        
+        // Show status message
+        setStatusMessage('All lights turned OFF');
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+      } else {
+        // Show error message
+        setStatusMessage('Failed to turn all lights OFF');
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+      }
+    } catch (error) {
+      console.error('Failed to turn all lights off:', error);
+      setStatusMessage(`Error: ${error.message}`);
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
+    } finally {
+      setIsLoading(false);
+    }
+  }}
+  isLoading={isLoading}
+/>
     
           {/* Divider */}
           <View style={styles.divider} />
@@ -793,9 +1122,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // Add these styles to your StyleSheet
-
-// Fan Controls - Modern Style
+  // Fan Controls - Modern Style
 fanControlsContainer: {
   flexDirection: 'row',
   justifyContent: 'center',
@@ -873,6 +1200,37 @@ statusText: {
 disabledButton: {
   opacity: 0.6,
 },
+masterLightContainer: {
+  marginTop: 10,
+  marginHorizontal: 20,
+  backgroundColor: '#1B1B1B',
+  borderRadius: 10,
+  padding: 15,
+},
+masterLightContent: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+},
+masterLightLeft: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
+masterLightIcon: {
+  width: 30,
+  height: 30,
+  marginRight: 10,
+},
+masterLightText: {
+  color: 'white',
+  fontSize: 16,
+},
+masterLightRight: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
 });
 
+
 export default Devices;
+

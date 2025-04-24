@@ -2,12 +2,11 @@ import React, { useState, useEffect } from "react";
 import { View, Text, Image, ScrollView, Alert, ActivityIndicator, TouchableOpacity } from "react-native";
 import { Col, Row, Grid } from "react-native-easy-grid";
 import moment from "moment";
-import ToggleSwitch from "../components/ToggleSwitch.jsx";
 import EnhancedMainLight from "../components/EnhancedMainLight.jsx";
 import { LightControlService } from "../Service/LightControlService.js";
 import { CANBusMonitor } from "../Service/CANBusMonitor.js";
 
-const LightScreenTablet = () => {
+const ImprovedLightScreenTablet = () => {
   // Current date/time
   const currentDate = moment().format("MMMM Do, YYYY");
   const dayOfTheWeek = moment().format("dddd");
@@ -17,6 +16,10 @@ const LightScreenTablet = () => {
   
   // State for master light switch
   const [masterLightOn, setMasterLightOn] = useState(false);
+  
+  // Add state for status messages
+  const [statusMessage, setStatusMessage] = useState('');
+  const [showStatus, setShowStatus] = useState(false);
   
   // Get all available lights
   const allLights = LightControlService.getAllLights();
@@ -96,50 +99,97 @@ const LightScreenTablet = () => {
     setMasterLightOn(anyLightOn);
   };
 
-  // Master light toggle handler
-  const handleMasterLightToggle = async (isOn) => {
+  // Turn all lights on
+  const handleAllLightsOn = async () => {
     try {
       setIsLoading(true);
       
-      if (isOn) {
-        const result = await LightControlService.allLightsOn();
-        if (result.success) {
-          // Update all light states to on and set brightness to 50
-          const newLightStates = {};
-          const newSliderValues = {};
-          
-          allLights.forEach(lightId => {
-            newLightStates[lightId] = true;
-            newSliderValues[lightId] = 50;
-          });
-          
-          setLightStates(newLightStates);
-          setSliderValues(newSliderValues);
-          setMasterLightOn(true);
-        } else {
-          Alert.alert("Error", "Failed to turn all lights on");
-        }
+      const result = await LightControlService.allLightsOn();
+      console.log('allLightsOn result:', JSON.stringify(result));
+      
+      if (result.success) {
+        // Update all light states to on and set brightness to 50
+        const newLightStates = {};
+        const newSliderValues = {};
+        
+        allLights.forEach(lightId => {
+          newLightStates[lightId] = true;
+          newSliderValues[lightId] = 50;
+        });
+        
+        setLightStates(newLightStates);
+        setSliderValues(newSliderValues);
+        setMasterLightOn(true);
+        
+        // Show success message
+        setStatusMessage('All lights turned ON');
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+        
+        console.log('Master light set to ON, all lights updated');
       } else {
-        const result = await LightControlService.allLightsOff();
-        if (result.success) {
-          // Update all light states to off and set brightness to 0
-          const newLightStates = {};
-          const newSliderValues = {};
-          
-          allLights.forEach(lightId => {
-            newLightStates[lightId] = false;
-            newSliderValues[lightId] = 0;
-          });
-          
-          setLightStates(newLightStates);
-          setSliderValues(newSliderValues);
-          setMasterLightOn(false);
-        } else {
-          Alert.alert("Error", "Failed to turn all lights off");
-        }
+        // Show error message
+        setStatusMessage('Failed to turn all lights ON');
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+        
+        console.error('Failed to turn all lights on:', result.error);
       }
     } catch (error) {
-      Alert.alert("Error", `Failed to control master lights: ${error.message}`);
+      // Show error message
+      setStatusMessage(`Error: ${error.message}`);
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
+      
+      console.error('Error turning all lights on:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Turn all lights off
+  const handleAllLightsOff = async () => {
+    try {
+      setIsLoading(true);
+      
+      const result = await LightControlService.allLightsOff();
+      console.log('allLightsOff result:', JSON.stringify(result));
+      
+      if (result.success) {
+        // Update all light states to off and set brightness to 0
+        const newLightStates = {};
+        const newSliderValues = {};
+        
+        allLights.forEach(lightId => {
+          newLightStates[lightId] = false;
+          newSliderValues[lightId] = 0;
+        });
+        
+        setLightStates(newLightStates);
+        setSliderValues(newSliderValues);
+        setMasterLightOn(false);
+        
+        // Show success message
+        setStatusMessage('All lights turned OFF');
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+        
+        console.log('Master light set to OFF, all lights updated');
+      } else {
+        // Show error message
+        setStatusMessage('Failed to turn all lights OFF');
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+        
+        console.error('Failed to turn all lights off:', result.error);
+      }
+    } catch (error) {
+      // Show error message
+      setStatusMessage(`Error: ${error.message}`);
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
+      
+      console.error('Error turning all lights off:', error);
     } finally {
       setIsLoading(false);
     }
@@ -185,8 +235,18 @@ const LightScreenTablet = () => {
       setSliderValues(newSliderValues);
       setMasterLightOn(true);
       
+      // Show success message
+      setStatusMessage('Mood lighting activated');
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
+      
     } catch (error) {
-      Alert.alert("Error", `Failed to set mood lighting: ${error.message}`);
+      // Show error message
+      setStatusMessage(`Error setting mood lighting: ${error.message}`);
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
+      
+      console.error('Failed to set mood lighting:', error);
     } finally {
       setIsLoading(false);
     }
@@ -234,8 +294,18 @@ const LightScreenTablet = () => {
       setSliderValues(newSliderValues);
       setMasterLightOn(true);
       
+      // Show success message
+      setStatusMessage('Evening lighting activated');
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
+      
     } catch (error) {
-      Alert.alert("Error", `Failed to set evening lighting: ${error.message}`);
+      // Show error message
+      setStatusMessage(`Error setting evening lighting: ${error.message}`);
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
+      
+      console.error('Failed to set evening lighting:', error);
     } finally {
       setIsLoading(false);
     }
@@ -313,7 +383,25 @@ const LightScreenTablet = () => {
         </Row>
       </Row>
       
-      {/* Master Light Switch Row */}
+      {/* Status message overlay */}
+      {showStatus && (
+        <View style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: [{ translateX: -150 }, { translateY: -25 }],
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          padding: 15,
+          borderRadius: 10,
+          zIndex: 1000,
+          width: 300,
+          alignItems: 'center'
+        }}>
+          <Text style={{ color: 'white', fontSize: 16 }}>{statusMessage}</Text>
+        </View>
+      )}
+      
+      {/* Master Light Control Row */}
       <Row size={5} style={{ justifyContent: "center", alignItems: "center" }}>
         <Col
           style={{
@@ -383,11 +471,45 @@ const LightScreenTablet = () => {
                 <Text style={{ color: '#FFB267' }}>Evening</Text>
               </TouchableOpacity>
               
-              {isLoading ? (
-                <ActivityIndicator size="small" color="#FFB267" />
-              ) : (
-                <ToggleSwitch isOn={masterLightOn} setIsOn={handleMasterLightToggle} />
-              )}
+              {/* REPLACED Toggle switch with ON/OFF buttons */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 10 }}>
+                {isLoading ? (
+                  <ActivityIndicator size="small" color="#FFB267" />
+                ) : (
+                  <>
+                    {/* ON Button */}
+                    <TouchableOpacity
+                      style={{
+                        backgroundColor: masterLightOn ? '#FFB267' : '#444',
+                        paddingHorizontal: 15,
+                        paddingVertical: 8,
+                        borderTopLeftRadius: 20,
+                        borderBottomLeftRadius: 20,
+                        marginRight: 1,
+                      }}
+                      onPress={handleAllLightsOn}
+                      disabled={isLoading || masterLightOn}
+                    >
+                      <Text style={{ color: masterLightOn ? '#000' : '#FFF' }}>ON</Text>
+                    </TouchableOpacity>
+                    
+                    {/* OFF Button */}
+                    <TouchableOpacity
+                      style={{
+                        backgroundColor: !masterLightOn ? '#FFB267' : '#444',
+                        paddingHorizontal: 15,
+                        paddingVertical: 8,
+                        borderTopRightRadius: 20,
+                        borderBottomRightRadius: 20,
+                      }}
+                      onPress={handleAllLightsOff}
+                      disabled={isLoading || !masterLightOn}
+                    >
+                      <Text style={{ color: !masterLightOn ? '#000' : '#FFF' }}>OFF</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </View>
             </View>
           </View>
         </Col>
@@ -576,4 +698,4 @@ const LightScreenTablet = () => {
   );
 };
 
-export default LightScreenTablet;
+export default ImprovedLightScreenTablet;
