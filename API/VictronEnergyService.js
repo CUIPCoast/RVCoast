@@ -1,52 +1,95 @@
-// API/VictronEnergyService.js
+// API/VictronEnergyService.js - Simplified Version
 import axios from 'axios';
 
-// The Victron Cerbo GX IP address
-const CERBO_IP = '192.168.8.242';
+// Configuration for Victron Venus OS connection
+const CONFIG = {
+  // Cerbo GX IP address - replace with your actual IP
+  HOST: '192.168.8.242',
+  // Connection timeout in ms
+  TIMEOUT: 5000,
+  // Refresh interval in ms
+  REFRESH_INTERVAL: 5000
+};
 
-// Create axios instance for Victron API
-const victronApi = axios.create({
-  baseURL: `http://${CERBO_IP}`,
-  timeout: 5000, // 5 second timeout
-});
+// State mapping functions
+const BATTERY_STATE_MAP = {
+  0: 'idle',
+  1: 'charging',
+  2: 'discharging'
+};
+
+const SYSTEM_STATE_MAP = {
+  0: 'Off',
+  1: 'Low power',
+  2: 'VE.Bus Fault',
+  3: 'Bulk charging',
+  4: 'Absorption charging',
+  5: 'Float charging',
+  6: 'Storage mode',
+  7: 'Equalisation charging',
+  8: 'Passthru',
+  9: 'Inverting',
+  10: 'Assisting',
+  11: 'Power supply mode',
+  252: 'External control'
+};
+
+const PV_STATE_MAP = {
+  0: 'off',
+  2: 'fault',
+  3: 'bulk',
+  4: 'absorption',
+  5: 'float',
+  6: 'storage',
+  7: 'equalize',
+  252: 'external control'
+};
 
 // Data storage for Victron data
-const victronData = {
+let victronData = {
   battery: {
-    soc: 42, // State of charge (percentage)
-    voltage: 13.1, // Battery voltage
-    current: -5.7, // Negative value means discharging, positive means charging
-    power: -75, // Power in watts (negative = discharge)
+    soc: 80, // State of charge (percentage)
+    voltage: 13.2, // Battery voltage
+    current: -2.5, // Negative value means discharging, positive means charging
+    power: -30, // Power in watts (negative = discharge)
     state: 'discharging', // Battery state
-    timeToGo: '11:02', // Time remaining at current usage rate
+    timeToGo: '8:45', // Time remaining at current usage rate
   },
   acLoads: {
-    power: 41, // Watts
-    lines: ['L1', 'L2'], // Active lines
+    power: 120, // Watts
+    lines: ['L1'], // Active lines
   },
   pvCharger: {
-    power: 0, // Current power generation in watts
-    dailyYield: 0, // kWh generated today
-    state: 'idle', // Charger state
+    power: 350, // Current power generation in watts
+    dailyYield: 1.8, // kWh generated today
+    state: 'charging', // Charger state
   },
   dcSystem: {
-    power: 11, // Current DC power usage in watts
-    source: 'battery', // Power source (e.g., 'battery', 'solar')
+    power: 30, // Current DC power usage in watts
+    source: 'solar', // Power source (e.g., 'battery', 'solar')
   },
   systemOverview: {
-    name: 'HUB-1',
-    state: 'Inverting', // System state
-    acInput: '--', // AC input state
+    name: 'Cerbo GX',
+    state: 'Charging', // System state
+    acInput: 'Grid', // AC input state
     mode: 'ON', // AC mode
     acLimit: 50.0, // AC current limit in amps
   },
   tanks: [],
   lastUpdate: new Date(),
-  apiStatus: 'fallback', // 'connected', 'fallback', 'error'
+  apiStatus: 'simulation', // 'connected', 'simulation', 'error'
 };
 
-// Configuration value to simulate changing data
+// Always simulate changing data since we don't have direct access yet
 let simulateChangingData = true;
+
+// Connection status
+let connectionStatus = {
+  connected: false,
+  lastAttempt: null,
+  lastSuccess: null,
+  failCount: 0
+};
 
 /**
  * Function to simulate changing data values
@@ -55,41 +98,70 @@ let simulateChangingData = true;
 const simulateDataChanges = () => {
   if (!simulateChangingData) return;
   
-  // Simulate battery discharge
-  victronData.battery.soc = Math.max(5, victronData.battery.soc - 0.1);
-  victronData.battery.power = -75 - Math.floor(Math.random() * 15);
-  victronData.battery.current = -5.7 - (Math.random() * 0.5);
+  // Randomly determine if PV is active
+  const isPVActive = Math.random() > 0.3; // 70% chance of solar being active
   
   // Simulate PV charger fluctuations
-  const isPVActive = Math.random() > 0.3; // 70% chance of solar being active
-  victronData.pvCharger.power = isPVActive ? Math.floor(Math.random() * 200) : 0;
+  victronData.pvCharger.power = isPVActive ? 300 + Math.floor(Math.random() * 100) : 0;
   victronData.pvCharger.state = isPVActive ? 'charging' : 'idle';
   
+  // Simulate battery changes based on PV status
+  if (isPVActive && victronData.battery.soc < 100) {
+    // When PV is active and battery is not full, simulate charging
+    victronData.battery.soc = Math.min(100, victronData.battery.soc + 0.1);
+    victronData.battery.current = 2 + (Math.random() * 1);
+    victronData.battery.power = 25 + Math.floor(Math.random() * 10);
+    victronData.battery.state = 'charging';
+  } else {
+    // Otherwise simulate discharging
+    victronData.battery.soc = Math.max(5, victronData.battery.soc - 0.1);
+    victronData.battery.current = -(2 + Math.random() * 1);
+    victronData.battery.power = -(25 + Math.floor(Math.random() * 10));
+    victronData.battery.state = 'discharging';
+  }
+  
+  // Update voltage based on SoC (simplified model)
+  victronData.battery.voltage = 12.2 + (victronData.battery.soc / 100) * 1.6;
+  
   // Simulate AC load changes
-  victronData.acLoads.power = 40 + Math.floor(Math.random() * 20);
+  victronData.acLoads.power = 100 + Math.floor(Math.random() * 50);
+  
+  // Update DC system power based on battery power (simplified)
+  victronData.dcSystem.power = Math.abs(victronData.battery.power);
+  victronData.dcSystem.source = isPVActive ? 'solar' : 'battery';
   
   // Update system overview based on simulated values
-  victronData.systemOverview.state = victronData.pvCharger.power > 0 ? 'Charging' : 'Inverting';
+  victronData.systemOverview.state = isPVActive ? 'Charging' : 'Inverting';
   
+  // Simulate time to go based on battery state and SoC
+  if (victronData.battery.state === 'discharging') {
+    const hours = Math.floor(victronData.battery.soc / 10);
+    const minutes = Math.floor(Math.random() * 60);
+    victronData.battery.timeToGo = `${hours}:${minutes.toString().padStart(2, '0')}`;
+  } else {
+    const timeToFull = Math.floor((100 - victronData.battery.soc) / 5);
+    victronData.battery.timeToGo = `${timeToFull}:${Math.floor(Math.random() * 60).toString().padStart(2, '0')}`;
+  }
+  
+  // Update last update timestamp
   victronData.lastUpdate = new Date();
 };
 
 // Start the simulation for changing data
-const simulationInterval = setInterval(simulateDataChanges, 5000);
+let simulationInterval = setInterval(simulateDataChanges, CONFIG.REFRESH_INTERVAL);
 
 /**
- * Try to fetch data from the Victron API (for future implementation)
+ * Main function to fetch Victron data
+ * @returns {Promise<boolean>} Success status
  */
-const attemptDataFetch = async () => {
-  try {
-    console.log('Connection to Victron API not implemented yet');
-    // This is where we'll implement the API connection when we find the right approach
-    return false;
-  } catch (error) {
-    console.error('Error connecting to Victron API:', error);
-    return false;
-  }
+const fetchVictronData = async () => {
+  // Currently we only simulate data
+  simulateDataChanges();
+  return true;
 };
+
+// Periodically refresh data
+let dataRefreshInterval = setInterval(fetchVictronData, CONFIG.REFRESH_INTERVAL);
 
 /**
  * Service to interact with Victron Energy Cerbo GX
@@ -100,6 +172,7 @@ export const VictronEnergyService = {
    * @returns {Promise<Object>} Battery data including SOC, voltage, current
    */
   getBatteryStatus: async () => {
+    await fetchVictronData();
     return victronData.battery;
   },
 
@@ -108,6 +181,7 @@ export const VictronEnergyService = {
    * @returns {Promise<Object>} AC loads data
    */
   getACLoads: async () => {
+    await fetchVictronData();
     return victronData.acLoads;
   },
 
@@ -116,6 +190,7 @@ export const VictronEnergyService = {
    * @returns {Promise<Object>} PV charger data
    */
   getPVCharger: async () => {
+    await fetchVictronData();
     return victronData.pvCharger;
   },
 
@@ -124,6 +199,7 @@ export const VictronEnergyService = {
    * @returns {Promise<Object>} DC system data
    */
   getDCSystem: async () => {
+    await fetchVictronData();
     return victronData.dcSystem;
   },
 
@@ -132,6 +208,7 @@ export const VictronEnergyService = {
    * @returns {Promise<Object>} System overview data
    */
   getSystemOverview: async () => {
+    await fetchVictronData();
     return victronData.systemOverview;
   },
 
@@ -140,6 +217,7 @@ export const VictronEnergyService = {
    * @returns {Promise<Array>} Array of tank data
    */
   getTanks: async () => {
+    await fetchVictronData();
     return victronData.tanks;
   },
 
@@ -148,6 +226,7 @@ export const VictronEnergyService = {
    * @returns {Promise<Object>} Comprehensive system data
    */
   getAllData: async () => {
+    await fetchVictronData();
     return {
       battery: victronData.battery,
       acLoads: victronData.acLoads,
@@ -156,7 +235,7 @@ export const VictronEnergyService = {
       systemOverview: victronData.systemOverview,
       tanks: victronData.tanks,
       timestamp: new Date().toISOString(),
-      refreshInterval: 5,
+      refreshInterval: CONFIG.REFRESH_INTERVAL / 1000,
       apiStatus: victronData.apiStatus
     };
   },
@@ -167,13 +246,21 @@ export const VictronEnergyService = {
    */
   toggleSimulation: (enable) => {
     simulateChangingData = enable;
+    
+    if (enable && !simulationInterval) {
+      simulationInterval = setInterval(simulateDataChanges, CONFIG.REFRESH_INTERVAL);
+    } else if (!enable && simulationInterval) {
+      clearInterval(simulationInterval);
+      simulationInterval = null;
+    }
+    
     console.log(`Data simulation ${enable ? 'enabled' : 'disabled'}`);
     return simulateChangingData;
   },
   
   /**
    * Check API connection status
-   * @returns {string} API status: 'connected', 'fallback', or 'error'
+   * @returns {string} API status: 'connected', 'simulation', or 'error'
    */
   getApiStatus: () => {
     return victronData.apiStatus;
@@ -188,29 +275,67 @@ export const VictronEnergyService = {
   },
   
   /**
-   * Try to connect to Victron API
+   * Try to connect to Victron API (not implemented yet)
    * @returns {Promise<boolean>} Success status
    */
   connectToApi: async () => {
-    const success = await attemptDataFetch();
-    victronData.apiStatus = success ? 'connected' : 'fallback';
-    return success;
+    console.log("Real API connection not implemented. Using simulation data.");
+    return true;
   },
   
   /**
-   * Advanced option: use Modbus TCP to directly query the Victron devices
-   * This would require a more complex implementation but provides more direct access
-   * Refer to Victron Energy's Modbus-TCP documentation for specifics
+   * Get current connection configuration
+   * @returns {Object} Current configuration
    */
-  queryModbusTCP: async (register, unit = 1) => {
-    try {
-      // This is a placeholder for a Modbus TCP implementation
-      console.warn('Modbus TCP query not implemented');
-      return null;
-    } catch (error) {
-      console.error('Error querying Modbus TCP:', error);
-      return null;
+  getConfiguration: () => {
+    return {
+      host: CONFIG.HOST,
+      refreshInterval: CONFIG.REFRESH_INTERVAL,
+      connectionStatus: connectionStatus,
+      simulationEnabled: simulateChangingData
+    };
+  },
+  
+  /**
+   * Update configuration
+   * @param {Object} newConfig - New configuration values
+   * @returns {Promise<boolean>} Success status
+   */
+  updateConfiguration: async (newConfig) => {
+    if (newConfig.refreshInterval && newConfig.refreshInterval !== CONFIG.REFRESH_INTERVAL) {
+      CONFIG.REFRESH_INTERVAL = newConfig.refreshInterval;
+      
+      // Update refresh interval
+      if (dataRefreshInterval) {
+        clearInterval(dataRefreshInterval);
+        dataRefreshInterval = setInterval(fetchVictronData, CONFIG.REFRESH_INTERVAL);
+      }
+      
+      if (simulationInterval) {
+        clearInterval(simulationInterval);
+        simulationInterval = setInterval(simulateDataChanges, CONFIG.REFRESH_INTERVAL);
+      }
     }
+    
+    return true;
+  },
+  
+  /**
+   * Close all connections and clean up
+   */
+  cleanup: async () => {
+    // Clear intervals
+    if (dataRefreshInterval) {
+      clearInterval(dataRefreshInterval);
+      dataRefreshInterval = null;
+    }
+    
+    if (simulationInterval) {
+      clearInterval(simulationInterval);
+      simulationInterval = null;
+    }
+    
+    return true;
   }
 };
 
