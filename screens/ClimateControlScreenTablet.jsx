@@ -309,6 +309,27 @@ const ClimateControlScreenTablet = () => {
     }
   };
 
+  // reusable toggle
+const ToggleButton = ({ icon, label, isActive, onPress, disabled }) => (
+  <TouchableOpacity
+    onPress={onPress}
+    disabled={disabled}
+    style={[
+      styles.toggleButtonBase,
+      isActive ? styles.toggleButtonActive : styles.toggleButtonInactive
+    ]}
+    activeOpacity={0.7}
+  >
+    <Image source={icon} style={styles.toggleIcon} />
+    <Text style={[
+      styles.toggleLabel,
+      isActive && styles.toggleLabelActive
+    ]}>
+      {label}
+    </Text>
+  </TouchableOpacity>
+);
+
   // Handle feature button press (Cool, Toe Kick, Furnace) with improved implementation from AirCon
   const handleButtonPress = async (label) => {
     setIsLoading(true);
@@ -943,47 +964,50 @@ useEffect(() => {
                     top: 100,
                   }}
                 >
-                  <TouchableOpacity
-                    style={{
-                      backgroundColor: isNightToggled ? "#301934" : "#FFBA00",
-                      paddingVertical: 15,
-                      paddingHorizontal: 20,
-                      borderRadius: 5,
-                      marginBottom: 10,
-                      width: 150,
-                      alignItems: "center",
-                      flexDirection: "row",
-                      justifyContent: "center",
-                    }}
-                    onPress={handleNightPress}
-                    disabled={isLoading}
-                  >
-                    <Image
-                      source={isNightToggled ? moonImage : sunImage}
-                      style={{ width: 30, height: 30, marginRight: 10 }}
-                    />
-                    <Text style={{ color: "white", fontSize: 16 }}> {isNightToggled ? "Night" : "Daytime"}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={{
-                      backgroundColor: isDehumidToggled ? "#003262" : "#00B9E8",
-                      paddingVertical: 15,
-                      paddingHorizontal: 20,
-                      borderRadius: 5,
-                      width: 150,
-                      alignItems: "center",
-                      flexDirection: "row",
-                      justifyContent: "center",
-                    }}
-                    onPress={handleDehumidPress}
-                    disabled={isLoading}
-                  >
-                    <Image
-                      source={require("../assets/drop.png")}
-                      style={{ width: 30, height: 30, marginRight: 10 }}
-                    />
-                    <Text style={{ color: "white", fontSize: 16 }}>Dehumid</Text>
-                  </TouchableOpacity>
+                  {/* Day/Night Toggle */}
+<TouchableOpacity
+  onPress={handleNightPress}
+  disabled={isLoading}
+  style={[
+    styles.toggleBase,
+    isNightToggled ? styles.toggleActiveDay : styles.toggleInactive
+  ]}
+  activeOpacity={0.7}
+>
+  <Image
+    source={isNightToggled ? moonImage : sunImage}
+    style={styles.toggleIcon}
+  />
+  <Text style={[
+    styles.toggleText,
+    isNightToggled && styles.toggleTextActive
+  ]}>
+    {isNightToggled ? 'Night Mode' : 'Day Mode'}
+  </Text>
+</TouchableOpacity>
+
+{/* Dehumidify Toggle */}
+<TouchableOpacity
+  onPress={handleDehumidPress}
+  disabled={isLoading}
+  style={[
+    styles.toggleBase,
+    isDehumidToggled ? styles.toggleActiveDehumid : styles.toggleInactive
+  ]}
+  activeOpacity={0.7}
+>
+  <Image
+    source={require("../assets/drop.png")}
+    style={styles.toggleIcon}
+  />
+  <Text style={[
+    styles.toggleText,
+    isDehumidToggled && styles.toggleTextActive
+  ]}>
+    {isDehumidToggled ? 'Dehumidify On' : 'Dehumidify Off'}
+  </Text>
+</TouchableOpacity>
+
                 </View>
                 </View>
               </View>
@@ -1006,26 +1030,11 @@ const getImageForLabel = (label) => {
 };
 
 // Update the FanSpeedButton component to handle active state:
-// Update the FanSpeedButton component to handle active state:
-const FanSpeedButton = ({ speed, onPress, isLoading, isActive, autoStyle }) => {
-  // Set background color based on active state
+const FanSpeedButton = ({ speed, onPress, isLoading, isActive }) => {
   const getBackgroundColor = () => {
-    if (isActive) {
-      return "#4CAF50"; // Green for any active button
-    }
-    
-    switch (speed) {
-      case "High":
-        return "#100C08"; // Dark for High
-      case "Med":
-        return "#242124"; // Medium for Med
-      case "Low":
-        return "#848482"; // Light for Low
-      case "Auto":
-        return "#333"; // Default for Auto
-      default:
-        return "#333";
-    }
+    return isActive 
+      ? '#4CAF50'    // green when active
+      : '#242124';   // same gray when inactive
   };
   
   return (
@@ -1034,8 +1043,7 @@ const FanSpeedButton = ({ speed, onPress, isLoading, isActive, autoStyle }) => {
       disabled={isLoading}
       style={[
         styles.fanSpeedButton,
-        { backgroundColor: getBackgroundColor() },
-        autoStyle && styles.autoSpeedButton
+        { backgroundColor: getBackgroundColor() }
       ]}
       activeOpacity={0.7}
     >
@@ -1179,11 +1187,46 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 76,
     margin: 2,
+    // no backgroundColor here — it’s set dynamically
   },
   autoSpeedButton: {
     marginTop: 5,
     marginBottom: 5,
-  }
+  },
+
+  toggleBase: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 150,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 25,
+    marginVertical: 8,
+  },
+  toggleActiveDay: {
+    backgroundColor: '#FFBA00',   // gold for Day/Night
+  },
+  toggleActiveDehumid: {
+    backgroundColor: '#00B9E8',   // cyan for Dehumidify
+  },
+  toggleInactive: {
+    backgroundColor: '#333',      // dark gray when off
+  },
+  toggleIcon: {
+    width: 24,
+    height: 24,
+    marginRight: 8,
+    tintColor: 'white',
+  },
+  toggleText: {
+    color: 'white',
+    fontSize: 16,
+  },
+  toggleTextActive: {
+    fontWeight: '600',
+  },
+  
 });
 
 export default ClimateControlScreenTablet;

@@ -4,14 +4,14 @@ import BatteryGauge from "../components/BatteryGauge";
 import Map from "../components/Map";
 import useScreenSize from "../helper/useScreenSize.jsx";
 import ToggleSwitch from "../components/ToggleSwitch.jsx";
-import TankHeaterControl from "../components/TankHeaterControl";
+
 import VictronEnergyPanel from "../components/VictronEnergyPanel";
 import EnergyFlowDiagram from "../components/EnergyFlowDiagram";
 import { VictronEnergyService } from "../API/VictronEnergyService";
 
 const System = () => {
   const [isOn, setIsOn] = useState(false);
-  const [isOnGray, setIsOnGray] = useState(false);
+  
   const isTablet = useScreenSize();
   const [victronData, setVictronData] = useState(null);
   const [energyError, setEnergyError] = useState(null);
@@ -186,26 +186,7 @@ const System = () => {
         <Map />
       </View>
       
-      {/* Tank Heater Controls */}
-      <View style={styles.tanksContainer}>
-        <Text style={styles.sectionTitle}>Water Tanks</Text>
-        
-        <TankHeaterControl
-          name="Fresh Water"
-          initialPercentage={75}
-          isOn={isOn}
-          setIsOn={setIsOn}
-          trackColor={{ minimum: '#4CAF50', maximum: '#E8F5E9' }}
-        />
-        
-        <TankHeaterControl
-          name="Gray Water"
-          initialPercentage={30}
-          isOn={isOnGray}
-          setIsOn={setIsOnGray}
-          trackColor={{ minimum: '#607D8B', maximum: '#CFD8DC' }}
-        />
-      </View>
+     
     </ScrollView>
   );
 };

@@ -47,6 +47,7 @@
     "react-native-screens": "~4.4.0",
     "react-native-screenutils": "^1.0.0",
     "react-native-svg": "^15.8.0",
+    "react-native-vector-icons": "^10.2.0",
     "react-native-vertical-slider-smartlife": "^1.0.9",
     "react-native-web": "~0.19.10",
     "rn-vertical-slider": "^4.4.0",

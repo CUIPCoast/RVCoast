@@ -5,13 +5,15 @@ import System from './System';
 import moment from 'moment';
 import Settings from './Settings';
 import ModalComponent from '../components/ModalComponent';
-import { Platform } from 'react-native';
+
 import TankHeaterControl from "../components/TankHeaterControl";
-import { useNavigation } from "@react-navigation/native";
+
 import AwningControlModal from "../components/AwningControlModal";
 import AirCon from "./AirCon.jsx";
 import Home from "./Home";
 import { WaterService } from '../API/RVControlServices.js';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+
 const MainScreen = () => {
     
     var currentDate = moment().format("MMMM Do, YYYY");
@@ -158,41 +160,63 @@ const MainScreen = () => {
                     <View className="mt-5 space-y-2 mb-5">
                     {/* Water Heater Button - Updated with service handler */}
                     <TouchableOpacity
-                        onPress={handleWaterHeaterToggle}
-                        style={{
-                        backgroundColor: isWaterHeaterOn ? "#4CAF05" : "#1A1A1D",
-                        flexDirection: "row",
-                        alignItems: "center",
-                        padding: 10,
-                        borderRadius: 5,
-                        }}
-                        disabled={isLoading}
-                    >
-                        <Image
-                        source={require("../assets/icons8-water-heater-64.png")}
-                        style={{ width: 55, height: 55, marginRight: 10 }}
-                        />
-                        <Text style={{ color: "white" }}>Water Heater</Text>
-                    </TouchableOpacity>
+   onPress={handleWaterHeaterToggle}
+   style={{
+     backgroundColor: isWaterHeaterOn ? "#4CAF05" : "#1A1A1D",
+     flexDirection: "row",
+     alignItems: "center",
+     justifyContent: "center",
+     paddingVertical: 12,
+     paddingHorizontal: 16,
+     borderRadius: 8,
+     shadowColor: "#000",
+     shadowOffset: { width: 0, height: 2 },
+     shadowOpacity: 0.3,
+     shadowRadius: 4,
+     elevation: 5,
+   }}
+   disabled={isLoading}
+ >
+   <Ionicons
+     name={isWaterHeaterOn ? "water" : "water-outline"}
+     size={32}
+     color="#FFF"
+     style={{ marginRight: 12 }}
+   />
+   <Text style={{ color: "white", fontSize: 16, fontWeight: "600" }}>
+     Water Heater
+   </Text>
+ </TouchableOpacity>
 
-                    {/* Water Pump Button - Updated with service handler */}
-                    <TouchableOpacity
-                        onPress={handleWaterPumpToggle}
-                        style={{
-                        backgroundColor: isWaterPumpOn ? "#4CAF05" : "#1A1A1D",
-                        flexDirection: "row",
-                        alignItems: "center",
-                        padding: 10,
-                        borderRadius: 5,
-                        }}
-                        disabled={isLoading}
-                    >
-                        <Image
-                        source={require("../assets/icons8-water-pump-64.png")}
-                        style={{ width: 55, height: 55, marginRight: 10 }}
-                        />
-                        <Text style={{ color: "white" }}>Water Pump</Text>
-                    </TouchableOpacity>
+                   {/* Water Pump Button */}
+ <TouchableOpacity
+   onPress={handleWaterPumpToggle}
+   style={{
+     backgroundColor: isWaterPumpOn ? "#4CAF05" : "#1A1A1D",
+     flexDirection: "row",
+     alignItems: "center",
+     justifyContent: "center",
+     paddingVertical: 12,
+     paddingHorizontal: 16,
+     borderRadius: 8,
+     shadowColor: "#000",
+     shadowOffset: { width: 0, height: 2 },
+     shadowOpacity: 0.3,
+     shadowRadius: 4,
+     elevation: 5,
+   }}
+   disabled={isLoading}
+ >
+   <Ionicons
+     name={isWaterPumpOn ? "pump" : "water-pump-outline"}
+     size={32}
+     color="#FFF"
+     style={{ marginRight: 12 }}
+   />
+   <Text style={{ color: "white", fontSize: 16, fontWeight: "600" }}>
+     Water Pump
+   </Text>
+ </TouchableOpacity>
                     </View>
                 </View>
 

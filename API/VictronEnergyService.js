@@ -13,7 +13,7 @@ const victronApi = axios.create({
 // Data storage for Victron data
 const victronData = {
   battery: {
-    soc: 50, // State of charge (percentage)
+    soc: 42, // State of charge (percentage)
     voltage: 13.1, // Battery voltage
     current: -5.7, // Negative value means discharging, positive means charging
     power: -75, // Power in watts (negative = discharge)
@@ -21,7 +21,7 @@ const victronData = {
     timeToGo: '11:02', // Time remaining at current usage rate
   },
   acLoads: {
-    power: 46, // Watts
+    power: 41, // Watts
     lines: ['L1', 'L2'], // Active lines
   },
   pvCharger: {

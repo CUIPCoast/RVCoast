@@ -248,46 +248,31 @@ const Devices = () => {
   
   // Handler for light toggle
  // Handler for light toggle
- const handleLightToggle = async (lightId, isOn) => {
+// Handler for individual EnhancedMainLight toggles
+const handleLightToggle = async (lightId, isOn) => {
   try {
-    // Update just this specific light's state
+    // 1) Update just this specific light's state
     const updatedStates = {
       ...lightStates,
       [lightId]: isOn
     };
-    
     setLightStates(updatedStates);
-    
-    // Use the updated light states to determine if any lights are on
-    const anyLightOn = Object.values(updatedStates).some(state => state);
-    
-    // Only update the master light state when all lights are off or when one light
-    // is turned on and master was previously off
-    if (isOn && !masterLightOn) {
-      // If we're turning a light ON and master was OFF, turn master ON
-      setMasterLightOn(true);
-    } else if (!anyLightOn && masterLightOn) {
-      // If NO lights are on now but master was ON, turn master OFF
-      setMasterLightOn(false);
-    }
-    
-    // Save the updated state to AsyncStorage
+
+    // 2) Persist the new per-light states
     await AsyncStorage.setItem('lightStates', JSON.stringify(updatedStates));
-    
+
+    // NOTE: no more touching masterLightOn here — it stays completely independent
+
   } catch (error) {
     console.error(`Failed to toggle light ${lightId}:`, error);
-    
-    // Revert to previous state on error
-    setLightStates(prev => ({
-      ...prev
-    }));
-    
-    // Show error message
+    // Revert on error
+    setLightStates(prev => ({ ...prev }));
     setStatusMessage(`Error toggling ${lightId}: ${error.message}`);
     setShowStatus(true);
     setTimeout(() => setShowStatus(false), 3000);
   }
 };
+
 
   // Master light toggle handler
   
