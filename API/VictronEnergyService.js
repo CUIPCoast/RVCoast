@@ -1,52 +1,14 @@
-// API/VictronEnergyService.js - Simplified Version
-import axios from 'axios';
+// API/VictronEnergyService.js - Updated with fallback simulation
+import { VictronAPI } from './VictronAPI';
 
-// Configuration for Victron Venus OS connection
+// Configuration
 const CONFIG = {
-  // Cerbo GX IP address - replace with your actual IP
-  HOST: '192.168.8.242',
-  // Connection timeout in ms
-  TIMEOUT: 5000,
   // Refresh interval in ms
   REFRESH_INTERVAL: 5000
 };
 
-// State mapping functions
-const BATTERY_STATE_MAP = {
-  0: 'idle',
-  1: 'charging',
-  2: 'discharging'
-};
-
-const SYSTEM_STATE_MAP = {
-  0: 'Off',
-  1: 'Low power',
-  2: 'VE.Bus Fault',
-  3: 'Bulk charging',
-  4: 'Absorption charging',
-  5: 'Float charging',
-  6: 'Storage mode',
-  7: 'Equalisation charging',
-  8: 'Passthru',
-  9: 'Inverting',
-  10: 'Assisting',
-  11: 'Power supply mode',
-  252: 'External control'
-};
-
-const PV_STATE_MAP = {
-  0: 'off',
-  2: 'fault',
-  3: 'bulk',
-  4: 'absorption',
-  5: 'float',
-  6: 'storage',
-  7: 'equalize',
-  252: 'external control'
-};
-
-// Data storage for Victron data
-let victronData = {
+// Data storage for simulated Victron data (for when API is unavailable)
+let simulatedData = {
   battery: {
     soc: 80, // State of charge (percentage)
     voltage: 13.2, // Battery voltage
@@ -80,100 +42,245 @@ let victronData = {
   apiStatus: 'simulation', // 'connected', 'simulation', 'error'
 };
 
-// Always simulate changing data since we don't have direct access yet
-let simulateChangingData = true;
+// Data storage for cached actual Victron data
+let victronData = null;
 
 // Connection status
 let connectionStatus = {
   connected: false,
   lastAttempt: null,
   lastSuccess: null,
-  failCount: 0
+  failCount: 0,
+  apiAvailable: false
 };
 
-/**
- * Function to simulate changing data values
- * This provides a more realistic test experience when real API isn't available
- */
-const simulateDataChanges = () => {
-  if (!simulateChangingData) return;
-  
+// Refresh interval ID
+let dataRefreshInterval = null;
+
+// Flag to use simulation when API is unavailable
+let useSimulation = true;
+
+// Randomly simulate changing values to make the UI more realistic
+const simulateChangingData = () => {
   // Randomly determine if PV is active
   const isPVActive = Math.random() > 0.3; // 70% chance of solar being active
   
   // Simulate PV charger fluctuations
-  victronData.pvCharger.power = isPVActive ? 300 + Math.floor(Math.random() * 100) : 0;
-  victronData.pvCharger.state = isPVActive ? 'charging' : 'idle';
+  simulatedData.pvCharger.power = isPVActive ? 300 + Math.floor(Math.random() * 100) : 0;
+  simulatedData.pvCharger.state = isPVActive ? 'charging' : 'idle';
   
   // Simulate battery changes based on PV status
-  if (isPVActive && victronData.battery.soc < 100) {
+  if (isPVActive && simulatedData.battery.soc < 100) {
     // When PV is active and battery is not full, simulate charging
-    victronData.battery.soc = Math.min(100, victronData.battery.soc + 0.1);
-    victronData.battery.current = 2 + (Math.random() * 1);
-    victronData.battery.power = 25 + Math.floor(Math.random() * 10);
-    victronData.battery.state = 'charging';
+    simulatedData.battery.soc = Math.min(100, simulatedData.battery.soc + 0.1);
+    simulatedData.battery.current = 2 + (Math.random() * 1);
+    simulatedData.battery.power = 25 + Math.floor(Math.random() * 10);
+    simulatedData.battery.state = 'charging';
   } else {
     // Otherwise simulate discharging
-    victronData.battery.soc = Math.max(5, victronData.battery.soc - 0.1);
-    victronData.battery.current = -(2 + Math.random() * 1);
-    victronData.battery.power = -(25 + Math.floor(Math.random() * 10));
-    victronData.battery.state = 'discharging';
+    simulatedData.battery.soc = Math.max(5, simulatedData.battery.soc - 0.1);
+    simulatedData.battery.current = -(2 + Math.random() * 1);
+    simulatedData.battery.power = -(25 + Math.floor(Math.random() * 10));
+    simulatedData.battery.state = 'discharging';
   }
   
   // Update voltage based on SoC (simplified model)
-  victronData.battery.voltage = 12.2 + (victronData.battery.soc / 100) * 1.6;
+  simulatedData.battery.voltage = 12.2 + (simulatedData.battery.soc / 100) * 1.6;
   
   // Simulate AC load changes
-  victronData.acLoads.power = 100 + Math.floor(Math.random() * 50);
+  simulatedData.acLoads.power = 100 + Math.floor(Math.random() * 50);
   
   // Update DC system power based on battery power (simplified)
-  victronData.dcSystem.power = Math.abs(victronData.battery.power);
-  victronData.dcSystem.source = isPVActive ? 'solar' : 'battery';
+  simulatedData.dcSystem.power = Math.abs(simulatedData.battery.power);
+  simulatedData.dcSystem.source = isPVActive ? 'solar' : 'battery';
   
   // Update system overview based on simulated values
-  victronData.systemOverview.state = isPVActive ? 'Charging' : 'Inverting';
+  simulatedData.systemOverview.state = isPVActive ? 'Charging' : 'Inverting';
   
   // Simulate time to go based on battery state and SoC
-  if (victronData.battery.state === 'discharging') {
-    const hours = Math.floor(victronData.battery.soc / 10);
+  if (simulatedData.battery.state === 'discharging') {
+    const hours = Math.floor(simulatedData.battery.soc / 10);
     const minutes = Math.floor(Math.random() * 60);
-    victronData.battery.timeToGo = `${hours}:${minutes.toString().padStart(2, '0')}`;
+    simulatedData.battery.timeToGo = `${hours}:${minutes.toString().padStart(2, '0')}`;
   } else {
-    const timeToFull = Math.floor((100 - victronData.battery.soc) / 5);
-    victronData.battery.timeToGo = `${timeToFull}:${Math.floor(Math.random() * 60).toString().padStart(2, '0')}`;
+    const timeToFull = Math.floor((100 - simulatedData.battery.soc) / 5);
+    simulatedData.battery.timeToGo = `${timeToFull}:${Math.floor(Math.random() * 60).toString().padStart(2, '0')}`;
   }
   
   // Update last update timestamp
-  victronData.lastUpdate = new Date();
+  simulatedData.lastUpdate = new Date();
 };
 
-// Start the simulation for changing data
-let simulationInterval = setInterval(simulateDataChanges, CONFIG.REFRESH_INTERVAL);
+// Simulation timer
+let simulationInterval = null;
 
 /**
- * Main function to fetch Victron data
+ * Start simulation timer
+ */
+const startSimulation = () => {
+  if (!simulationInterval) {
+    console.log('Starting Victron data simulation');
+    simulationInterval = setInterval(simulateChangingData, CONFIG.REFRESH_INTERVAL);
+    useSimulation = true;
+  }
+};
+
+/**
+ * Stop simulation timer
+ */
+const stopSimulation = () => {
+  if (simulationInterval) {
+    console.log('Stopping Victron data simulation');
+    clearInterval(simulationInterval);
+    simulationInterval = null;
+  }
+};
+
+/**
+ * Check if the API is available
+ * @returns {Promise<boolean>} True if API is available
+ */
+const checkApiAvailability = async () => {
+  try {
+    // Check if the API is available
+    connectionStatus.apiAvailable = await VictronAPI.checkApiAvailable();
+    console.log('Victron API available:', connectionStatus.apiAvailable);
+    return connectionStatus.apiAvailable;
+  } catch (error) {
+    console.error('Error checking API availability:', error);
+    connectionStatus.apiAvailable = false;
+    return false;
+  }
+};
+
+/**
+ * Fetch data from Victron API
  * @returns {Promise<boolean>} Success status
  */
 const fetchVictronData = async () => {
-  // Currently we only simulate data
-  simulateDataChanges();
-  return true;
-};
+  // If we're in simulation mode or the API is not available, don't try to fetch
+  if (useSimulation || !connectionStatus.apiAvailable) {
+    simulateChangingData();
+    return true;
+  }
 
-// Periodically refresh data
-let dataRefreshInterval = setInterval(fetchVictronData, CONFIG.REFRESH_INTERVAL);
+  try {
+    connectionStatus.lastAttempt = new Date();
+    
+    // Get all data from the API
+    const data = await VictronAPI.getAllData();
+    
+    // Update the cached data
+    victronData = data;
+    
+    // Update connection status
+    connectionStatus.connected = true;
+    connectionStatus.lastSuccess = new Date();
+    connectionStatus.failCount = 0;
+    
+    return true;
+  } catch (error) {
+    console.error('Error fetching Victron data:', error);
+    
+    connectionStatus.connected = false;
+    connectionStatus.failCount++;
+    
+    // If too many failures, check API availability and enable simulation if needed
+    if (connectionStatus.failCount > 3) {
+      const apiAvailable = await checkApiAvailability();
+      if (!apiAvailable) {
+        console.log('API not available after multiple failures, enabling simulation');
+        useSimulation = true;
+        startSimulation();
+      }
+    }
+    
+    // Always return success if we're in simulation mode
+    if (useSimulation) {
+      simulateChangingData();
+      return true;
+    }
+    
+    // If we have no cached data, return failure
+    if (!victronData && !useSimulation) {
+      return false;
+    }
+    
+    // Otherwise, we can still use the cached data
+    return true;
+  }
+};
 
 /**
  * Service to interact with Victron Energy Cerbo GX
  */
 export const VictronEnergyService = {
   /**
+   * Initialize the service
+   * @returns {Promise<boolean>} Success status
+   */
+  initialize: async () => {
+    try {
+      console.log('Initializing VictronEnergyService');
+      
+      // Check if the API is available
+      const apiAvailable = await checkApiAvailability();
+      
+      if (!apiAvailable) {
+        console.log('Victron API not available, using simulation');
+        useSimulation = true;
+        startSimulation();
+      } else {
+        console.log('Victron API available, using real data');
+        useSimulation = false;
+        stopSimulation();
+      }
+      
+      // Get initial data
+      await fetchVictronData();
+      
+      // Set up periodic refresh
+      if (!dataRefreshInterval) {
+        dataRefreshInterval = setInterval(fetchVictronData, CONFIG.REFRESH_INTERVAL);
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Failed to initialize Victron service:', error);
+      
+      // Fall back to simulation
+      console.log('Falling back to simulation mode');
+      useSimulation = true;
+      startSimulation();
+      
+      return true; // Still return true since we can use simulation
+    }
+  },
+  
+  /**
    * Get current battery status
    * @returns {Promise<Object>} Battery data including SOC, voltage, current
    */
   getBatteryStatus: async () => {
-    await fetchVictronData();
-    return victronData.battery;
+    if (useSimulation) {
+      return simulatedData.battery;
+    }
+    
+    try {
+      // Try to get fresh data
+      const data = await VictronAPI.getBatteryStatus();
+      // Update cached data
+      if (victronData) victronData.battery = data;
+      return data;
+    } catch (error) {
+      console.error('Error getting battery status:', error);
+      
+      // Fall back to cached or simulated data
+      if (victronData && victronData.battery) {
+        return victronData.battery;
+      }
+      return simulatedData.battery;
+    }
   },
 
   /**
@@ -181,8 +288,25 @@ export const VictronEnergyService = {
    * @returns {Promise<Object>} AC loads data
    */
   getACLoads: async () => {
-    await fetchVictronData();
-    return victronData.acLoads;
+    if (useSimulation) {
+      return simulatedData.acLoads;
+    }
+    
+    try {
+      // Try to get fresh data
+      const data = await VictronAPI.getACLoadsData();
+      // Update cached data
+      if (victronData) victronData.acLoads = data;
+      return data;
+    } catch (error) {
+      console.error('Error getting AC loads data:', error);
+      
+      // Fall back to cached or simulated data
+      if (victronData && victronData.acLoads) {
+        return victronData.acLoads;
+      }
+      return simulatedData.acLoads;
+    }
   },
 
   /**
@@ -190,8 +314,25 @@ export const VictronEnergyService = {
    * @returns {Promise<Object>} PV charger data
    */
   getPVCharger: async () => {
-    await fetchVictronData();
-    return victronData.pvCharger;
+    if (useSimulation) {
+      return simulatedData.pvCharger;
+    }
+    
+    try {
+      // Try to get fresh data
+      const data = await VictronAPI.getPVChargerData();
+      // Update cached data
+      if (victronData) victronData.pvCharger = data;
+      return data;
+    } catch (error) {
+      console.error('Error getting PV charger data:', error);
+      
+      // Fall back to cached or simulated data
+      if (victronData && victronData.pvCharger) {
+        return victronData.pvCharger;
+      }
+      return simulatedData.pvCharger;
+    }
   },
 
   /**
@@ -199,8 +340,25 @@ export const VictronEnergyService = {
    * @returns {Promise<Object>} DC system data
    */
   getDCSystem: async () => {
-    await fetchVictronData();
-    return victronData.dcSystem;
+    if (useSimulation) {
+      return simulatedData.dcSystem;
+    }
+    
+    try {
+      // Try to get fresh data
+      const data = await VictronAPI.getDCSystemData();
+      // Update cached data
+      if (victronData) victronData.dcSystem = data;
+      return data;
+    } catch (error) {
+      console.error('Error getting DC system data:', error);
+      
+      // Fall back to cached or simulated data
+      if (victronData && victronData.dcSystem) {
+        return victronData.dcSystem;
+      }
+      return simulatedData.dcSystem;
+    }
   },
 
   /**
@@ -208,8 +366,25 @@ export const VictronEnergyService = {
    * @returns {Promise<Object>} System overview data
    */
   getSystemOverview: async () => {
-    await fetchVictronData();
-    return victronData.systemOverview;
+    if (useSimulation) {
+      return simulatedData.systemOverview;
+    }
+    
+    try {
+      // Try to get fresh data
+      const data = await VictronAPI.getSystemOverview();
+      // Update cached data
+      if (victronData) victronData.systemOverview = data;
+      return data;
+    } catch (error) {
+      console.error('Error getting system overview:', error);
+      
+      // Fall back to cached or simulated data
+      if (victronData && victronData.systemOverview) {
+        return victronData.systemOverview;
+      }
+      return simulatedData.systemOverview;
+    }
   },
 
   /**
@@ -217,8 +392,8 @@ export const VictronEnergyService = {
    * @returns {Promise<Array>} Array of tank data
    */
   getTanks: async () => {
-    await fetchVictronData();
-    return victronData.tanks;
+    // Fall back to simulated data
+    return simulatedData.tanks;
   },
 
   /**
@@ -226,36 +401,117 @@ export const VictronEnergyService = {
    * @returns {Promise<Object>} Comprehensive system data
    */
   getAllData: async () => {
-    await fetchVictronData();
-    return {
-      battery: victronData.battery,
-      acLoads: victronData.acLoads,
-      pvCharger: victronData.pvCharger,
-      dcSystem: victronData.dcSystem,
-      systemOverview: victronData.systemOverview,
-      tanks: victronData.tanks,
-      timestamp: new Date().toISOString(),
-      refreshInterval: CONFIG.REFRESH_INTERVAL / 1000,
-      apiStatus: victronData.apiStatus
-    };
+    try {
+      // If using simulation, return simulated data
+      if (useSimulation) {
+        simulateChangingData();
+        return {
+          battery: simulatedData.battery,
+          acLoads: simulatedData.acLoads,
+          pvCharger: simulatedData.pvCharger,
+          dcSystem: simulatedData.dcSystem,
+          systemOverview: simulatedData.systemOverview,
+          tanks: simulatedData.tanks,
+          timestamp: new Date().toISOString(),
+          refreshInterval: CONFIG.REFRESH_INTERVAL / 1000,
+          apiStatus: 'simulation'
+        };
+      }
+      
+      // Otherwise try to fetch from API
+      if (connectionStatus.apiAvailable) {
+        const data = await VictronAPI.getAllData();
+        victronData = data;
+        
+        return {
+          battery: data.battery,
+          acLoads: data.acLoads,
+          pvCharger: data.pvCharger,
+          dcSystem: data.dcSystem,
+          systemOverview: data.systemOverview,
+          tanks: data.tanks || [],
+          timestamp: new Date().toISOString(),
+          refreshInterval: CONFIG.REFRESH_INTERVAL / 1000,
+          apiStatus: 'connected'
+        };
+      }
+      
+      // If we have cached data, return it
+      if (victronData) {
+        return {
+          battery: victronData.battery,
+          acLoads: victronData.acLoads,
+          pvCharger: victronData.pvCharger,
+          dcSystem: victronData.dcSystem,
+          systemOverview: victronData.systemOverview,
+          tanks: victronData.tanks || [],
+          timestamp: victronData.timestamp || new Date().toISOString(),
+          refreshInterval: CONFIG.REFRESH_INTERVAL / 1000,
+          apiStatus: 'cached'
+        };
+      }
+      
+      // Fallback to simulation as a last resort
+      useSimulation = true;
+      startSimulation();
+      simulateChangingData();
+      
+      return {
+        battery: simulatedData.battery,
+        acLoads: simulatedData.acLoads,
+        pvCharger: simulatedData.pvCharger,
+        dcSystem: simulatedData.dcSystem,
+        systemOverview: simulatedData.systemOverview,
+        tanks: simulatedData.tanks,
+        timestamp: new Date().toISOString(),
+        refreshInterval: CONFIG.REFRESH_INTERVAL / 1000,
+        apiStatus: 'simulation'
+      };
+    } catch (error) {
+      console.error('Error getting all Victron data:', error);
+      
+      // If API fails, switch to simulation mode
+      useSimulation = true;
+      startSimulation();
+      
+      return {
+        battery: simulatedData.battery,
+        acLoads: simulatedData.acLoads,
+        pvCharger: simulatedData.pvCharger,
+        dcSystem: simulatedData.dcSystem,
+        systemOverview: simulatedData.systemOverview,
+        tanks: simulatedData.tanks,
+        timestamp: new Date().toISOString(),
+        refreshInterval: CONFIG.REFRESH_INTERVAL / 1000,
+        apiStatus: 'simulation'
+      };
+    }
   },
   
   /**
    * Toggle data simulation
    * @param {boolean} enable Whether to enable simulation
    */
-  toggleSimulation: (enable) => {
-    simulateChangingData = enable;
+  toggleSimulation: async (enable) => {
+    useSimulation = enable;
     
-    if (enable && !simulationInterval) {
-      simulationInterval = setInterval(simulateDataChanges, CONFIG.REFRESH_INTERVAL);
-    } else if (!enable && simulationInterval) {
-      clearInterval(simulationInterval);
-      simulationInterval = null;
+    if (enable) {
+      startSimulation();
+    } else {
+      stopSimulation();
+      
+      // Check if API is available when disabling simulation
+      await checkApiAvailability();
+      
+      if (!connectionStatus.apiAvailable) {
+        // If API is not available, go back to simulation
+        console.log('API not available, re-enabling simulation');
+        useSimulation = true;
+        startSimulation();
+      }
     }
     
-    console.log(`Data simulation ${enable ? 'enabled' : 'disabled'}`);
-    return simulateChangingData;
+    return useSimulation;
   },
   
   /**
@@ -263,7 +519,15 @@ export const VictronEnergyService = {
    * @returns {string} API status: 'connected', 'simulation', or 'error'
    */
   getApiStatus: () => {
-    return victronData.apiStatus;
+    if (useSimulation) {
+      return 'simulation';
+    }
+    
+    if (connectionStatus.connected) {
+      return 'connected';
+    }
+    
+    return 'error';
   },
   
   /**
@@ -271,16 +535,47 @@ export const VictronEnergyService = {
    * @returns {Date} Timestamp of last update
    */
   getLastUpdate: () => {
-    return victronData.lastUpdate;
+    if (useSimulation) {
+      return simulatedData.lastUpdate;
+    }
+    
+    return connectionStatus.lastSuccess || new Date();
   },
   
   /**
-   * Try to connect to Victron API (not implemented yet)
+   * Try to connect to Victron API
    * @returns {Promise<boolean>} Success status
    */
   connectToApi: async () => {
-    console.log("Real API connection not implemented. Using simulation data.");
-    return true;
+    try {
+      // First check if API is available
+      const apiAvailable = await checkApiAvailability();
+      
+      if (!apiAvailable) {
+        console.log('API not available, cannot connect');
+        useSimulation = true;
+        startSimulation();
+        return false;
+      }
+      
+      // Try to reconnect
+      await VictronAPI.reconnect();
+      useSimulation = false;
+      stopSimulation();
+      
+      // Fetch initial data
+      await fetchVictronData();
+      
+      return true;
+    } catch (error) {
+      console.error('Error connecting to Victron API:', error);
+      
+      // Fall back to simulation
+      useSimulation = true;
+      startSimulation();
+      
+      return false;
+    }
   },
   
   /**
@@ -289,10 +584,9 @@ export const VictronEnergyService = {
    */
   getConfiguration: () => {
     return {
-      host: CONFIG.HOST,
       refreshInterval: CONFIG.REFRESH_INTERVAL,
-      connectionStatus: connectionStatus,
-      simulationEnabled: simulateChangingData
+      connectionStatus,
+      simulationEnabled: useSimulation
     };
   },
   
@@ -302,22 +596,46 @@ export const VictronEnergyService = {
    * @returns {Promise<boolean>} Success status
    */
   updateConfiguration: async (newConfig) => {
-    if (newConfig.refreshInterval && newConfig.refreshInterval !== CONFIG.REFRESH_INTERVAL) {
-      CONFIG.REFRESH_INTERVAL = newConfig.refreshInterval;
-      
-      // Update refresh interval
-      if (dataRefreshInterval) {
-        clearInterval(dataRefreshInterval);
-        dataRefreshInterval = setInterval(fetchVictronData, CONFIG.REFRESH_INTERVAL);
+    try {
+      // Update local configuration
+      if (newConfig.refreshInterval && newConfig.refreshInterval !== CONFIG.REFRESH_INTERVAL) {
+        CONFIG.REFRESH_INTERVAL = newConfig.refreshInterval;
+        
+        // Update refresh interval
+        if (dataRefreshInterval) {
+          clearInterval(dataRefreshInterval);
+          dataRefreshInterval = setInterval(fetchVictronData, CONFIG.REFRESH_INTERVAL);
+        }
+        
+        // Update simulation interval if active
+        if (simulationInterval) {
+          clearInterval(simulationInterval);
+          simulationInterval = setInterval(simulateChangingData, CONFIG.REFRESH_INTERVAL);
+        }
       }
       
-      if (simulationInterval) {
-        clearInterval(simulationInterval);
-        simulationInterval = setInterval(simulateDataChanges, CONFIG.REFRESH_INTERVAL);
+      // If API is available, update remote configuration
+      if (connectionStatus.apiAvailable && !useSimulation) {
+        const apiConfig = {};
+        
+        // Only send API-specific config
+        if (newConfig.host) apiConfig.host = newConfig.host;
+        if (newConfig.port) apiConfig.port = newConfig.port;
+        if (newConfig.timeout) apiConfig.timeout = newConfig.timeout;
+        if (newConfig.pollInterval) apiConfig.pollInterval = newConfig.pollInterval;
+        if (newConfig.debug !== undefined) apiConfig.debug = newConfig.debug;
+        
+        // Only update API config if there are values to update
+        if (Object.keys(apiConfig).length > 0) {
+          await VictronAPI.updateConfiguration(apiConfig);
+        }
       }
+      
+      return true;
+    } catch (error) {
+      console.error('Error updating configuration:', error);
+      return false;
     }
-    
-    return true;
   },
   
   /**
@@ -338,5 +656,13 @@ export const VictronEnergyService = {
     return true;
   }
 };
+
+// Auto-initialize when imported
+VictronEnergyService.initialize().catch(error => {
+  console.error('Failed to initialize VictronEnergyService:', error);
+  // Always ensure simulation is running if initialization fails
+  useSimulation = true;
+  startSimulation();
+});
 
 export default VictronEnergyService;
