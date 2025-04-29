@@ -127,7 +127,8 @@ const VictronEnergyPanel = ({ onError, refreshInterval = 10000 }) => {
             <View style={styles.batteryContainer}>
               <View style={styles.batteryPercentage}>
                 <Text style={[styles.batteryValue, { color: getBatteryColor(energyData.battery.soc) }]}>
-                  {energyData.battery.soc}%
+                {energyData.battery.soc.toFixed(1)}%
+
                 </Text>
                 <Text style={styles.batteryState}>
                   {energyData.battery.state}
@@ -139,7 +140,7 @@ const VictronEnergyPanel = ({ onError, refreshInterval = 10000 }) => {
                   {energyData.battery.power}W
                 </Text>
                 <Text style={styles.detailText}>
-                  {energyData.battery.voltage}V • {energyData.battery.current}A
+                  {energyData.battery.voltagev}V • {energyData.battery.current.toFixed(1)}A
                 </Text>
               </View>
             </View>

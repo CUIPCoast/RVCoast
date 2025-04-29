@@ -70,11 +70,11 @@ const System = () => {
             <View className="bg-gray-800 rounded-lg p-4 mb-4">
               <View className="flex-row justify-between items-center">
                 <View>
-                  <Text className="text-white text-lg font-bold">{victronData.battery.soc}%</Text>
+                  <Text className="text-white text-lg font-bold">{victronData.battery.soc.toFixed(1)}%</Text>
                   <Text className="text-gray-400">Battery</Text>
                 </View>
                 <View>
-                  <Text className="text-white text-lg font-bold">{victronData.battery.power}W</Text>
+                  <Text className="text-white text-lg font-bold">{victronData.battery.power.toFixed(1)}W</Text>
                   <Text className="text-gray-400">{victronData.battery.state}</Text>
                 </View>
               </View>
@@ -130,7 +130,7 @@ const System = () => {
       decelerationRate={0.8}
       className="bg-brown"
     >
-      <Text className="text-white text-3xl font-semibold mb-4">System</Text>
+      <Text className="text-white text-3xl font-semibold mb-4">RV Health</Text>
       
       {/* Victron Energy Panel */}
       {/* Show either detailed or simple energy panel based on user preference */}
@@ -154,10 +154,11 @@ const System = () => {
           {victronData ? (
             <View style={styles.simpleEnergyData}>
               <View style={styles.energyItem}>
-                <Text style={styles.energyValue}>{victronData.battery.soc}%</Text>
+                <Text style={styles.energyValue}>{victronData.battery.soc.toFixed(1)}%</Text>
                 <Text style={styles.energyLabel}>Battery</Text>
                 <Text style={styles.energyDetail}>
-                  {victronData.battery.voltage}V • {victronData.battery.state}
+                {victronData.battery.voltage.toFixed(1)}V • {victronData.battery.state}
+
                 </Text>
               </View>
               
