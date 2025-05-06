@@ -167,6 +167,7 @@ const System = () => {
 
           {/* ————————————— CONNECTION LINES ————————————— */}
           
+          {/* */}
           {/* Red to Blue (Left to Center in top row) */}
           <HorizontalLine top={58} left={263} width={130} />
           <ConnectionDot top={158} left={314} />

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Svg, { 
   Rect, 
   LinearGradient, 
@@ -13,26 +13,59 @@ import {
 } from "react-native";
 
 const BatteryCard = ({ width = 250, height = 150, children }) => {
-  // Parse battery level from children if available (from victronData)
-  let batteryLevel = 0;
-  let batteryPower = "0W";
-  let isLoading = true;
+  // State to track parsed values
+  const [batteryLevel, setBatteryLevel] = useState(0);
+  const [batteryPower, setBatteryPower] = useState("0W");
+  const [isLoading, setIsLoading] = useState(true);
   
-  // Try to find the battery percentage in children
-  React.Children.forEach(children, child => {
-    if (child && child.props && child.props.children) {
-      const childText = String(child.props.children);
-      if (childText.includes('%')) {
-        const match = childText.match(/(\d+)%/);
-        if (match && match[1]) {
-          batteryLevel = parseInt(match[1], 10);
-          isLoading = false;
-        }
-      } else if (childText.includes('W')) {
-        batteryPower = childText;
+  // Parse children when they change
+  useEffect(() => {
+    let foundLevel = 0;
+    let foundPower = "0W";
+    let stillLoading = true;
+    
+    // Parse battery info from children
+    const parseChildren = (child) => {
+      if (!child) return;
+      
+      // Handle fragments or arrays of children
+      if (child.type === React.Fragment) {
+        React.Children.forEach(child.props.children, parseChildren);
+        return;
       }
-    }
-  });
+      
+      // Parse text content
+      if (child.props && child.props.children) {
+        const childText = String(child.props.children);
+        
+        // Look for percentage values
+        if (childText.includes('%')) {
+          const match = childText.match(/(\d+(?:\.\d+)?)%/);
+          if (match && match[1]) {
+            foundLevel = parseFloat(match[1]);
+            stillLoading = false;
+            // Log for debugging
+            console.log(`Found battery level: ${foundLevel}%`);
+          }
+        } 
+        
+        // Look for power values
+        if (childText.includes('W')) {
+          foundPower = childText;
+          // Log for debugging
+          console.log(`Found battery power: ${foundPower}`);
+        }
+      }
+    };
+    
+    // Start the parsing process
+    React.Children.forEach(children, parseChildren);
+    
+    // Update state with what we found
+    setBatteryLevel(foundLevel);
+    setBatteryPower(foundPower);
+    setIsLoading(stillLoading);
+  }, [children]);
   
   // Calculate dynamic values
   const padding = 8;
@@ -41,7 +74,10 @@ const BatteryCard = ({ width = 250, height = 150, children }) => {
   const capWidth = 15;
   const capHeight = height * 0.4;
   const innerPadding = 6;
-  const levelWidth = isLoading ? 0 : (batteryBody - (innerPadding * 2) - padding) * (batteryLevel / 100);
+  
+  // Important fix: ensure levelWidth calculation is correct
+  const maxFillWidth = batteryBody - (innerPadding * 2) - padding * 1.5;
+  const levelWidth = isLoading ? 0 : (maxFillWidth * batteryLevel / 100);
   
   // Determine battery color based on level
   let fillColor = '#4CAF50'; // Green for good battery
@@ -54,6 +90,9 @@ const BatteryCard = ({ width = 250, height = 150, children }) => {
     fillColor = '#F57C00'; // Orange for medium battery (matching your orange card)
     gradientColors = ['#FFB74D', '#E65100'];
   }
+
+  // For debugging - log the fill level
+  console.log(`Rendering battery at ${batteryLevel}% - levelWidth: ${levelWidth}/${maxFillWidth}`);
 
   return (
     <View style={styles.container}>
@@ -111,7 +150,7 @@ const BatteryCard = ({ width = 250, height = 150, children }) => {
             <Stop offset="1" stopColor={gradientColors[1]} />
           </LinearGradient>
         )}
-        {!isLoading && (
+        {!isLoading && levelWidth > 0 && (
           <Rect
             x={innerPadding + padding}
             y={innerPadding + padding}
@@ -121,6 +160,20 @@ const BatteryCard = ({ width = 250, height = 150, children }) => {
             ry={cornerRadius / 2}
             fill="url(#batteryLevelGradient)"
           />
+        )}
+        
+        {/* Battery percentage display */}
+        {!isLoading && (
+          <SvgText
+            x={width / 2}
+            y={height / 2 + 5}
+            fontSize="24"
+            fontWeight="bold"
+            fill="#ffffff"
+            textAnchor="middle"
+          >
+            {`${batteryLevel}%`}
+          </SvgText>
         )}
         
         {/* Battery label */}
