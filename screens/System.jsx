@@ -133,7 +133,7 @@ const System = () => {
                 <Text style={styles.energyValue}>{victronData.battery.soc.toFixed(1)}%</Text>
                 <Text style={styles.energyLabel}>Battery</Text>
                 <Text style={styles.energyDetail}>
-                {victronData.battery.voltage.toFixed(1)}V • {victronData.battery.state}
+                {victronData.battery.voltage.toFixed(1)}V • {victronData.battery.state.toFixed(1)}
 
                 </Text>
               </View>
@@ -144,7 +144,7 @@ const System = () => {
               </View>
               
               <View style={styles.energyItem}>
-                <Text style={styles.energyValue}>{victronData.pvCharger.power}W</Text>
+                <Text style={styles.energyValue}>{victronData.pvCharger.power.toFixed(1)}W</Text>
                 <Text style={styles.energyLabel}>Solar Input</Text>
               </View>
             </View>
