@@ -103,11 +103,8 @@ const Wifi = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 20,
-    paddingHorizontal: 20,
+    padding: 20,
     backgroundColor: '#f9f9f9',
-    height: 350,
-    width: 360,
   },
   header: {
     fontSize: 18,

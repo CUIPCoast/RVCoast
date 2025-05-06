@@ -27,6 +27,7 @@ const screenOptions = (route, color) => {
     case 'Vents':
       iconName = 'filter';
       break;
+    
     case 'Settings':
       iconName = 'setting';
       break;
@@ -67,6 +68,7 @@ const TabletTabs = () => {
         <Tab.Screen name="System" component={LightScreenTablet} />
         <Tab.Screen name="Air Conditioning" component={ClimateControl} />
         <Tab.Screen name="Vents" component={Vents}/>
+        <Tab.Screen name="Victron" component={System} />
         <Tab.Screen name="Settings" component={Settings} />
       </Tab.Navigator>
     </View>

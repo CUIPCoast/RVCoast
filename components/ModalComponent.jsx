@@ -1,122 +1,109 @@
-import React, {useState} from 'react';
-import {Alert, Modal, StyleSheet, Text, Pressable, View, Image} from 'react-native';
-import {SafeAreaView, SafeAreaProvider} from 'react-native-safe-area-context';
+// ModalComponent.js
+import React, { useState } from 'react';
+import { Alert, Modal, StyleSheet, Text, Pressable, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
 import Settings from '../screens/Settings';
 import Devices from '../screens/Devices';
-import AirCon from '../screens/AirCon';
 import Home from '../screens/Home';
-import System from '../screens/System';
 import GroupComponent from './GroupComponent';
-import AwningControlModal from './AwningControlModal';
-import MainScreen from '../screens/MainScreen';
 import Wifi from './Wifi';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
-const ModalComponent = ({nameComponent}) => {
+const ModalComponent = ({ nameComponent }) => {
   const [modalVisible, setModalVisible] = useState(false);
+  const isWifi = nameComponent === 'Wifi';
 
-  const renderLogo = (nameComponent) => {
-    switch (nameComponent) {
-      case 'Settings':
-        return <Settings />;
-      case 'Home':
-        return <Home />;
-      case 'Devices':
-        return <Devices />;
-       case 'Wifi':
-        return <Wifi />;
-      // case 'Awning':
-      //   return <AwningControlModal />;
-      default:
-        return <Text>Screen not found!</Text>;
+  const renderLogo = (name) => {
+    switch (name) {
+      case 'Settings': return <Ionicons name="settings-outline" size={32} color="#FFF" />;
+      case 'Home':     return <Ionicons name="home-outline"      size={32} color="#FFF" />;
+      case 'Devices':  return <Ionicons name="phone-portrait-outline" size={32} color="#FFF" />;
+      case 'Wifi':     return <Ionicons name="wifi-outline"      size={152} color="#FFF" />;
+      default:         return <Text>?</Text>;
     }
   };
 
-  const renderContent = (nameComponent) => {
-    switch (nameComponent) {
-      case 'Settings':
-        return <GroupComponent />;
-      case 'Home':
-        return <Home />;
-      case 'Devices':
-        return <Wifi />;
-      default:
-        return <Text>Screen not found!</Text>;
+  const renderContent = (name) => {
+    switch (name) {
+      case 'Settings': return <Settings />;
+      case 'Home':     return <Home />;
+      case 'Devices':  return <Devices />;
+      case 'Wifi':     return <Wifi />;
+      default:         return <Text>Screen not found!</Text>;
     }
   };
+
   return (
-    <SafeAreaProvider>
-      <SafeAreaView className="flex-1 justify-center items-center">
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={modalVisible}
-          onRequestClose={() => {
-            Alert.alert('Modal has been closed.');
-            setModalVisible(!modalVisible);
-          }}>
-          <View className="flex-1 justify-center items-center">
-            <View className="bg-gray-200 items-end rounded-xl">
-              <Pressable
-                onPress={() => setModalVisible(!modalVisible)}>
-                <Text className="text-bold text-white pt-4 pr-6">X</Text>
-              </Pressable>
-              <Text className="m-4">
-                {renderContent(nameComponent)}
-              </Text>
+    <SafeAreaView style={styles.container}>
+      {/* the icon you tap */}
+      <Pressable onPress={() => setModalVisible(true)}>
+        {renderLogo(nameComponent)}
+      </Pressable>
 
+      <Modal
+        animationType="slide"
+        transparent={!isWifi}      // if full-screen, let it be opaque
+        visible={modalVisible}
+        onRequestClose={() => {
+          setModalVisible(false);
+          Alert.alert('Modal has been closed.');
+        }}
+      >
+        {isWifi ? (
+          // full screen wrapper
+          <SafeAreaView style={styles.fullscreen}>
+            <Pressable onPress={() => setModalVisible(false)} style={styles.closeBtn}>
+              <Text style={styles.closeText}>✕</Text>
+            </Pressable>
+            {renderContent(nameComponent)}
+          </SafeAreaView>
+        ) : (
+          // your old centered box for everything else
+          <View style={styles.centeredView}>
+            <View style={styles.modalView}>
+              <Pressable onPress={() => setModalVisible(false)} style={styles.closeBtn}>
+                <Text style={styles.closeText}>✕</Text>
+              </Pressable>
+              {renderContent(nameComponent)}
             </View>
           </View>
-        </Modal>
-        <Pressable
-          onPress={() => setModalVisible(true)}
-        >
-          <View>{renderLogo(nameComponent)}</View>
-        </Pressable>
-      </SafeAreaView>
-    </SafeAreaProvider>
+        )}
+      </Modal>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  container: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fullscreen: {
+    flex: 1,
+    backgroundColor: '#FFF',
+    padding: 16,
+  },
   centeredView: {
     flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalView: {
-    margin: 20,
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 35,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
+    width: '80%',
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    padding: 16,
     elevation: 5,
   },
-  button: {
-    borderRadius: 20,
-    padding: 10,
-    elevation: 2,
+  closeBtn: {
+    alignSelf: 'flex-end',
+    padding: 8,
   },
-  buttonOpen: {
-    backgroundColor: '#F194FF',
-  },
-  buttonClose: {
-    backgroundColor: '#2196F3',
-  },
-  textStyle: {
-    color: 'white',
+  closeText: {
+    fontSize: 18,
     fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  modalText: {
-    marginBottom: 15,
-    textAlign: 'center',
   },
 });
 

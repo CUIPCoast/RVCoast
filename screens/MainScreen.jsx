@@ -132,7 +132,7 @@ const MainScreen = () => {
                         elevation: 6,
                     }}
                     size={75}>
-                        <System />
+                        
                     </Row>
                 </Col>
 
@@ -208,7 +208,7 @@ const MainScreen = () => {
    disabled={isLoading}
  >
    <Ionicons
-     name={isWaterPumpOn ? "pump" : "water-pump-outline"}
+     name={isWaterPumpOn ? "pie-chart-outline" : "pie-chart-outline"}
      size={32}
      color="#FFF"
      style={{ marginRight: 12 }}
@@ -244,24 +244,47 @@ const MainScreen = () => {
                 </Row>
 
                             
-                <Row className="rounded-xl mt15" style={{ 
+                <Row className="rounded-x2 mt20" style={{ 
                   justifyContent: "center", 
                   alignItems: "center",  
                   
                   }}>
-                <Col className="pb-10 mt10" size={60} style={{ justifyContent: "center", alignItems: "center" }}>
-                
-                <Row className="bg-brown rounded-xl ml-2 pb-10"
-                style={{
-                  shadowColor: "#FFF",
-                  shadowOffset: { width: 0, height: 6 },
-                  shadowOpacity: 1,
-                  shadowRadius: 4,
-                  elevation: 6,
-                }}>
-                <ModalComponent nameComponent={"Devices"} />
-                </Row>
+                <Col className="pb-5 mt15" size={60} style={{ justifyContent: "center", alignItems: "center" }}>
+                    <Row
+                        className="bg-brown rounded-xl ml-2 mt8"
+                        style={{
+                            flexDirection: "column",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            padding: 10,
+                            overflow: "visible",
+                            width: 220,
+                            height: 180,
+                            position: "relative",
+                            shadowColor: "#FFF",
+                            shadowOffset: { width: 0, height: 6 },
+                            shadowOpacity: 1,
+                            shadowRadius: 4,
+                            elevation: 6,
+                        }}
+                    >
+                        <Text
+                            className="text-white"
+                            style={{
+                                position: "absolute",
+                                top: 10,
+                                left: 10,
+                                zIndex: 1,
+                            }}
+                        >
+                            Wifi
+                        </Text>
+                        <Pressable onPress={() => setModalVisible(true)}>
+                        <ModalComponent nameComponent="Wifi" />
 
+                        </Pressable>
+                        
+                    </Row>
                 </Col>
 
                 <Col className="pb-5 mt15" size={60} style={{ justifyContent: "center", alignItems: "center" }}>

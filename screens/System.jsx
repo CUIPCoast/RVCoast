@@ -1,15 +1,19 @@
 import React, { useState, useEffect } from "react";
 import { ScrollView, View, Text, Image, StyleSheet, TouchableOpacity } from "react-native";
-import BatteryGauge from "../components/BatteryGauge";
+
 import Map from "../components/Map";
 import useScreenSize from "../helper/useScreenSize.jsx";
-import ToggleSwitch from "../components/ToggleSwitch.jsx";
 
+import { Col, Row, Grid } from "react-native-easy-grid";
 import VictronEnergyPanel from "../components/VictronEnergyPanel";
 import EnergyFlowDiagram from "../components/EnergyFlowDiagram";
 import { VictronEnergyService } from "../API/VictronEnergyService";
+import moment from 'moment';
 
 const System = () => {
+
+   var currentDate = moment().format("MMMM Do, YYYY");
+  var DayOfTheWeek = moment().format("dddd");
   const [isOn, setIsOn] = useState(false);
   
   const isTablet = useScreenSize();
@@ -57,69 +61,41 @@ const System = () => {
   // Tablet view with integrated Victron data
   if (isTablet) {
     return (
-      <View className="m-3">
-        <View className="flex-row justify-between">
-          <Text className="text-white text-lg">Solar Power</Text>
-          <ToggleSwitch isOn={isOn} setIsOn={setIsOn} />
-        </View>
-        
-        {/* Display battery info from Victron if available */}
-        {victronData ? (
-          <View className="w-full pt-4">
-            <Text className="text-white text-xl font-semibold mb-2">Energy System</Text>
-            <View className="bg-gray-800 rounded-lg p-4 mb-4">
-              <View className="flex-row justify-between items-center">
-                <View>
-                  <Text className="text-white text-lg font-bold">{victronData.battery.soc.toFixed(1)}%</Text>
-                  <Text className="text-gray-400">Battery</Text>
-                </View>
-                <View>
-                  <Text className="text-white text-lg font-bold">{victronData.battery.power.toFixed(1)}W</Text>
-                  <Text className="text-gray-400">{victronData.battery.state}</Text>
-                </View>
-              </View>
-            </View>
-            
-            {/* Energy consumption display */}
-            <View className="bg-gray-800 rounded-lg p-4">
-              <Text className="text-white font-semibold mb-2">Power Consumption</Text>
-              <View className="flex-row justify-between">
-                <View className="items-center">
-                  <Text className="text-white text-lg font-bold">{victronData.acLoads.power}W</Text>
-                  <Text className="text-gray-400">AC Loads</Text>
-                </View>
-                <View className="items-center">
-                  <Text className="text-white text-lg font-bold">{victronData.pvCharger.power}W</Text>
-                  <Text className="text-gray-400">Solar</Text>
-                </View>
-                <View className="items-center">
-                  <Text className="text-white text-lg font-bold">{victronData.dcSystem.power}W</Text>
-                  <Text className="text-gray-400">DC System</Text>
-                </View>
-              </View>
-            </View>
-            
-            <TouchableOpacity 
-              className="mt-4 bg-gray-700 p-2 rounded-lg items-center" 
-              onPress={toggleEnergyView}
-            >
-              <Text className="text-white">
-                {showDetailedView ? "Show Simple View" : "Show Detailed View"}
-              </Text>
-            </TouchableOpacity>
-            
-            {showDetailedView && (
-              <EnergyFlowDiagram energyData={victronData} />
-            )}
-          </View>
-        ) : (
-          <View className="justify-between pb-5">
-            <Image className="h-4 w-7 mt-2 ml-2" source={require("../assets/battery.png")} />
-            <BatteryGauge />
-          </View>
-        )}
-      </View>
-    );
+<Grid className="bg-black">
+         <Row size={10}>
+                          <Row className="bg-black" size={9}>
+                              <Col className="m-1 ml-3">
+                                  <Text className="text-3xl text-white">{DayOfTheWeek}</Text>
+                                  <Text className="text-lg text-white">{currentDate}</Text>
+                              </Col>
+                          </Row>
+                          <Row
+                              className="bg-black"
+                              size={1}
+                          >
+                              <View className="pt-3 pl-3">
+                              <Image
+                                  source={require("../assets/images/icon.png")}
+                                  style={{
+                                      width: 70,
+                                      height: 45,
+                                      right: 0,
+                                      paddingTop: 10,
+                                      backgroundColor: "white"
+                                  }}
+                              />
+                              </View>
+                              </Row>
+              </Row>
+
+                  
+              
+
+
+      </Grid>
+      
+    )
+    
   }
   
   // Mobile view
