@@ -8,13 +8,17 @@ import {
   StyleSheet,
   TouchableOpacity,
 } from "react-native";
-import { Col, Row, Grid } from "react-native-easy-grid";
+
 import Map from "../components/Map";
 import useScreenSize from "../helper/useScreenSize.jsx";
 import VictronEnergyPanel from "../components/VictronEnergyPanel";
 import EnergyFlowDiagram from "../components/EnergyFlowDiagram";
 import { VictronEnergyService } from "../API/VictronEnergyService";
 import moment from "moment";
+
+import BatteryCard from "../components/BatteryCard.jsx";
+import { HorizontalLine, VerticalLine, ConnectionDot } from '../components/Lines.js';
+
 
 
 const System = () => {
@@ -65,50 +69,7 @@ const System = () => {
     setShowDetailedView(!showDetailedView);
   };
 
-  // Draw a horizontal connection line
-  const HorizontalLine = ({ top, left, width }) => (
-    <View
-      style={{
-        position: 'absolute',
-        height: 3,
-        width: width,
-        backgroundColor: '#4A90E2',
-        top: top,
-        left: left,
-      }}
-    />
-  );
-
-  // Draw a vertical connection line
-  const VerticalLine = ({ top, left, height }) => (
-    <View
-      style={{
-        position: 'absolute',
-        width: 3,
-        height: height,
-        backgroundColor: '#4A90E2',
-        top: top,
-        left: left,
-      }}
-    />
-  );
-
-  // Draw a connection dot
-  const ConnectionDot = ({ top, left }) => (
-    <View
-      style={{
-        position: 'absolute',
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        backgroundColor: '#fff',
-        borderWidth: 2,
-        borderColor: '#4A90E2',
-        top: top - 5, // Center the dot
-        left: left - 5, // Center the dot
-      }}
-    />
-  );
+ 
 
   // Tablet view with integrated Victron data
   if (isTablet) {
@@ -167,16 +128,20 @@ const System = () => {
 
           {/* ————————————— BOTTOM ROW OF CARDS ————————————— */}
           <View style={styles.panelRow}>
-            <View style={styles.darkGreenCard}>
-              <Text style={styles.cardValue}>
-                {victronData
-                  ? `${victronData.battery.soc.toFixed(0)}%`
-                  : "--"}
-              </Text>
-              <Text style={styles.cardSubtitle}>
-                {victronData ? `${victronData.battery.power}W` : ""}
-              </Text>
-            </View>
+          <BatteryCard>
+  {victronData ? (
+    <>
+      <Text style={styles.cardValue}>
+        {`${victronData.battery.soc.toFixed(0)}%`}
+      </Text>
+      <Text style={styles.cardSubtitle}>
+        {`${victronData.battery.power}W`}
+      </Text>
+    </>
+  ) : (
+    <Text style={styles.cardValue}>--</Text>
+  )}
+</BatteryCard>
 
             <View style={styles.darkerGreenCard}>
               <Text style={styles.cardTitle}>DC Power</Text>
@@ -344,6 +309,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     zIndex: 1,
   },
+
+  
   
   // Card header styles
   redCardHeader: {
@@ -479,7 +446,6 @@ const styles = StyleSheet.create({
   
   // Bottom row cards
   darkGreenCard: {
-    
     borderRadius: 12,
     padding: 12,
     marginHorizontal: 8,
@@ -493,7 +459,6 @@ const styles = StyleSheet.create({
     width: 250,
     height: 150,
     backgroundColor: "#2E7D32",
-   
   },
   
   darkerGreenCard: {
