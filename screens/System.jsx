@@ -169,33 +169,25 @@ const System = () => {
           
           {/* */}
           {/* Red to Blue (Left to Center in top row) */}
-          <HorizontalLine top={58} left={263} width={130} />
-          <ConnectionDot top={158} left={314} />
-          <ConnectionDot top={128} left={174} />
+          <ConnectionDot top={88} left = {260}></ConnectionDot>
+          <ConnectionDot top={88} left = {395}></ConnectionDot>
+          <HorizontalLine top={86} left = {260} width={200}></HorizontalLine>
+          
 
 
           {/* Blue to Green (Center to Right in top row) */}
-          <HorizontalLine top={128} left={392} width={30} />
-          <ConnectionDot top={128} left={392} />
-          <ConnectionDot top={128} left={422} />
+         
 
 
           {/* Vertical line from Blue box down */}
-          <VerticalLine top={176} left={268} height={48} />
-          <ConnectionDot top={176} left={268} />
-          <ConnectionDot top={224} left={268} />
-
+         
 
           {/* Left bottom box to center vertical line */}
-          <HorizontalLine top={268} left={144} width={124} />
-          <ConnectionDot top={268} left={144} />
-          <ConnectionDot top={268} left={268} />
+     
 
 
           {/* Right bottom box to center vertical line */}
-          <HorizontalLine top={268} left={268} width={124} />
-          <ConnectionDot top={268} left={268} />
-          <ConnectionDot top={268} left={392} />
+         
 
         </View>
       </SafeAreaView>

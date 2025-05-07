@@ -11,6 +11,7 @@ export const HorizontalLine = ({ top, left, width }) => (
       backgroundColor: '#4A90E2',
       top,
       left,
+      zindex: 2,
     }}
   />
 );
@@ -40,6 +41,7 @@ export const ConnectionDot = ({ top, left }) => (
       borderColor: '#4A90E2',
       top: top - 5,    // center the dot
       left: left - 5,  // center the dot
+      zIndex: 1,
     }}
   />
 );

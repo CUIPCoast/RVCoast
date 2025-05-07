@@ -25,9 +25,11 @@ const screenOptions = (route, color) => {
       iconName = 'API';
       break;
     case 'Vents':
-      iconName = 'filter';
+      iconName = 'cloudo';
       break;
-    
+    case 'Victron':
+      iconName = 'hdd'
+      break;
     case 'Settings':
       iconName = 'setting';
       break;
