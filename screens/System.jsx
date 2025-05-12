@@ -18,6 +18,7 @@ import moment from "moment";
 
 import BatteryCard from "../components/BatteryCard.jsx";
 import { HorizontalLine, VerticalLine, ConnectionDot } from '../components/Lines.js';
+import PVChargerCard from "../components/PVChargerCard.jsx";
 
 
 
@@ -152,17 +153,16 @@ const System = () => {
               </Text>
             </View>
 
-            <View style={styles.orangeCard}>
-            <View style={styles.orangeCardHeader}>
-                <Text style={styles.orangeCardHeaderText}>PV Charger</Text>
-              </View>
-              
-              <Text style={styles.cardValue}>
-                {victronData
-                  ? `${victronData.pvCharger.power.toFixed(0)}W`
-                  : "0W"}
-              </Text>
-            </View>
+            <PVChargerCard
+  power={
+    victronData
+      ? `${victronData.pvCharger.power.toFixed(0)}W`
+      : '0W'
+  }
+  imageSource={require('../assets/smartsolar.png')}   
+  cardOffset={{ top: 10, left: 0 }}     // tweak these anytime
+  imageOffset={{ top: 60, left: -74 }}   //   ″      ″
+/>
           </View>
 
           {/* ————————————— CONNECTION LINES ————————————— */}
@@ -177,17 +177,39 @@ const System = () => {
 
           {/* Blue to Green (Center to Right in top row) */}
          
-
+          <ConnectionDot top={88} left = {575}></ConnectionDot>
+          <ConnectionDot top={140} left = {487}></ConnectionDot>
+          <ConnectionDot top={88} left = {712}></ConnectionDot>
+          <HorizontalLine top={86} left = {560} width={200}></HorizontalLine>
 
           {/* Vertical line from Blue box down */}
+         <VerticalLine top={140} left = {485} height={130}></VerticalLine>
+         <ConnectionDot top={272} left = {255}></ConnectionDot>
+         <ConnectionDot top={271} left = {782}></ConnectionDot>
+          
          
-
-          {/* Left bottom box to center vertical line */}
      
 
+         <ConnectionDot top={272} left = {312}></ConnectionDot>
+         <VerticalLine top={269} left = {311} height={78}></VerticalLine>
+         <HorizontalLine top={345} left = {312} width={65}></HorizontalLine>
 
-          {/* Right bottom box to center vertical line */}
-         
+         <ConnectionDot top={346} left = {312}></ConnectionDot>
+
+         <HorizontalLine top={271} left = {260} width={55}></HorizontalLine>
+         <ConnectionDot top={346} left = {375}></ConnectionDot>
+
+         <HorizontalLine top={271} left = {315} width={170}></HorizontalLine>
+         <ConnectionDot top={273} left = {486}></ConnectionDot>
+
+         <HorizontalLine top={271} left = {490} width={155}></HorizontalLine>
+         <ConnectionDot top={273} left = {646}></ConnectionDot>
+
+         <VerticalLine top={269} left = {645} height={78}></VerticalLine>
+         <ConnectionDot top={346} left = {647}></ConnectionDot>
+
+         <HorizontalLine top={345} left = {650} width={85}></HorizontalLine>
+         <ConnectionDot top={346} left = {727}></ConnectionDot>
 
         </View>
       </SafeAreaView>
@@ -455,7 +477,7 @@ const styles = StyleSheet.create({
   },
   
   darkerGreenCard: {
-    marginTop: 70,
+    marginTop: 95,
     borderRadius: 12,
     padding: 12,
     marginHorizontal: 8,
