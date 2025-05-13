@@ -26,14 +26,19 @@ const MovingPulse = ({ horizontal, travel, duration = 1800, delay = 0 }) => {
 
   return (
     <Animated.View
-      style={{
-        position: 'absolute',
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: '#80D8FF',     // lighter blue “energy” dot
-        transform: [translate],
-      }}
+    style={{
+      position: 'absolute',
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: '#80D8FF',
+      transform: [
+        translate,
+        horizontal
+          ? { translateY: -2.5 }  
+          : { translateX: -2.5 }
+      ],
+    }}
     />
   );
 };
@@ -106,7 +111,7 @@ export const VerticalLine = ({
 export const ConnectionDot = ({
   top,
   left,
-  size = 10,
+  size = 15,
   color = '#4A90E2',
 }) => (
   <View

@@ -5,7 +5,7 @@ import System from './System';
 import moment from 'moment';
 import Settings from './Settings';
 import ModalComponent from '../components/ModalComponent';
-
+import Map from "../components/Map";
 import TankHeaterControl from "../components/TankHeaterControl";
 
 import AwningControlModal from "../components/AwningControlModal";
@@ -132,7 +132,10 @@ const MainScreen = () => {
                         elevation: 6,
                     }}
                     size={75}>
-                        
+                        <View className="mb-6">
+        <Text className="text-white text-lg font-semibold mb-2 top-2 left-3">Live Location</Text>
+        <Map />
+      </View>
                     </Row>
                 </Col>
 
@@ -249,6 +252,7 @@ const MainScreen = () => {
                   alignItems: "center",  
                   
                   }}>
+                    
                 <Col className="pb-5 mt15" size={60} style={{ justifyContent: "center", alignItems: "center" }}>
                     <Row
                         className="bg-brown rounded-xl ml-2 mt8"

@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
     marginBottom: 10, // Space from bottom of the screen
     
     
-    height: 60, // Adjust height as needed
+    height: 63, // Adjust height as needed
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,

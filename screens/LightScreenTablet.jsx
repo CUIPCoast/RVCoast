@@ -402,7 +402,7 @@ const ImprovedLightScreenTablet = () => {
       )}
       
       {/* Master Light Control Row */}
-      <Row size={5} style={{ justifyContent: "center", alignItems: "center" }}>
+      <Row size={5} style={{ justifyContent: "center", alignItems: "center",  }}>
         <Col
           style={{
             width: "40%",
@@ -412,6 +412,7 @@ const ImprovedLightScreenTablet = () => {
             justifyContent: "center",
             padding: 20,
             bottom: 220,
+            
           }}
         >
           <View
@@ -542,6 +543,11 @@ const ImprovedLightScreenTablet = () => {
               marginLeft: -260,
               marginRight: 30,
               bottom: 140,
+              shadowColor: "#FFF",
+                            shadowOffset: { width: 0, height: 6 },
+                            shadowOpacity: 1,
+                            shadowRadius: 4,
+                            elevation: 6,
             }}
           >
             <Text
@@ -596,6 +602,11 @@ const ImprovedLightScreenTablet = () => {
               padding: 20,
               marginRight: 30,
               bottom: 140,
+              shadowColor: "#FFF",
+                            shadowOffset: { width: 0, height: 6 },
+                            shadowOpacity: 1,
+                            shadowRadius: 4,
+                            elevation: 6,
             }}
           >
             <Text
@@ -649,6 +660,11 @@ const ImprovedLightScreenTablet = () => {
               justifyContent: "flex-start",
               padding: 20,
               bottom: 140,
+              shadowColor: "#FFF",
+                            shadowOffset: { width: 0, height: 6 },
+                            shadowOpacity: 1,
+                            shadowRadius: 4,
+                            elevation: 6,
             }}
           >
             <Text

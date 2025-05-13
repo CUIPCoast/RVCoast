@@ -14,20 +14,16 @@ import useScreenSize from "../helper/useScreenSize.jsx";
 import VictronEnergyPanel from "../components/VictronEnergyPanel";
 import EnergyFlowDiagram from "../components/EnergyFlowDiagram";
 import { VictronEnergyService } from "../API/VictronEnergyService";
-import moment from "moment";
+
 
 import BatteryCard from "../components/BatteryCard.jsx";
 import { HorizontalLine, VerticalLine, ConnectionDot } from '../components/Lines.js';
 import PVChargerCard from "../components/PVChargerCard.jsx";
-
+import GlowingCard from '../components/GlowingCards.jsx';
 
 
 const System = () => {
 
-   var currentDate = moment().format("MMMM Do, YYYY");
-  var DayOfTheWeek = moment().format("dddd");
-  const [isOn, setIsOn] = useState(false);
-  
   const isTablet = useScreenSize();
   const [victronData, setVictronData] = useState(null);
   const [energyError, setEnergyError] = useState(null);
@@ -79,8 +75,8 @@ const System = () => {
         {/* ————————————— HEADER ————————————— */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.headerDay}>{DayOfTheWeek}</Text>
-            <Text style={styles.headerDate}>{currentDate}</Text>
+            <Text style={styles.headerDay}>Victron System</Text>
+            <Text style={styles.headerDate}>Overview</Text>
           </View>
           <Image
             source={require("../assets/images/icon.png")}
@@ -92,13 +88,17 @@ const System = () => {
         <View style={styles.diagramContainer}>
           {/* ————————————— TOP ROW OF CARDS ————————————— */}
           <View style={styles.panelRow}>
-            <View style={styles.redCard}>
+          <GlowingCard glowColor="#D32F2F" style={styles.cardWrapper}>
+          <View style={styles.redCard}>
               <View style={styles.redCardHeader}>
                 <Text style={styles.redCardHeaderText}>Grid Power</Text>
               </View>
               <Text style={styles.cardValue}>--</Text>
             </View>
+            </GlowingCard>
+            
 
+            <GlowingCard glowColor="#6CB4EE" style={styles.cardWrapper}>
             <View style={styles.blueCard}>
             <View style={styles.blueCardHeader}>
                 <Text style={styles.blueCardHeaderText}>Inverting</Text>
@@ -114,6 +114,9 @@ const System = () => {
               />
             </View>
 
+            </GlowingCard>
+            
+            <GlowingCard glowColor="#228B22" style={styles.cardWrapper}>
             <View style={styles.greenCard}>
               <View style={styles.greenCardHeader}>
                 <Text style={styles.greenCardHeaderText}>AC Loads</Text>
@@ -125,6 +128,8 @@ const System = () => {
                 {victronData ? victronData.acLoads.lines.join(" + ") : ""}
               </Text>
             </View>
+            </GlowingCard>
+           
           </View>
 
           {/* ————————————— BOTTOM ROW OF CARDS ————————————— */}
@@ -143,9 +148,12 @@ const System = () => {
     <Text style={styles.cardValue}>--</Text>
   )}
 </BatteryCard>
-
-            <View style={styles.darkerGreenCard}>
-              <Text style={styles.cardTitle}>DC Power</Text>
+<GlowingCard glowColor="#228B22" style={styles.cardWrapper}>
+<View style={styles.darkerGreenCard}>
+<View style={styles.darkerGreenCardHeader}>
+                <Text style={styles.greenCardHeaderText}>DC Power</Text>
+              </View>
+              
               <Text style={styles.cardValue}>
                 {victronData
                   ? `${victronData.dcSystem.power}W`
@@ -153,7 +161,9 @@ const System = () => {
               </Text>
             </View>
 
-            <PVChargerCard
+</GlowingCard>
+<GlowingCard glowColor="#FFBF00" style={styles.cardWrapper}>
+<PVChargerCard
   power={
     victronData
       ? `${victronData.pvCharger.power.toFixed(0)}W`
@@ -163,29 +173,32 @@ const System = () => {
   cardOffset={{ top: 10, left: 0 }}     // tweak these anytime
   imageOffset={{ top: 60, left: -74 }}   //   ″      ″
 />
+
+</GlowingCard>
+           
           </View>
 
           {/* ————————————— CONNECTION LINES ————————————— */}
           
           {/* */}
           {/* Red to Blue (Left to Center in top row) */}
-          <ConnectionDot top={88} left = {260}></ConnectionDot>
+          <ConnectionDot top={87} left = {270}></ConnectionDot>
           <ConnectionDot top={88} left = {395}></ConnectionDot>
-          <HorizontalLine top={86} left = {260} width={200}></HorizontalLine>
+          <HorizontalLine top={86} left = {245} width={160}></HorizontalLine>
           
 
 
           {/* Blue to Green (Center to Right in top row) */}
          
           <ConnectionDot top={88} left = {575}></ConnectionDot>
-          <ConnectionDot top={140} left = {487}></ConnectionDot>
+          <ConnectionDot top={150} left = {486}></ConnectionDot>
           <ConnectionDot top={88} left = {712}></ConnectionDot>
           <HorizontalLine top={86} left = {560} width={200}></HorizontalLine>
 
           {/* Vertical line from Blue box down */}
          <VerticalLine top={140} left = {485} height={130}></VerticalLine>
          <ConnectionDot top={272} left = {255}></ConnectionDot>
-         <ConnectionDot top={271} left = {782}></ConnectionDot>
+         
           
          
      
@@ -197,7 +210,7 @@ const System = () => {
          <ConnectionDot top={346} left = {312}></ConnectionDot>
 
          <HorizontalLine top={271} left = {260} width={55}></HorizontalLine>
-         <ConnectionDot top={346} left = {375}></ConnectionDot>
+         <ConnectionDot top={346} left = {365}></ConnectionDot>
 
          <HorizontalLine top={271} left = {315} width={170}></HorizontalLine>
          <ConnectionDot top={273} left = {486}></ConnectionDot>
@@ -209,7 +222,7 @@ const System = () => {
          <ConnectionDot top={346} left = {647}></ConnectionDot>
 
          <HorizontalLine top={345} left = {650} width={85}></HorizontalLine>
-         <ConnectionDot top={346} left = {727}></ConnectionDot>
+         
 
         </View>
       </SafeAreaView>
@@ -315,7 +328,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   diagramContainer: {
-    flex: 1,
+    bottom:15,
     position: 'relative',
   },
   panelRow: {
@@ -323,6 +336,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 16,
     zIndex: 1,
+    
   },
 
   
@@ -370,8 +384,8 @@ const styles = StyleSheet.create({
 
   },
 
-  orangeCardHeader: {
-    backgroundColor: '#E86100',
+  darkerGreenCardHeader: {
+    backgroundColor: '#004225',
     width: '100%',
     paddingVertical: 8,
     borderTopLeftRadius: 12,
@@ -383,6 +397,8 @@ const styles = StyleSheet.create({
     top: 10,
 
   },
+
+ 
   redCardHeaderText: {
     color: '#FFB3B3',
     fontSize: 18,
@@ -393,87 +409,77 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
   },
+  darkerGreenCardHeaderText: {
+    color: '#A0FF9F',
+    fontSize: 18,
+    fontWeight: '700',
+  },
   blueCardHeaderText: {
     color: '#0047AB',
     fontSize: 18,
     fontWeight: '700',
   },
-  orangeCardHeaderText: {
-    color: '#F7E7CE',
-    fontSize: 18,
-    fontWeight: '700',
-  },
+ 
  
   // Top row cards
   redCard: {
     borderRadius: 12,
     padding: 12,
     marginHorizontal: 8,
-    shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 4,
     justifyContent: "center",
     alignItems: "center",
     width: 250,
     height: 180,
     backgroundColor: "#D32F2F",
     position: "relative",
-    paddingTop: 40, // Add padding at the top to accommodate the header
+    paddingTop: 40,
+  
+    // Glow
+    shadowColor: "#FF6B6B",         // Soft red glow
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.8,
+    shadowRadius: 15,
+    elevation: 10, // Android
+    
   },
   
+  
   blueCard: {
-    
     borderRadius: 12,
     padding: 12,
     marginHorizontal: 8,
-    shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 4,
     justifyContent: "center",
     alignItems: "center",
     width: 180,
     height: 140,
     backgroundColor: "#1976D2",
-    // Add any blue card specific styling here
+  
+    // Glow
+    shadowColor: "#6CB4EE",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 15,
+    elevation: 10,
   },
   
   greenCard: {
     borderRadius: 12,
     padding: 12,
     marginHorizontal: 8,
-    shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 4,
     justifyContent: "center",
     alignItems: "center",
     width: 250,
     height: 180,
     backgroundColor: "#388E3C",
     position: "relative",
-    paddingTop: 40, // Add padding at the top to accommodate the header
-  },
+    paddingTop: 40,
   
-  // Bottom row cards
-  darkGreenCard: {
-    borderRadius: 12,
-    padding: 12,
-    marginHorizontal: 8,
-    shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 4,
-    justifyContent: "center",
-    alignItems: "center",
-    width: 250,
-    height: 150,
-    backgroundColor: "#2E7D32",
+    // Glow
+    shadowColor: "#A0FF9F",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 15,
+    elevation: 10,
   },
   
   darkerGreenCard: {
@@ -481,37 +487,24 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
     marginHorizontal: 8,
-    shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 4,
     justifyContent: "center",
     alignItems: "center",
-    right:35,
+    right: 35,
     width: 220,
     height: 110,
     backgroundColor: "#1B5E20",
-    // Add any darker green card specific styling here
+  
+    // Glow
+    shadowColor: "#66FF99",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 15,
+    elevation: 10,
   },
   
-  orangeCard: {
-    
-    borderRadius: 12,
-    padding: 12,
-    marginHorizontal: 8,
-    shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 4,
-    justifyContent: "center",
-    alignItems: "center",
-    width: 180,
-    height: 140,
-    backgroundColor: "#F57C00",
-    // Add any orange card specific styling here
-  },
+  
+  
+  
   cardTitle: {
     color: "#fff",
     fontSize: 18,
@@ -522,6 +515,7 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 24,
     fontWeight: "700",
+    
   },
   cardSubtitle: {
     color: "#fff",

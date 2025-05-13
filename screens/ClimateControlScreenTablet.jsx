@@ -78,75 +78,7 @@ const ClimateControlScreenTablet = () => {
     setTemp(newTemp);
   };
   
-  // Add a new useEffect for handling weather data
-  useEffect(() => {
-    const fetchWeatherData = async () => {
-      try {
-        // Reset weather error state
-        setWeatherError(false);
-        
-        // Check if any network connectivity is available
-        // This is just a simple check - you might need to use a more robust method like NetInfo
-        const checkNetworkBeforeRequest = async () => {
-          return new Promise((resolve) => {
-            // Use a timeout to simulate network check
-            setTimeout(() => resolve(true), 100);
-          });
-        };
-        
-        const isNetworkAvailable = await checkNetworkBeforeRequest();
-        if (!isNetworkAvailable) {
-          throw new Error('No network connection available');
-        }
-        
-        // Add a timeout to the API call to avoid hanging if network is unstable
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Request timeout')), 10000);
-        });
-        
-        // This should be replaced with your actual weather API call
-        // For example: const weatherResponse = await ClimateService.getWeatherData();
-        const weatherResponse = await Promise.race([
-          // Your actual weather API call would go here
-          // For now, using a placeholder promise that resolves successfully
-          new Promise(resolve => setTimeout(() => resolve({ success: true, data: { temp: 75 } }), 500)),
-          timeoutPromise
-        ]);
-        
-        if (weatherResponse && weatherResponse.success) {
-          setWeatherData(weatherResponse.data);
-        } else {
-          throw new Error('Failed to fetch weather data');
-        }
-      } catch (error) {
-        console.error('Error fetching weather data:', error);
-        setWeatherError(true);
-        
-        // Only show network error message if it's actually a network error
-        if (error.message.includes('Network') || error.name === 'AxiosError') {
-          setErrorMessage('Unable to connect to weather service. Using saved temperature settings.');
-          
-          // Show status message for network error
-          setStatusMessage('Network error: Using offline mode');
-          setShowStatus(true);
-          setTimeout(() => setShowStatus(false), 3000);
-        }
-      }
-    };
-    
-    // Call the function to fetch weather data
-    fetchWeatherData();
-    
-    // Set up a timer to retry fetching every 5 minutes if there was an error
-    let retryTimer;
-    if (weatherError) {
-      retryTimer = setTimeout(fetchWeatherData, 300000); // 5 minutes
-    }
-    
-    return () => {
-      if (retryTimer) clearTimeout(retryTimer);
-    };
-  }, [weatherError]);
+  
 
   // Temperature change implementation from AirCon.jsx
   useEffect(() => {
@@ -309,26 +241,7 @@ const ClimateControlScreenTablet = () => {
     }
   };
 
-  // reusable toggle
-const ToggleButton = ({ icon, label, isActive, onPress, disabled }) => (
-  <TouchableOpacity
-    onPress={onPress}
-    disabled={disabled}
-    style={[
-      styles.toggleButtonBase,
-      isActive ? styles.toggleButtonActive : styles.toggleButtonInactive
-    ]}
-    activeOpacity={0.7}
-  >
-    <Image source={icon} style={styles.toggleIcon} />
-    <Text style={[
-      styles.toggleLabel,
-      isActive && styles.toggleLabelActive
-    ]}>
-      {label}
-    </Text>
-  </TouchableOpacity>
-);
+
 
   // Handle feature button press (Cool, Toe Kick, Furnace) with improved implementation from AirCon
   const handleButtonPress = async (label) => {
@@ -653,24 +566,7 @@ useEffect(() => {
     checkPendingChanges();
   }, [isCoolToggled, isToekickToggled, isFurnaceToggled, isLoading]);
 
-  // Function to check if network is available - can be called before API requests
-  const isNetworkAvailable = async () => {
-    // This is a simplified check - in a real app, you would use NetInfo or similar
-    return new Promise((resolve) => {
-      // Simple check - if we can get a response in reasonable time
-      const fetchTimeout = setTimeout(() => resolve(false), 3000);
-      
-      fetch('https://www.google.com', { method: 'HEAD', mode: 'no-cors' })
-        .then(() => {
-          clearTimeout(fetchTimeout);
-          resolve(true);
-        })
-        .catch(() => {
-          clearTimeout(fetchTimeout);
-          resolve(false);
-        });
-    });
-  };
+ 
 
   // If the screen is a tablet, render the climate control interface
   if (isTablet) {
@@ -754,6 +650,11 @@ useEffect(() => {
                 justifyContent: "flex-start",
                 padding: 20,
                 margin: 50,
+                shadowColor: "#FFF",
+                            shadowOffset: { width: 0, height: 6 },
+                            shadowOpacity: 1,
+                            shadowRadius: 4,
+                            elevation: 6,
               }}
             >
               <Text
@@ -833,6 +734,11 @@ useEffect(() => {
                       margin: 25,
                       right: 80,
                       bottom: 10,
+                      shadowColor: "#FFF",
+                            shadowOffset: { width: 0, height: 6 },
+                            shadowOpacity: 1,
+                            shadowRadius: 4,
+                            elevation: 6,
                     }}
                   >
                     <Text
