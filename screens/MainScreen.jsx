@@ -13,6 +13,7 @@ import AirCon from "./AirCon.jsx";
 import Home from "./Home";
 import { WaterService } from '../API/RVControlServices.js';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const MainScreen = () => {
     
@@ -120,10 +121,10 @@ const MainScreen = () => {
 
             <Row size={80}>
                 <Col size={15} className="">
-                    <Row className=" rounded-xl mr-3 ml-3 mt-3" size={25}>
+                    <Row className=" rounded-xl mr-3 ml-3 mt-1 top-5" size={28}>
                         <Home />
                     </Row>
-                    <Row className="bg-brown rounded-xl m-3 mb-10" 
+                    <Row className="bg-brown rounded-xl m-3 mb-10 top-15" 
                     style = {{
                         shadowColor: "#FFFFFF",
                         shadowOffset: { width: 100, height: 120, },
@@ -161,65 +162,55 @@ const MainScreen = () => {
                     <Text className="text-white mb-1">Heaters</Text>
                     
                     <View className="mt-5 space-y-2 mb-5">
-                    {/* Water Heater Button - Updated with service handler */}
-                    <TouchableOpacity
-   onPress={handleWaterHeaterToggle}
-   style={{
-     backgroundColor: isWaterHeaterOn ? "#4CAF05" : "#1A1A1D",
-     flexDirection: "row",
-     alignItems: "center",
-     justifyContent: "center",
-     paddingVertical: 12,
-     paddingHorizontal: 16,
-     borderRadius: 8,
-     shadowColor: "#000",
-     shadowOffset: { width: 0, height: 2 },
-     shadowOpacity: 0.3,
-     shadowRadius: 4,
-     elevation: 5,
-   }}
-   disabled={isLoading}
- >
-   <Ionicons
-     name={isWaterHeaterOn ? "water" : "water-outline"}
-     size={32}
-     color="#FFF"
-     style={{ marginRight: 12 }}
-   />
-   <Text style={{ color: "white", fontSize: 16, fontWeight: "600" }}>
-     Water Heater
-   </Text>
- </TouchableOpacity>
+                    
+                  {/* Water Heater Button */}
+      <TouchableOpacity
+        onPress={handleWaterHeaterToggle}
+        disabled={isLoading}
+        activeOpacity={0.8}
+      >
+        <LinearGradient
+          colors={
+            isWaterHeaterOn
+              ? ['#00C6FB', '#005BEA']
+              : ['#1A1A1D', '#1A1A1D']
+          }
+          style={styles.waterbutton}
+        >
+          <Ionicons
+            name={isWaterHeaterOn ? 'water' : 'water-outline'}
+            size={32}
+            color="#FFF"
+            style={styles.icon}
+          />
+          <Text style={styles.label}>Water Heater</Text>
+        </LinearGradient>
+      </TouchableOpacity>
 
-                   {/* Water Pump Button */}
- <TouchableOpacity
-   onPress={handleWaterPumpToggle}
-   style={{
-     backgroundColor: isWaterPumpOn ? "#4CAF05" : "#1A1A1D",
-     flexDirection: "row",
-     alignItems: "center",
-     justifyContent: "center",
-     paddingVertical: 12,
-     paddingHorizontal: 16,
-     borderRadius: 8,
-     shadowColor: "#000",
-     shadowOffset: { width: 0, height: 2 },
-     shadowOpacity: 0.3,
-     shadowRadius: 4,
-     elevation: 5,
-   }}
-   disabled={isLoading}
- >
-   <Ionicons
-     name={isWaterPumpOn ? "pie-chart-outline" : "pie-chart-outline"}
-     size={32}
-     color="#FFF"
-     style={{ marginRight: 12 }}
-   />
-   <Text style={{ color: "white", fontSize: 16, fontWeight: "600" }}>
-     Water Pump
-   </Text>
- </TouchableOpacity>
+      {/* Water Pump Button */}
+      <TouchableOpacity
+        onPress={handleWaterPumpToggle}
+        disabled={isLoading}
+        activeOpacity={0.8}
+      >
+        <LinearGradient
+          colors={
+            isWaterPumpOn
+              ? ['#00C6FB', '#005BEA']
+              : ['#1A1A1D', '#1A1A1D']
+          }
+          style={styles.waterbutton}
+        >
+          <Ionicons
+            // you can swap this for a “pump” icon if you find one
+            name={isWaterPumpOn ? 'pie-chart' : 'pie-chart-outline'}
+            size={32}
+            color="#FFF"
+            style={styles.icon}
+          />
+          <Text style={styles.label}>Water Pump</Text>
+        </LinearGradient>
+      </TouchableOpacity>
                     </View>
                 </View>
 
@@ -356,6 +347,28 @@ const MainScreen = () => {
 };
 
 const styles = {
+    waterbutton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 5,
+        marginVertical: 8,
+      },
+      icon: {
+        marginRight: 12,
+      },
+      label: {
+        color: '#FFF',
+        fontSize: 16,
+        fontWeight: '600',
+      },
     errorContainer: {
         backgroundColor: "rgba(255, 0, 0, 0.1)",
         padding: 10,

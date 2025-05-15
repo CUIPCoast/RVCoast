@@ -119,7 +119,7 @@ const Home = () => {
       <Image
         style={styles.statusbarPosition}
         contentFit="cover"
-        source={require("../assets/image-7.png")}
+        source={require("../assets/homeImage.png")}
       />
       <View style={styles.mainContent}>
         <View style={styles.weatherContainer}>

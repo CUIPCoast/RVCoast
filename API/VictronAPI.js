@@ -1,4 +1,4 @@
-// API/VictronAPI.js - Fixed with better error handling
+// API/VictronAPI.js - Updated with Grid Power and DC Power support
 import axios from 'axios';
 
 // Use the same base URL as your RV control API
@@ -114,6 +114,20 @@ export const VictronAPI = {
       return response.data.data;
     } catch (error) {
       console.error('Error fetching DC system data:', error);
+      throw error;
+    }
+  },
+  
+  /**
+   * Get Grid power data
+   * @returns {Promise<Object>} Grid data
+   */
+  getGrid: async () => {
+    try {
+      const response = await api.get('/grid');
+      return response.data.data;
+    } catch (error) {
+      console.error('Error fetching grid data:', error);
       throw error;
     }
   },
