@@ -99,22 +99,13 @@ const System = () => {
             
 
             <GlowingCard glowColor="#6CB4EE" style={styles.cardWrapper}>
-            <View style={styles.blueCard}>
-            <View style={styles.blueCardHeader}>
-                <Text style={styles.blueCardHeaderText}>Inverting</Text>
-              </View>
-              <Text style={styles.cardValue}>
-                {victronData
-                  ? `${victronData.dcSystem.power.toFixed(0)}W`
-                  : "--"}
-              </Text>
-              <Image
-                source={require("../assets/wifi.png")}
-                style={styles.victronLogo}
-              />
-            </View>
-
-            </GlowingCard>
+      <Image
+        source={require('../assets/victron.png')}  // ← swap in your image here
+        style={styles.blueCard}
+        resizeMode="cover"
+        
+      />
+    </GlowingCard>
             
             <GlowingCard glowColor="#228B22" style={styles.cardWrapper}>
             <View style={styles.greenCard}>
@@ -138,7 +129,7 @@ const System = () => {
   {victronData ? (
     <>
       <Text style={styles.cardValue}>
-        {`${victronData.battery.soc.toFixed(0)}%`}
+        {`${victronData.battery.soc * 100}%`}
       </Text>
       <Text style={styles.cardSubtitle}>
         {`${victronData.battery.power}W`}
@@ -183,16 +174,16 @@ const System = () => {
           {/* */}
           {/* Red to Blue (Left to Center in top row) */}
           <ConnectionDot top={87} left = {270}></ConnectionDot>
-          <ConnectionDot top={88} left = {395}></ConnectionDot>
+          <ConnectionDot top={88} left = {402}></ConnectionDot>
           <HorizontalLine top={86} left = {245} width={160}></HorizontalLine>
           
 
 
           {/* Blue to Green (Center to Right in top row) */}
          
-          <ConnectionDot top={88} left = {575}></ConnectionDot>
-          <ConnectionDot top={150} left = {486}></ConnectionDot>
-          <ConnectionDot top={88} left = {712}></ConnectionDot>
+          <ConnectionDot top={87} left = {570}></ConnectionDot>
+          <ConnectionDot top={165} left = {486}></ConnectionDot>
+          <ConnectionDot top={88} left = {702}></ConnectionDot>
           <HorizontalLine top={86} left = {560} width={200}></HorizontalLine>
 
           {/* Vertical line from Blue box down */}
@@ -264,7 +255,7 @@ const System = () => {
                 <Text style={styles.energyValue}>{victronData.battery.soc.toFixed(1)}%</Text>
                 <Text style={styles.energyLabel}>Battery</Text>
                 <Text style={styles.energyDetail}>
-                {victronData.battery.voltage.toFixed(1)}V • {victronData.battery.state.toFixed(1)}
+                {victronData.battery.voltage.toFixed(1)}V •  {` ${victronData.battery.current.toFixed(1)} A`}
 
                 </Text>
               </View>
@@ -356,19 +347,7 @@ const styles = StyleSheet.create({
     
   },
 
-  blueCardHeader: {
-    backgroundColor: '#B9D9EB',
-    width: '100%',
-    paddingVertical: 8,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
-    alignItems: 'center',
-    position: 'absolute',
-    top: 10,
-
-  },
+  
 
   greenCardHeader: {
     backgroundColor: '#50C878',
@@ -414,11 +393,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
   },
-  blueCardHeaderText: {
-    color: '#0047AB',
-    fontSize: 18,
-    fontWeight: '700',
-  },
+  
  
  
   // Top row cards
@@ -446,20 +421,16 @@ const styles = StyleSheet.create({
   
   blueCard: {
     borderRadius: 12,
-    padding: 12,
     marginHorizontal: 8,
-    justifyContent: "center",
-    alignItems: "center",
-    width: 180,
-    height: 140,
+    width: 160,    // was 180
+    height: 160,   // was 140
     backgroundColor: "#1976D2",
-  
-    // Glow
     shadowColor: "#6CB4EE",
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 15,
     elevation: 10,
+    overflow: "hidden",
   },
   
   greenCard: {
