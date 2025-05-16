@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, Modal, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { StyleSheet, View, Text, Modal, TouchableOpacity, ActivityIndicator, Animated, Easing } from 'react-native';
 import { Color } from '../GlobalStyles';
 import { AwningService } from '../API/RVControlServices';
 
@@ -16,6 +16,46 @@ const AwningControlModal = ({ isVisible, onClose }) => {
   const [showStatus, setShowStatus] = useState(false);
   const [isExtending, setIsExtending] = useState(false);
   const [isRetracting, setIsRetracting] = useState(false);
+  
+  // Animation refs and state
+  const awningExtension = useRef(new Animated.Value(0)).current; // 0 = retracted, 1 = extended
+  const [animationInProgress, setAnimationInProgress] = useState(false);
+  
+  // Start awning extension animation
+  const animateExtend = () => {
+    setAnimationInProgress(true);
+    Animated.timing(awningExtension, {
+      toValue: 1,
+      duration: 3000,
+      easing: Easing.inOut(Easing.ease),
+      useNativeDriver: false,
+    }).start(({ finished }) => {
+      if (finished) {
+        setAnimationInProgress(false);
+      }
+    });
+  };
+  
+  // Start awning retraction animation
+  const animateRetract = () => {
+    setAnimationInProgress(true);
+    Animated.timing(awningExtension, {
+      toValue: 0,
+      duration: 3000,
+      easing: Easing.inOut(Easing.ease),
+      useNativeDriver: false,
+    }).start(({ finished }) => {
+      if (finished) {
+        setAnimationInProgress(false);
+      }
+    });
+  };
+  
+  // Stop animation at current position
+  const stopAnimation = () => {
+    awningExtension.stopAnimation();
+    setAnimationInProgress(false);
+  };
 
   // Handle extending the awning
   const handleExtend = async () => {
@@ -23,18 +63,25 @@ const AwningControlModal = ({ isVisible, onClose }) => {
     setIsExtending(true);
     setIsRetracting(false);
     
+    // Start the extension animation
+    animateExtend();
+    
     try {
       const result = await AwningService.extendAwning();
       
       if (result.success) {
         setStatusMessage('Awning extending...');
       } else {
+        // Stop animation if the API call fails
+        stopAnimation();
         setStatusMessage('Failed to extend awning');
       }
       
       setShowStatus(true);
       setTimeout(() => setShowStatus(false), 3000);
     } catch (error) {
+      // Stop animation on error
+      stopAnimation();
       console.error('Error extending awning:', error);
       setStatusMessage('Error: ' + error.message);
       setShowStatus(true);
@@ -50,18 +97,25 @@ const AwningControlModal = ({ isVisible, onClose }) => {
     setIsRetracting(true);
     setIsExtending(false);
     
+    // Start the retraction animation
+    animateRetract();
+    
     try {
       const result = await AwningService.retractAwning();
       
       if (result.success) {
         setStatusMessage('Awning retracting...');
       } else {
+        // Stop animation if the API call fails
+        stopAnimation();
         setStatusMessage('Failed to retract awning');
       }
       
       setShowStatus(true);
       setTimeout(() => setShowStatus(false), 3000);
     } catch (error) {
+      // Stop animation on error
+      stopAnimation();
       console.error('Error retracting awning:', error);
       setStatusMessage('Error: ' + error.message);
       setShowStatus(true);
@@ -74,6 +128,9 @@ const AwningControlModal = ({ isVisible, onClose }) => {
   // Handle stopping the awning
   const handleStop = async () => {
     setIsLoading(true);
+    
+    // Stop the animation
+    stopAnimation();
     
     try {
       const result = await AwningService.stopAwning();
@@ -104,8 +161,82 @@ const AwningControlModal = ({ isVisible, onClose }) => {
       setIsExtending(false);
       setIsRetracting(false);
       setShowStatus(false);
+      // Reset animation to retracted position when modal closes
+      awningExtension.setValue(0);
     }
   }, [isVisible]);
+
+  // Awning Animation Component
+  const AwningAnimation = () => {
+    // Calculate animated styles
+    const awningWidth = awningExtension.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['5%', '75%']
+    });
+    
+    const awningAngle = awningExtension.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0deg', '-25deg']
+    });
+    
+    const awningTranslateX = awningExtension.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, -20]
+    });
+    
+    const awningOpacity = awningExtension.interpolate({
+      inputRange: [0, 0.1],
+      outputRange: [0, 1],
+      extrapolate: 'clamp'
+    });
+
+    return (
+      <View style={styles.animationContainer}>
+        {/* RV Side View */}
+        <View style={styles.rv}>
+          <View style={styles.rvWindow} />
+          <View style={styles.rvDoor} />
+        </View>
+        
+        {/* Awning Mount Point */}
+        <View style={styles.awningMount} />
+        
+        {/* Animated Awning Arm */}
+        <Animated.View 
+          style={[
+            styles.awningArm, 
+            { 
+              transform: [
+                { translateX: awningTranslateX },
+                { rotateZ: awningAngle },
+              ],
+              opacity: awningOpacity
+            }
+          ]} 
+        />
+        
+        {/* Animated Awning Fabric */}
+        <Animated.View 
+          style={[
+            styles.awningFabric, 
+            { 
+              width: awningWidth,
+              transform: [
+                { translateX: awningTranslateX },
+                { rotateZ: awningAngle },
+              ],
+              opacity: awningOpacity
+            }
+          ]} 
+        />
+        
+        {/* Animation Status */}
+        <Text style={styles.animationStatus}>
+          {isExtending ? 'Extending...' : isRetracting ? 'Retracting...' : ''}
+        </Text>
+      </View>
+    );
+  };
 
   return (
     <Modal
@@ -117,6 +248,9 @@ const AwningControlModal = ({ isVisible, onClose }) => {
       <View style={styles.modalContainer}>
         <View style={styles.modalContent}>
           <Text style={styles.modalTitle}>Awning Control</Text>
+
+          {/* Awning Animation */}
+          <AwningAnimation />
 
           {/* Control Buttons */}
           <View style={styles.buttonRow}>
@@ -206,8 +340,82 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: Color.white0,
-    marginBottom: 30,
+    marginBottom: 20,
   },
+  
+  // Animation styles
+  animationContainer: {
+    width: '100%',
+    height: 160,
+    marginBottom: 25,
+    position: 'relative',
+    backgroundColor: '#E0E0E0',
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  rv: {
+    width: 80,
+    height: 120,
+    backgroundColor: '#777',
+    borderRadius: 5,
+    position: 'absolute',
+    left: '25%',
+    bottom: 10,
+  },
+  rvWindow: {
+    width: 30,
+    height: 25,
+    backgroundColor: '#AAA',
+    borderRadius: 3,
+    position: 'absolute',
+    top: 15,
+    right: 10,
+  },
+  rvDoor: {
+    width: 20,
+    height: 40,
+    backgroundColor: '#555',
+    borderRadius: 2,
+    position: 'absolute',
+    bottom: 0,
+    left: 15,
+  },
+  awningMount: {
+    width: 5,
+    height: 5,
+    backgroundColor: '#333',
+    position: 'absolute',
+    left: '32%',
+    top: 35,
+  },
+  awningArm: {
+    width: 3,
+    height: 50,
+    backgroundColor: '#999',
+    position: 'absolute',
+    left: '32%',
+    top: 35,
+    transformOrigin: 'top left',
+  },
+  awningFabric: {
+    height: 5,
+    backgroundColor: '#FF8200', // Orange awning fabric
+    position: 'absolute',
+    left: '32%',
+    top: 35,
+    borderBottomRightRadius: 5,
+    transformOrigin: 'top left',
+  },
+  animationStatus: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    fontSize: 12,
+    color: '#555',
+    fontStyle: 'italic',
+  },
+  
+  // Control button styles
   buttonRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

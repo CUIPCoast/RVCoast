@@ -5,10 +5,12 @@ import EnhancedMainLight from "../components/EnhancedMainLight.jsx";
 import useScreenSize from "../helper/useScreenSize.jsx";
 import AwningControlModal from "../components/AwningControlModal";
 import HeaterControlModal from "../components/HeaterControlModal";
-import { LightService, FanService } from "../API/RVControlServices"; // Add FanService import
+import { LightService, FanService, WaterService } from "../API/RVControlServices"; 
 import MasterLightControl from "../components/MasterLightControl.jsx";
 import { Feather as Icon } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 import {
   Padding,
@@ -80,8 +82,8 @@ const Devices = () => {
   // Fan and water control states
   const [isBathroomFanOn, setBathroomFanOn] = useState(false);
   const [isBayVentFanOn, setBayVentFanOn] = useState(false);
-  const [IsWaterHeater, setWaterHeaterOn] = useState(false); 
-  const [IsWaterPump, setWaterPumpOn] = useState(false); 
+  const [isWaterHeaterOn, setWaterHeaterOn] = useState(false);
+  const [isWaterPumpOn, setWaterPumpOn] = useState(false);
   
   // State for API operation status
   const [statusMessage, setStatusMessage] = useState('');
@@ -230,13 +232,45 @@ const Devices = () => {
     }
   };
   
-  const toggleWaterHeater = () => {
-    setWaterHeaterOn((prevStatus) => !prevStatus);
-  };
-  
-  const toggleWaterPump = () => {
-    setWaterPumpOn((prevStatus) => !prevStatus);
-  };
+  // Water heater toggle (async)
+ const handleWaterHeaterToggle = async () => {
+   setIsLoading(true);
+   try {
+     const result = await WaterService.toggleWaterHeater();
+     if (result.success) {
+       setWaterHeaterOn(prev => !prev);
+       setStatusMessage(`Water heater ${!isWaterHeaterOn ? 'turned on' : 'turned off'}`);
+     } else {
+       setStatusMessage('Failed to toggle water heater');
+     }
+   } catch (e) {
+     setStatusMessage(`Error: ${e.message}`);
+   } finally {
+     setShowStatus(true);
+     setTimeout(() => setShowStatus(false), 3000);
+     setIsLoading(false);
+   }
+ };
+
+ // Water pump toggle (async)
+ const handleWaterPumpToggle = async () => {
+   setIsLoading(true);
+   try {
+     const result = await WaterService.toggleWaterPump();
+     if (result.success) {
+       setWaterPumpOn(prev => !prev);
+       setStatusMessage(`Water pump ${!isWaterPumpOn ? 'turned on' : 'turned off'}`);
+     } else {
+       setStatusMessage('Failed to toggle water pump');
+     }
+   } catch (e) {
+     setStatusMessage(`Error: ${e.message}`);
+   } finally {
+     setShowStatus(true);
+     setTimeout(() => setShowStatus(false), 3000);
+     setIsLoading(false);
+   }
+ };
 
   // Handler for slider value changes
   const handleSliderChange = (lightId, value) => {
@@ -429,6 +463,76 @@ const handleLightToggle = async (lightId, isOn) => {
     } else if (selectedTab === TABS.BEDROOM) {
       return (
         <>
+        {/* ───── Water Controls (Bedroom Tab) ───── */}
+         <View style={styles.fanControlsContainer}>
+            <TouchableOpacity
+   style={[
+     styles.waterControlButton,
+     isWaterHeaterOn
+       ? styles.waterControlButtonActive
+       : styles.waterControlButtonInactive,
+     isLoading && styles.disabledButton,
+   ]}
+    onPress={handleWaterHeaterToggle}
+    disabled={isLoading}
+  >
+             <View style={styles.fanIconContainer}>
+  <View
+    style={[
+      styles.fanIconCircle,
+      isWaterHeaterOn
+        ? styles.waterIconCircleActive
+        : styles.waterIconCircleInactive,
+    ]}
+  >
+    <Ionicons
+      name={isWaterHeaterOn ? 'water' : 'water-outline'}
+      size={24}
+      color={isWaterHeaterOn ? '#FFF' : '#888'}
+    />
+  </View>
+</View>
+
+             <Text style={styles.fanButtonLabel}>Water Heater</Text>
+             <View style={[styles.statusIndicator, isWaterHeaterOn ? styles.statusActive : styles.statusInactive]}>
+               <Text style={styles.statusText}>{isWaterHeaterOn ? 'ON' : 'OFF'}</Text>
+             </View>
+           </TouchableOpacity>
+
+            <TouchableOpacity style={[
+     styles.waterControlButton,
+     isWaterPumpOn
+       ? styles.waterControlButtonActive
+       : styles.waterControlButtonInactive,
+     isLoading && styles.disabledButton,
+   ]}
+    onPress={handleWaterPumpToggle}
+    disabled={isLoading}
+  >
+<View style={styles.fanIconContainer}>
+               
+                         <View style={[
+       styles.fanIconCircle,
+       isWaterPumpOn
+         ? styles.waterIconCircleActive
+         : styles.waterIconCircleInactive
+     ]}>
+                 <Ionicons
+                   name={isWaterPumpOn ? 'pie-chart' : 'pie-chart-outline'}
+                   size={24}
+                   color={isWaterPumpOn ? '#FFF' : '#888'}
+                 />
+               </View>
+             </View>
+             <Text style={styles.fanButtonLabel}>Water Pump</Text>
+             <View style={[styles.statusIndicator, isWaterPumpOn ? styles.statusActive : styles.statusInactive]}>
+               <Text style={styles.statusText}>{isWaterPumpOn ? 'ON' : 'OFF'}</Text>
+             </View>
+            </TouchableOpacity>
+   
+             
+           
+         </View>
          <MasterLightControl 
   isOn={masterLightOn}
   onToggleOn={async () => {
@@ -819,32 +923,47 @@ const styles = StyleSheet.create({
   disabledButton: {
     opacity: 0.7,
   },
-  waterPumpOn: {
-    backgroundColor: "#4CAF50",
-    borderWidth: 2,
-    borderColor: "#388E3C",
-  },
-  waterPumpOff: {
-    backgroundColor: "#FF6B6B",
-    borderWidth: 2,
-    borderColor: "#D32F2F",
-  },
-  waterHeaterOn: {
-    backgroundColor: "#4CAF50",
-    borderWidth: 2,
-    borderColor: "#388E3C",
-  },
-  waterHeaterOff: {
-    backgroundColor: "#FF6B6B",
-    borderWidth: 2,
-    borderColor: "#D32F2F",
-  },
+  
   fanControlsText: {
     color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "600",
     textAlign: "center",
     marginTop: 10,
+  },
+
+   waterControlButton: {
+    width: 140,
+    height: 140,
+    borderRadius: 16,
+    justifyContent: 'space-between',   // match fan
+    alignItems: 'center',
+    padding: 15,                        // match fan
+    marginHorizontal: 10,
+    backgroundColor: '#0047AB',
+    borderWidth: 2,
+    borderColor: '#66B2FF',
+    shadowColor: '#66B2FF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  waterControlButtonActive: {
+    backgroundColor: '#005BB5',         // slightly brighter when ON
+    borderColor: '#99CCFF',
+  },
+  waterControlButtonInactive: {
+    backgroundColor: '#002F5F',         // darker when OFF
+    borderColor: '#224E7A',
+  },
+  waterIconCircleActive: {
+    backgroundColor: '#66B2FF',
+  },
+  waterIconCircleInactive: {
+    backgroundColor: '#1A1F2E',
+    borderWidth: 1,
+    borderColor: '#224E7A',
   },
   title: {
     fontSize: 18,
