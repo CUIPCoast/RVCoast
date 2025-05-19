@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { LightControlService } from '../Service/LightControlService';
@@ -22,98 +22,55 @@ const EnhancedMainLight = ({
   const [hasApiConnection, setHasApiConnection] = useState(true); // Assume connection is good until proven otherwise
   const [apiTested, setApiTested] = useState(false);
 
+  // Add a ref to track previous value
+  const prevValueRef = useRef(value);
+  
+  // Add debounce timer ref
+  const debounceTimerRef = useRef(null);
+
   // This useEffect syncs with parent component after initial render
   useEffect(() => {
-    console.log(`Update for ${lightId}: isOn=${isOn}, value=${value}`);
-    // Always update local state to match parent state
     setLocalIsOn(isOn);
-    setLocalValue(isOn ? value : 0);
+    // Only update value if light is on
+    if (isOn) {
+      setLocalValue(value);
+    } else {
+      setLocalValue(0);
+    }
   }, [isOn, value]);
 
   // Handle slider value changes
+  // Handle slider value changes - make this smoother
   const handleValueChange = (newValue) => {
-  // Only allow value changes if light is on 
-  if (localIsOn) {
-    setIsChanging(true);
-    setLocalValue(newValue);
-    
-    // Update on/off state based on slider position
-    if (newValue === 0 && localIsOn) {
-      setLocalIsOn(false);
-    } else if (newValue > 0 && !localIsOn) {
-      setLocalIsOn(true);
+    // Only update value - don't change on/off state during sliding
+    if (localIsOn) {
+      setLocalValue(newValue);
     }
-  } else {
-    // If light is off, don't allow slider movement
-    // Reset slider to 0
-    setLocalValue(0);
-  }
-};
+  };
 
-  // Handle when sliding is complete
-const handleSlidingComplete = async () => {
-  // Only proceed if we're not loading
-  if (isLoading) return;
-  
-  setIsLoading(true);
-  try {
-    if (supportsDimming) {
-      // For dimmable lights, update brightness
-      if (localValue === 0 && localIsOn) {
-        // Turn off if slider is at 0
-        const result = await LightControlService.toggleLight(lightId);
-        if (result.success) {
-          setLocalIsOn(false);
-          onToggle(false);
-        } else {
-          setLocalValue(value);
-        }
-      } else if (localValue > 0) {
-        // Update brightness and ensure light is on
-        if (!localIsOn) {
-          const result = await LightControlService.toggleLight(lightId);
-          if (result.success) {
-            setLocalIsOn(true);
-            onToggle(true);
-          } else {
-            setLocalValue(0);
-            setIsChanging(false);
-            setIsLoading(false);
-            return;
-          }
-        }
-        
-        // Now set the brightness
+  // Handle when sliding is complete with better API handling
+  const handleSlidingComplete = async () => {
+    if (isLoading || !localIsOn) return;
+    
+    setIsLoading(true);
+    try {
+      // Only handle dimming if the light is already on
+      if (supportsDimming) {
         const result = await LightControlService.setBrightness(lightId, localValue);
         if (result.success) {
           onValueChange(localValue);
         } else {
-          setLocalValue(isOn ? value : 0);
+          // Reset to previous value on error
+          setLocalValue(value);
         }
       }
-    } else {
-      // For non-dimmable lights, only toggle on/off
-      const shouldBeOn = localValue > 0;
-      if (shouldBeOn !== localIsOn) {
-        const result = await LightControlService.toggleLight(lightId);
-        if (result.success) {
-          setLocalIsOn(shouldBeOn);
-          onToggle(shouldBeOn);
-        } else {
-          setLocalValue(isOn ? value : 0);
-        }
-      }
+    } catch (error) {
+      console.error(`Failed to set brightness for ${name}:`, error);
+      setLocalValue(value);
+    } finally {
+      setIsLoading(false);
     }
-  } catch (error) {
-    console.error(`Failed to control ${name}:`, error);
-    // Reset to previous state
-    setLocalValue(isOn ? value : 0);
-    setLocalIsOn(isOn);
-  } finally {
-    setIsLoading(false);
-    setIsChanging(false);
-  }
-};
+  };
 
   // Test API connection without showing errors to user
   const testApiConnection = async () => {
@@ -141,43 +98,32 @@ const handleSlidingComplete = async () => {
     
     setIsLoading(true);
     try {
-      // If we haven't tested API yet or previous test failed, try now
-      if (!apiTested || !hasApiConnection) {
-        const connectionSuccessful = await testApiConnection();
-        if (!connectionSuccessful) {
-          console.warn(`Cannot connect to light control system for ${name}`);
-          return; // Exit early if connection test failed
-        }
-      }
-      
       const result = await LightControlService.toggleLight(lightId);
       if (result.success) {
         const newState = !localIsOn;
         setLocalIsOn(newState);
         
-        // Update slider value when toggling on/off
-        if (!newState) {
-          setLocalValue(0);
-          onValueChange(0);
-        } else if (newState && localValue === 0) {
-          // When turning on, set to default value if slider was at 0
-          const defaultValue = 50;
+        // If turning on, set to default brightness
+        if (newState) {
+          const defaultValue = localValue > 0 ? localValue : 50;
           setLocalValue(defaultValue);
-          onValueChange(defaultValue);
           
+          // If dimming is supported, set the brightness
           if (supportsDimming) {
             await LightControlService.setBrightness(lightId, defaultValue);
+            onValueChange(defaultValue);
           }
+        } else {
+          // Light turned off
+          setLocalValue(0);
+          onValueChange(0);
         }
         
+        // Notify parent
         onToggle(newState);
-      } else {
-        setHasApiConnection(false);
-        console.warn(`Failed to toggle ${name}`);
       }
     } catch (error) {
       console.error(`Failed to toggle ${name}:`, error);
-      setHasApiConnection(false);
     } finally {
       setIsLoading(false);
     }

@@ -93,10 +93,7 @@ const ImprovedLightScreenTablet = () => {
       [lightId]: isOn
     }));
     
-    // Update master light state based on all lights
-    const updatedStates = { ...lightStates, [lightId]: isOn };
-    const anyLightOn = Object.values(updatedStates).some(state => state);
-    setMasterLightOn(anyLightOn);
+    
   };
 
   // Turn all lights on
@@ -108,15 +105,16 @@ const ImprovedLightScreenTablet = () => {
       console.log('allLightsOn result:', JSON.stringify(result));
       
       if (result.success) {
-        // Update all light states to on and set brightness to 50
+        // IMPORTANT: Update UI state for all lights
         const newLightStates = {};
         const newSliderValues = {};
         
         allLights.forEach(lightId => {
           newLightStates[lightId] = true;
-          newSliderValues[lightId] = 50;
+          newSliderValues[lightId] = 50; // Default brightness when turned on
         });
         
+        // Update states in a single batch to avoid partial updates
         setLightStates(newLightStates);
         setSliderValues(newSliderValues);
         setMasterLightOn(true);
@@ -125,23 +123,16 @@ const ImprovedLightScreenTablet = () => {
         setStatusMessage('All lights turned ON');
         setShowStatus(true);
         setTimeout(() => setShowStatus(false), 3000);
-        
-        console.log('Master light set to ON, all lights updated');
       } else {
         // Show error message
         setStatusMessage('Failed to turn all lights ON');
         setShowStatus(true);
         setTimeout(() => setShowStatus(false), 3000);
-        
-        console.error('Failed to turn all lights on:', result.error);
       }
     } catch (error) {
-      // Show error message
       setStatusMessage(`Error: ${error.message}`);
       setShowStatus(true);
       setTimeout(() => setShowStatus(false), 3000);
-      
-      console.error('Error turning all lights on:', error);
     } finally {
       setIsLoading(false);
     }
@@ -156,7 +147,7 @@ const ImprovedLightScreenTablet = () => {
       console.log('allLightsOff result:', JSON.stringify(result));
       
       if (result.success) {
-        // Update all light states to off and set brightness to 0
+        // Update ALL lights to off state
         const newLightStates = {};
         const newSliderValues = {};
         
@@ -165,6 +156,7 @@ const ImprovedLightScreenTablet = () => {
           newSliderValues[lightId] = 0;
         });
         
+        // Update states in a single batch
         setLightStates(newLightStates);
         setSliderValues(newSliderValues);
         setMasterLightOn(false);
@@ -173,23 +165,15 @@ const ImprovedLightScreenTablet = () => {
         setStatusMessage('All lights turned OFF');
         setShowStatus(true);
         setTimeout(() => setShowStatus(false), 3000);
-        
-        console.log('Master light set to OFF, all lights updated');
       } else {
-        // Show error message
         setStatusMessage('Failed to turn all lights OFF');
         setShowStatus(true);
         setTimeout(() => setShowStatus(false), 3000);
-        
-        console.error('Failed to turn all lights off:', result.error);
       }
     } catch (error) {
-      // Show error message
       setStatusMessage(`Error: ${error.message}`);
       setShowStatus(true);
       setTimeout(() => setShowStatus(false), 3000);
-      
-      console.error('Error turning all lights off:', error);
     } finally {
       setIsLoading(false);
     }
