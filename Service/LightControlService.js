@@ -22,80 +22,50 @@ export const LightControlService = {
   },
 
   /**
-   * Set a light's brightness level (1-50%)
+   * Set a light's brightness level
    * @param {string} lightId - The ID of the light
-   * @param {number} percentage - Brightness percentage (1-50)
+   * @param {number} percentage - Brightness percentage (0-100)
    * @returns {Promise} Promise that resolves when command is sent
    */
   setBrightness: async (lightId, percentage) => {
     try {
-      // Validate percentage (the Spyder Firefly system only supports 1-50%)
-      if (percentage <= 0) {
-        // If percentage is 0 or negative, turn off the light
-        return await LightControlService.turnOffLight(lightId);
+      // Convert percentage (0-100) to hex value (00-FA)
+      // Note: The RV-C protocol uses 0-250 for 0-100% brightness
+      const brightnessValue = Math.floor((percentage / 100) * 250).toString(16).padStart(2, '0').toUpperCase();
+      
+      // Map of light IDs to their corresponding command prefix
+      const lightPrefixMap = {
+        'bath_light': '15',
+        'vibe_light': '16',
+        'vanity_light': '17',
+        'dinette_lights': '18', 
+        'awning_lights': '19',
+        'kitchen_lights': '1A',
+        'bed_ovhd_light': '1B',
+        'shower_lights': '1C',
+        'under_cab_lights': '1D',
+        'strip_lights': '20',
+        'left_reading_lights': '22',
+        'right_reading_lights': '23',
+        'hitch_lights': '1E',
+        'porch_lights': '1F'
+      };
+      
+      const prefix = lightPrefixMap[lightId];
+      if (!prefix) {
+        throw new Error(`Dimming is not supported for ${lightId}`);
       }
       
-      // Clamp to maximum allowed brightness of 50%
-      const clampedPercentage = Math.min(percentage, 50);
+      // Command 00 is "Set Brightness" directly
+      // Format: 19FEDB9F#[InstanceID]FF[Brightness]00FF00FFFF
+      const brightnessCommand = `19FEDB9F#${prefix}FF${brightnessValue}00FF00FFFF`;
       
-      // Use the new brightness endpoint we added to the server
-      const response = await fetch(`${RVControlService.baseURL}/brightness`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          lightId: lightId,
-          level: clampedPercentage
-        }),
-      });
-      
-      const result = await response.json();
-      
-      if (!result.status === 'success') {
-        throw new Error(result.message || 'Failed to set brightness');
-      }
-      
+      // Send the command
+      const result = await RVControlService.executeRawCommand(brightnessCommand);
       return { success: true, result };
     } catch (error) {
       console.error(`Failed to set brightness for light (${lightId}):`, error);
-      
-      // Fallback to using the raw command approach if server endpoint fails
-      try {
-        // Convert to hex value for CAN command (hex bytes are between 01-32)
-        const hexValue = Math.floor((clampedPercentage / 50) * 50).toString(16).padStart(2, '0').toUpperCase();
-        
-        // Map of light IDs to their corresponding command prefix
-        const lightPrefixMap = {
-          'bath_light': '15',
-          'vibe_light': '16',
-          'vanity_light': '17',
-          'dinette_lights': '18', 
-          'awning_lights': '19',
-          'kitchen_lights': '1A',
-          'bed_ovhd_light': '1B',
-          'shower_lights': '1C',
-          'under_cab_lights': '1D',
-          'strip_lights': '20',
-          'left_reading_lights': '22',
-          'right_reading_lights': '23',
-          'hitch_lights': '1E',
-          'porch_lights': '1F'
-        };
-        
-        const prefix = lightPrefixMap[lightId];
-        if (!prefix) {
-          throw new Error(`Dimming is not supported for ${lightId}`);
-        }
-        
-        // Construct and execute the raw CAN command for brightness
-        const brightnessCommand = `19FEDB9F#${prefix}FF00${hexValue}0000FFFF`;
-        const result = await RVControlService.executeRawCommand(brightnessCommand);
-        return { success: true, result };
-      } catch (fallbackError) {
-        console.error(`Fallback also failed for ${lightId}:`, fallbackError);
-        return { success: false, error: error.message };
-      }
+      return { success: false, error: error.message };
     }
   },
 
