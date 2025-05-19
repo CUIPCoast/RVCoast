@@ -32,106 +32,88 @@ const EnhancedMainLight = ({
 
   // Handle slider value changes
   const handleValueChange = (newValue) => {
-    // Only allow value changes if light is on 
-    if (localIsOn) {
-      setIsChanging(true);
-      setLocalValue(newValue);
-      
-      // Update on/off state based on slider position
-      if (newValue === 0 && localIsOn) {
-        setLocalIsOn(false);
-      } else if (newValue > 0 && !localIsOn) {
-        setLocalIsOn(true);
-      }
-    } else {
-      // If light is off, don't allow slider movement
-      // Reset slider to 0
-      setLocalValue(0);
+  // Only allow value changes if light is on 
+  if (localIsOn) {
+    setIsChanging(true);
+    setLocalValue(newValue);
+    
+    // Update on/off state based on slider position
+    if (newValue === 0 && localIsOn) {
+      setLocalIsOn(false);
+    } else if (newValue > 0 && !localIsOn) {
+      setLocalIsOn(true);
     }
-  };
+  } else {
+    // If light is off, don't allow slider movement
+    // Reset slider to 0
+    setLocalValue(0);
+  }
+};
 
   // Handle when sliding is complete
-  const handleSlidingComplete = async () => {
-    // Only proceed if we're not loading
-    if (isLoading) return;
-    
-    if (!apiTested) {
-      // First time interacting with slider - let's test connection
-      const connectionSuccessful = await testApiConnection();
-      if (!connectionSuccessful) {
-        // Reset the slider value if connection failed
-        setLocalValue(isOn ? value : 0);
-        setLocalIsOn(isOn);
-        setIsChanging(false);
-        return;
-      }
-    }
-    
-    setIsLoading(true);
-    try {
-      if (!supportsDimming) {
-        // For non-dimmable lights, only toggle on/off
-        const shouldBeOn = localValue > 0;
-        if (shouldBeOn !== localIsOn) {
+const handleSlidingComplete = async () => {
+  // Only proceed if we're not loading
+  if (isLoading) return;
+  
+  setIsLoading(true);
+  try {
+    if (supportsDimming) {
+      // For dimmable lights, update brightness
+      if (localValue === 0 && localIsOn) {
+        // Turn off if slider is at 0
+        const result = await LightControlService.toggleLight(lightId);
+        if (result.success) {
+          setLocalIsOn(false);
+          onToggle(false);
+        } else {
+          setLocalValue(value);
+        }
+      } else if (localValue > 0) {
+        // Update brightness and ensure light is on
+        if (!localIsOn) {
           const result = await LightControlService.toggleLight(lightId);
           if (result.success) {
-            setLocalIsOn(shouldBeOn);
-            onToggle(shouldBeOn);
+            setLocalIsOn(true);
+            onToggle(true);
           } else {
-            // Revert back if the request failed
-            setHasApiConnection(false);
-            setLocalValue(isOn ? value : 0);
-            setLocalIsOn(isOn);
+            setLocalValue(0);
+            setIsChanging(false);
+            setIsLoading(false);
+            return;
           }
         }
-      } else {
-        // For dimmable lights, update brightness
-        if (localValue === 0 && localIsOn) {
-          // Turn off if slider is at 0
-          const result = await LightControlService.toggleLight(lightId);
-          if (result.success) {
-            setLocalIsOn(false);
-            onToggle(false);
-          } else {
-            setHasApiConnection(false);
-            setLocalValue(value);
-          }
-        } else if (localValue > 0) {
-          // Update brightness and ensure light is on
-          if (!localIsOn) {
-            const result = await LightControlService.toggleLight(lightId);
-            if (result.success) {
-              setLocalIsOn(true);
-              onToggle(true);
-            } else {
-              setHasApiConnection(false);
-              setLocalValue(0);
-              setIsChanging(false);
-              return;
-            }
-          }
-          
-          const result = await LightControlService.setBrightness(lightId, localValue);
-          if (result.success) {
-            onValueChange(localValue);
-          } else {
-            setHasApiConnection(false);
-            setLocalValue(isOn ? value : 0);
-          }
+        
+        // Now set the brightness
+        const result = await LightControlService.setBrightness(lightId, localValue);
+        if (result.success) {
+          onValueChange(localValue);
+        } else {
+          setLocalValue(isOn ? value : 0);
         }
       }
-    } catch (error) {
-      console.error(`Failed to control ${name}:`, error);
-      // Update API connection status if we got an error
-      setHasApiConnection(false);
-      // Reset to previous state
-      setLocalValue(isOn ? value : 0);
-      setLocalIsOn(isOn);
-    } finally {
-      setIsLoading(false);
-      setIsChanging(false);
+    } else {
+      // For non-dimmable lights, only toggle on/off
+      const shouldBeOn = localValue > 0;
+      if (shouldBeOn !== localIsOn) {
+        const result = await LightControlService.toggleLight(lightId);
+        if (result.success) {
+          setLocalIsOn(shouldBeOn);
+          onToggle(shouldBeOn);
+        } else {
+          setLocalValue(isOn ? value : 0);
+        }
+      }
     }
-  };
+  } catch (error) {
+    console.error(`Failed to control ${name}:`, error);
+    // Reset to previous state
+    setLocalValue(isOn ? value : 0);
+    setLocalIsOn(isOn);
+  } finally {
+    setIsLoading(false);
+    setIsChanging(false);
+  }
+};
 
   // Test API connection without showing errors to user
   const testApiConnection = async () => {
