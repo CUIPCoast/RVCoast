@@ -909,6 +909,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 5,
+    
   },
   fanButtonOn: {
     backgroundColor: "#4CAF50",
@@ -940,7 +941,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 15,                        // match fan
     marginHorizontal: 10,
-    backgroundColor: '#0047AB',
+    backgroundColor: '#8AB9F1',
     borderWidth: 2,
     borderColor: '#66B2FF',
     shadowColor: '#66B2FF',
@@ -954,14 +955,14 @@ const styles = StyleSheet.create({
     borderColor: '#99CCFF',
   },
   waterControlButtonInactive: {
-    backgroundColor: '#002F5F',         // darker when OFF
+    backgroundColor: '#002147',         // darker when OFF
     borderColor: '#224E7A',
   },
   waterIconCircleActive: {
     backgroundColor: '#66B2FF',
   },
   waterIconCircleInactive: {
-    backgroundColor: '#1A1F2E',
+    backgroundColor: '#003153',
     borderWidth: 1,
     borderColor: '#224E7A',
   },
@@ -1006,10 +1007,11 @@ modernFanButton: {
   alignItems: 'center',
   padding: 15,
   marginHorizontal: 10,
-  shadowColor: '#000',
+  shadowColor: '#66B2FF',
   shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.2,
-  shadowRadius: 8,
+  shadowOpacity: 0.5,
+  shadowRadius: 12,
+  elevation: 8,
   elevation: 6,
   borderWidth: 1,
 },
