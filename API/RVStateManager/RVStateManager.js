@@ -237,6 +237,30 @@ class RVStateManager {
       console.error('Error processing climate status message:', error);
     }
   }
+
+  /**
+   * Handle command execution messages
+   */
+  handleCommandExecuted(message) {
+    try {
+      console.log('RVStateManager: Command executed remotely:', message.command);
+      
+      // You could update state based on known command effects here
+      // For example, if a light toggle command was executed:
+      // if (message.command.includes('lights_toggle')) {
+      //   // Update light state accordingly
+      // }
+      
+      // Emit event for listeners
+      this.events.emit('commandExecuted', {
+        command: message.command,
+        timestamp: message.timestamp,
+        remote: true
+      });
+    } catch (error) {
+      console.error('RVStateManager: Error handling command executed message:', error);
+    }
+  }
   
   // Process water system messages from the CAN bus
   processWaterStatusMessage(message) {
@@ -257,6 +281,143 @@ class RVStateManager {
       console.error('Error processing water status message:', error);
     }
   }
+
+  /**
+   * Process light status updates from CAN bus
+   */
+  processLightStatusFromCAN(data) {
+    try {
+      const instanceHex = data[0];
+      const brightnessHex = data[2];
+      const statusHex = data[3];
+      
+      // Convert hex to decimal
+      const instance = parseInt(instanceHex, 16);
+      const brightness = parseInt(brightnessHex, 16);
+      const isDimmerUpdate = statusHex && statusHex.toString().toUpperCase() === 'FC';
+      
+      if (isDimmerUpdate) {
+        const lightId = this.mapInstanceToLightId(instance);
+        if (lightId) {
+          // Convert brightness to percentage (0-200 hex -> 0-100%)
+          const percentage = Math.round((brightness / 200) * 100);
+          const isOn = percentage > 0;
+          
+          console.log(`RVStateManager: Light update from CAN - ${lightId}: ${percentage}% (${isOn ? 'ON' : 'OFF'})`);
+          
+          // Update state
+          this.updateLightState(lightId, isOn, percentage);
+        }
+      }
+    } catch (error) {
+      console.error('RVStateManager: Error processing light status from CAN:', error);
+    }
+  }
+
+  /**
+   * Process command execution from CAN bus
+   */
+  processCommandFromCAN(data) {
+    try {
+      const instanceHex = data[0];
+      const instance = parseInt(instanceHex, 16);
+      
+      // Check for water system commands
+      if (instance === 44) { // Water pump (0x2C)
+        const isOn = data[2] && parseInt(data[2], 16) > 0;
+        console.log(`RVStateManager: Water pump ${isOn ? 'ON' : 'OFF'} from CAN`);
+        this.updateWaterState({ pumpOn: isOn });
+      } else if (instance === 43) { // Water heater (0x2B)
+        const isOn = data[2] && parseInt(data[2], 16) > 0;
+        console.log(`RVStateManager: Water heater ${isOn ? 'ON' : 'OFF'} from CAN`);
+        this.updateWaterState({ heaterOn: isOn });
+      } else {
+        // Check for light commands
+        const lightId = this.mapInstanceToLightId(instance);
+        if (lightId) {
+          // This might be a toggle command
+          const command = data[3] ? parseInt(data[3], 16) : 0;
+          if (command === 5) { // Toggle command
+            console.log(`RVStateManager: Light toggle from CAN - ${lightId}`);
+            // We don't know the new state from the command, so we'll wait for the status update
+          }
+        }
+      }
+    } catch (error) {
+      console.error('RVStateManager: Error processing command from CAN:', error);
+    }
+  }
+
+  /**
+   * Process climate control messages from CAN bus
+   */
+  processClimateFromCAN(data, canId) {
+    try {
+      console.log(`RVStateManager: Climate control message from CAN - ID: ${canId}`);
+      
+      // Update climate state with raw data for now
+      // More specific parsing could be added based on your climate control protocol
+      this.updateClimateState({
+        lastCANUpdate: new Date().toISOString(),
+        lastCANId: canId,
+        rawCANData: data
+      });
+    } catch (error) {
+      console.error('RVStateManager: Error processing climate from CAN:', error);
+    }
+  }
+
+  /**
+   * Map CAN instance numbers to light IDs
+   */
+  mapInstanceToLightId(instance) {
+    const instanceMap = {
+      26: 'kitchen_lights',    // 0x1A
+      21: 'bath_light',        // 0x15
+      27: 'bed_ovhd_light',    // 0x1B
+      22: 'vibe_light',        // 0x16
+      23: 'vanity_light',      // 0x17
+      25: 'awning_lights',     // 0x19
+      28: 'shower_lights',     // 0x1C
+      29: 'under_cab_lights',  // 0x1D
+      30: 'hitch_lights',      // 0x1E
+      31: 'porch_lights',      // 0x1F
+      34: 'left_reading_lights', // 0x22
+      35: 'right_reading_lights', // 0x23
+      24: 'dinette_lights',    // 0x18
+      32: 'strip_lights'       // 0x20
+    };
+    
+    return instanceMap[instance];
+  }
+
+  /**
+   * Handle CAN bus messages from WebSocket
+   */
+  handleCANMessage(message) {
+    try {
+      if (!message.data || !message.data.id) {
+        return;
+      }
+      
+      const canData = message.data;
+      const { id, data } = canData;
+      
+      // Process different types of CAN messages
+      if (id === '19FEDA98' && Array.isArray(data) && data.length >= 4) {
+        // Light status update
+        this.processLightStatusFromCAN(data);
+      } else if (id === '19FEDB9F' && Array.isArray(data) && data.length > 0) {
+        // Command execution - could be lights, water systems, etc.
+        this.processCommandFromCAN(data);
+      } else if (id && (id.startsWith('19FEF9') || id.startsWith('19FED9') || id.startsWith('19FFE2'))) {
+        // Climate control messages
+        this.processClimateFromCAN(data, id);
+      }
+    } catch (error) {
+      console.error('RVStateManager: Error handling CAN message:', error);
+    }
+  }
   
   // Set up WebSocket for multi-device synchronization
   setupSyncSocket() {
@@ -264,10 +425,11 @@ class RVStateManager {
       // Use your existing server's WebSocket endpoint
       const wsUrl = 'ws://192.168.8.200:3000'; // Match your server.js configuration
       
+      console.log(`RVStateManager: Connecting to WebSocket at ${wsUrl}`);
       this.syncSocket = new WebSocket(wsUrl);
       
       this.syncSocket.onopen = () => {
-        console.log('WebSocket connected for state synchronization');
+        console.log('RVStateManager: WebSocket connected for state synchronization');
         this.state.isOnline = true;
         
         // Process any queued offline changes
@@ -277,70 +439,130 @@ class RVStateManager {
         this.sendMessage({
           type: 'stateSync',
           deviceId: this.state.deviceId,
-          state: this.state
+          state: this.state,
+          timestamp: new Date().toISOString()
         });
       };
       
       this.syncSocket.onmessage = (event) => {
         try {
-          const message = JSON.parse(event.data);
+          // Handle different types of incoming data
+          const messageData = event.data;
           
-          // Ignore messages from this device
-          if (message.sourceDeviceId === this.state.deviceId) {
+          // Check if the message is empty or just whitespace
+          if (!messageData || messageData.trim() === '') {
+            console.log('RVStateManager: Received empty WebSocket message, ignoring');
             return;
           }
           
-          // Apply state update from another device
+          // Check if the message starts with non-JSON characters
+          const trimmedData = messageData.trim();
+          if (!trimmedData.startsWith('{') && !trimmedData.startsWith('[')) {
+            console.log('RVStateManager: Received non-JSON WebSocket message:', trimmedData);
+            return;
+          }
+          
+          // Try to parse as JSON
+          let message;
+          try {
+            message = JSON.parse(trimmedData);
+          } catch (jsonError) {
+            console.warn('RVStateManager: Failed to parse WebSocket JSON:', jsonError.message);
+            return;
+          }
+          
+          // Ignore messages from this device
+          if (message.sourceDeviceId === this.state.deviceId || message.deviceId === this.state.deviceId) {
+            return;
+          }
+          
+          // Handle different message types
           if (message.type === 'stateUpdate') {
-            this.updatingState = true;
-            
-            // Merge in the remote state changes
-            const newState = { ...this.state };
-            Object.keys(message.state).forEach(key => {
-              if (key !== 'deviceId') { // Don't override our device ID
-                newState[key] = message.state[key];
-              }
-            });
-            
-            this.state = newState;
-            this.saveState();
-            
-            // Notify listeners of external state change
-            this.events.emit('externalStateChange', this.state);
-            
-            this.updatingState = false;
+            this.handleExternalStateUpdate(message);
+          } else if (message.type === 'commandExecuted') {
+            this.handleCommandExecuted(message);
+          } else if (message.type === 'canMessage') {
+            this.handleCANMessage(message);
+          } else if (message.type === 'subscriptionAck') {
+            console.log('RVStateManager: Subscription acknowledged');
+          } else if (message.type === 'error') {
+            console.error('RVStateManager: Server error:', message.message);
           }
         } catch (error) {
-          console.error('Error processing WebSocket message:', error);
+          console.error('RVStateManager: Error processing WebSocket message:', error);
         }
       };
       
-      this.syncSocket.onclose = () => {
-        console.log('WebSocket disconnected');
+      this.syncSocket.onclose = (event) => {
+        console.log(`RVStateManager: WebSocket disconnected (code: ${event.code})`);
         this.state.isOnline = false;
         
-        // Try to reconnect after delay
-        setTimeout(() => this.setupSyncSocket(), 5000);
+        // Try to reconnect after delay if not closing intentionally
+        if (event.code !== 1000) {
+          setTimeout(() => this.setupSyncSocket(), 5000);
+        }
       };
       
       this.syncSocket.onerror = (error) => {
-        console.error('WebSocket error:', error);
+        console.error('RVStateManager: WebSocket error:', error);
         this.state.isOnline = false;
       };
     } catch (error) {
-      console.error('Failed to create WebSocket:', error);
+      console.error('RVStateManager: Failed to create WebSocket:', error);
       this.state.isOnline = false;
     }
   }
+
+   /**
+   * Handle external state updates from other devices
+   */
+   handleExternalStateUpdate(message) {
+    try {
+      this.updatingState = true;
+      
+      // Merge in the remote state changes
+      const newState = { ...this.state };
+      Object.keys(message.state).forEach(key => {
+        if (key !== 'deviceId' && key !== 'lastUpdate') { // Don't override our device ID or last update
+          newState[key] = { ...newState[key], ...message.state[key] };
+        }
+      });
+      
+      // Update timestamp
+      newState.lastUpdate = new Date().toISOString();
+      
+      this.state = newState;
+      this.saveState();
+      
+      // Notify listeners of external state change
+      this.events.emit('externalStateChange', this.state);
+      
+      console.log('RVStateManager: Applied external state update from device:', message.sourceDeviceId);
+    } catch (error) {
+      console.error('RVStateManager: Error handling external state update:', error);
+    } finally {
+      this.updatingState = false;
+    }
+  }
   
-  // Send message through WebSocket
+  /**
+   * Send message through WebSocket with error handling
+   */
   sendMessage(message) {
     if (this.syncSocket && this.syncSocket.readyState === WebSocket.OPEN) {
       try {
         this.syncSocket.send(JSON.stringify(message));
       } catch (error) {
-        console.error('Error sending WebSocket message:', error);
+        console.error('RVStateManager: Error sending WebSocket message:', error);
       }
+    } else {
+      console.log('RVStateManager: WebSocket not connected, queueing message');
+      // Queue the message for when connection is restored
+      this.offlineQueue.push({
+        type: 'message',
+        data: message,
+        timestamp: new Date().toISOString()
+      });
     }
   }
   

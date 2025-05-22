@@ -1,4 +1,4 @@
-// API/RVStateManager/CANBusListener.js - CAN Bus listener for RV State Manager
+// Service/CANBusListener.js - Fixed version with better message parsing
 import { EventEmitter } from 'events';
 
 /**
@@ -32,6 +32,7 @@ class CANBusListener extends EventEmitter {
       // Connect to your existing WebSocket server from server.js
       const wsUrl = this.baseUrl.replace(/^http/, 'ws');
       
+      console.log(`CANBusListener: Connecting to ${wsUrl}`);
       this.ws = new WebSocket(wsUrl);
       
       this.ws.onopen = () => {
@@ -49,16 +50,35 @@ class CANBusListener extends EventEmitter {
       
       this.ws.onmessage = (event) => {
         try {
-          // Handle both JSON and plain text messages
-          let message;
+          // Handle different types of incoming data
+          const messageData = event.data;
           
-          // Try to parse as JSON first
+          // Check if the message is empty or just whitespace
+          if (!messageData || messageData.trim() === '') {
+            console.log('CANBusListener: Received empty message, ignoring');
+            return;
+          }
+          
+          // Check if the message starts with non-JSON characters
+          const trimmedData = messageData.trim();
+          if (!trimmedData.startsWith('{') && !trimmedData.startsWith('[')) {
+            console.log('CANBusListener: Received non-JSON message:', trimmedData);
+            
+            // Try to handle raw CAN data format if it looks like CAN data
+            if (this.isCANDataFormat(trimmedData)) {
+              this.handleRawCANData(trimmedData);
+            }
+            return;
+          }
+          
+          // Try to parse as JSON
+          let message;
           try {
-            message = JSON.parse(event.data);
+            message = JSON.parse(trimmedData);
           } catch (jsonError) {
-            // If JSON parsing fails, treat as plain text
-            console.log('CANBusListener: Received non-JSON message:', event.data);
-            return; // Skip non-JSON messages for now
+            console.warn('CANBusListener: Failed to parse JSON:', jsonError.message);
+            console.log('CANBusListener: Raw message data:', trimmedData);
+            return;
           }
           
           this.handleCANMessage(message);
@@ -68,7 +88,7 @@ class CANBusListener extends EventEmitter {
       };
       
       this.ws.onclose = (event) => {
-        console.log('CANBusListener: WebSocket closed');
+        console.log(`CANBusListener: WebSocket closed (code: ${event.code})`);
         this.connected = false;
         this.emit('disconnected');
         
@@ -91,6 +111,49 @@ class CANBusListener extends EventEmitter {
   }
   
   /**
+   * Check if the message looks like raw CAN data
+   */
+  isCANDataFormat(message) {
+    // Look for patterns like "can0  19FEDB9F   [8]  1A FF FA 05 FF 00 FF FF"
+    const canPattern = /can\d+\s+[0-9A-F]+\s+\[\d+\]/i;
+    return canPattern.test(message);
+  }
+  
+  /**
+   * Handle raw CAN data messages
+   */
+  handleRawCANData(rawData) {
+    try {
+      // Parse raw CAN data format
+      // Example: "can0  19FEDB9F   [8]  1A FF FA 05 FF 00 FF FF"
+      const parts = rawData.trim().split(/\s+/);
+      
+      if (parts.length < 4) {
+        return; // Not enough parts to be valid CAN data
+      }
+      
+      const canInterface = parts[0]; // 'can0'
+      const id = parts[1]; // '19FEDB9F'
+      const dataLength = parts[2].replace('[', '').replace(']', ''); // '8'
+      const data = parts.slice(3); // ['1A', 'FF', 'FA', '05', 'FF', '00', 'FF', 'FF']
+      
+      const canMessage = {
+        interface: canInterface,
+        id,
+        dataLength: parseInt(dataLength),
+        data,
+        timestamp: Date.now()
+      };
+      
+      // Process this as a CAN message
+      this.parseCANMessage(canMessage);
+      
+    } catch (error) {
+      console.error('CANBusListener: Error parsing raw CAN data:', error);
+    }
+  }
+  
+  /**
    * Handle incoming CAN messages from your server.js WebSocket
    */
   handleCANMessage(message) {
@@ -102,16 +165,19 @@ class CANBusListener extends EventEmitter {
         this.parseCANMessage(canData);
       } else if (message.type === 'commandExecuted') {
         // Handle command execution confirmations
+        console.log('CANBusListener: Command executed:', message.command);
         this.emit('commandExecuted', {
           command: message.command,
           timestamp: message.timestamp
         });
       } else if (message.type === 'initialState') {
         // Handle initial state from server
+        console.log('CANBusListener: Initial state received');
         this.emit('initialState', message);
       } else {
         // Log unhandled message types for debugging
         console.log('CANBusListener: Unhandled message type:', message.type || 'unknown');
+        console.log('CANBusListener: Message content:', message);
       }
     } catch (error) {
       console.error('CANBusListener: Error handling message:', error);
@@ -173,6 +239,7 @@ class CANBusListener extends EventEmitter {
       // Check for climate control messages
       else if (id && (id.startsWith('19FEF9') || id.startsWith('19FED9') || id.startsWith('19FFE2'))) {
         // Parse climate control status
+        console.log('CANBusListener: Climate control message detected:', id);
         this.emit('message', {
           dgn: '19FEF9',
           type: 'climate',
@@ -182,7 +249,7 @@ class CANBusListener extends EventEmitter {
         });
       }
       
-      // Check for water system messages
+      // Check for water system messages (looking for DC_DIMMER_COMMAND_2)
       else if (id === '19FEDB9F' && Array.isArray(data) && data.length > 0) {
         // Check if this is a water pump or heater status
         const instanceHex = data[0];
@@ -256,7 +323,7 @@ class CANBusListener extends EventEmitter {
    * Send message to WebSocket server
    */
   sendMessage(message) {
-    if (this.connected && this.ws) {
+    if (this.connected && this.ws && this.ws.readyState === WebSocket.OPEN) {
       try {
         this.ws.send(JSON.stringify(message));
       } catch (error) {
