@@ -5,6 +5,7 @@ import moment from "moment";
 import EnhancedMainLight from "../components/EnhancedMainLight.jsx";
 import { LightControlService } from "../Service/LightControlService.js";
 import { CANBusMonitor } from "../Service/CANBusMonitor.js";
+import rvStateManager from "../API/RVStateManager/RVStateManager"; // Add this import
 
 const ImprovedLightScreenTablet = () => {
   // Current date/time
@@ -14,7 +15,7 @@ const ImprovedLightScreenTablet = () => {
   // State for loading indicator
   const [isLoading, setIsLoading] = useState(false);
   
-  // State for master light switch
+  // State for master light switch - now derived from RV State Manager
   const [masterLightOn, setMasterLightOn] = useState(false);
   
   // Add state for status messages
@@ -27,76 +28,54 @@ const ImprovedLightScreenTablet = () => {
   // Check if dimming is supported
   const supportsDimming = LightControlService.supportsDimming();
   
-  // State to track if light is on/off
+  // Remove local light state management - use RV State Manager instead
   const [lightStates, setLightStates] = useState({});
-  
-  // State for slider values (brightness levels)
-  const [sliderValues, setSliderValues] = useState({});
-  
-  // Initialize light states and slider values
+
+  // Subscribe to RV State Manager for individual light states only
   useEffect(() => {
-    const initialLightStates = {};
-    const initialSliderValues = {};
-    
-    allLights.forEach(lightId => {
-      initialLightStates[lightId] = false;
-      initialSliderValues[lightId] = 50; // Default to middle value
-    });
-    
-    setLightStates(initialLightStates);
-    setSliderValues(initialSliderValues);
-    
-    // Subscribe to CAN bus dimming updates
-    const subscription = CANBusMonitor.subscribeToDimmingUpdates((updates) => {
-      // Updates object will contain lightId: brightness pairs
-      
-      // Update light states based on brightness values
-      const newLightStates = { ...lightStates };
-      const newSliderValues = { ...sliderValues };
-      
-      // Process each update
-      Object.entries(updates).forEach(([lightId, brightness]) => {
-        // Light is on if brightness > 0
-        newLightStates[lightId] = brightness > 0;
+    const unsubscribe = rvStateManager.subscribe(({ category, state }) => {
+      if (category === 'lights') {
+        // Update local light states for UI consistency (but NOT master control)
+        const currentLights = state.lights || {};
+        const newLightStates = {};
+        Object.entries(currentLights).forEach(([lightId, lightState]) => {
+          newLightStates[lightId] = lightState.isOn;
+        });
+        setLightStates(newLightStates);
         
-        // Update slider value (scale 0-50 to 0-100 for UI)
-        newSliderValues[lightId] = brightness > 0 ? brightness * 2 : 0;
+        console.log('Individual light states updated');
+      }
+    });
+
+    // Initialize individual light states on component mount (but NOT master state)
+    const currentLights = rvStateManager.getCategoryState('lights');
+    const initialLightStates = {};
+    Object.entries(currentLights).forEach(([lightId, lightState]) => {
+      initialLightStates[lightId] = lightState ? lightState.isOn : false;
+    });
+    setLightStates(initialLightStates);
+
+    return unsubscribe;
+  }, []);
+
+  // Subscribe to CAN bus updates (keep existing functionality)
+  useEffect(() => {
+    const subscription = CANBusMonitor.subscribeToDimmingUpdates((updates) => {
+      Object.entries(updates).forEach(([lightId, brightness]) => {
+        const isOn = brightness > 0;
+        const brightnessPercent = brightness > 0 ? brightness * 2 : 0;
+        
+        // Update RV State Manager
+        rvStateManager.updateLightState(lightId, isOn, brightnessPercent);
       });
-      
-      // Update state
-      setLightStates(newLightStates);
-      setSliderValues(newSliderValues);
-      
-      // Check if any light is on to update master switch
-      const anyLightOn = Object.values(newLightStates).some(state => state);
-      setMasterLightOn(anyLightOn);
     });
     
-    // Clean up subscription when component unmounts
     return () => {
       subscription.unsubscribe();
     };
   }, []);
 
-  // Handler for slider value changes
-  const handleSliderChange = (lightId, value) => {
-    setSliderValues(prev => ({
-      ...prev,
-      [lightId]: value
-    }));
-  };
-  
-  // Handler for light toggle
-  const handleLightToggle = (lightId, isOn) => {
-    setLightStates(prev => ({
-      ...prev,
-      [lightId]: isOn
-    }));
-    
-    
-  };
-
-  // Turn all lights on
+  // Turn all lights on - Only changes master state when explicitly called
   const handleAllLightsOn = async () => {
     try {
       setIsLoading(true);
@@ -105,18 +84,12 @@ const ImprovedLightScreenTablet = () => {
       console.log('allLightsOn result:', JSON.stringify(result));
       
       if (result.success) {
-        // IMPORTANT: Update UI state for all lights
-        const newLightStates = {};
-        const newSliderValues = {};
-        
+        // Update RV State Manager for all lights
         allLights.forEach(lightId => {
-          newLightStates[lightId] = true;
-          newSliderValues[lightId] = 50; // Default brightness when turned on
+          rvStateManager.updateLightState(lightId, true, 100); // Turn on at 100%
         });
         
-        // Update states in a single batch to avoid partial updates
-        setLightStates(newLightStates);
-        setSliderValues(newSliderValues);
+        // Only update master state when using master control
         setMasterLightOn(true);
         
         // Show success message
@@ -124,7 +97,6 @@ const ImprovedLightScreenTablet = () => {
         setShowStatus(true);
         setTimeout(() => setShowStatus(false), 3000);
       } else {
-        // Show error message
         setStatusMessage('Failed to turn all lights ON');
         setShowStatus(true);
         setTimeout(() => setShowStatus(false), 3000);
@@ -138,7 +110,7 @@ const ImprovedLightScreenTablet = () => {
     }
   };
   
-  // Turn all lights off
+  // Turn all lights off - Only changes master state when explicitly called
   const handleAllLightsOff = async () => {
     try {
       setIsLoading(true);
@@ -147,21 +119,14 @@ const ImprovedLightScreenTablet = () => {
       console.log('allLightsOff result:', JSON.stringify(result));
       
       if (result.success) {
-        // Update ALL lights to off state
-        const newLightStates = {};
-        const newSliderValues = {};
-        
+        // Update RV State Manager for all lights
         allLights.forEach(lightId => {
-          newLightStates[lightId] = false;
-          newSliderValues[lightId] = 0;
+          rvStateManager.updateLightState(lightId, false, 0);
         });
         
-        // Update states in a single batch
-        setLightStates(newLightStates);
-        setSliderValues(newSliderValues);
+        // Only update master state when using master control
         setMasterLightOn(false);
         
-        // Show success message
         setStatusMessage('All lights turned OFF');
         setShowStatus(true);
         setTimeout(() => setShowStatus(false), 3000);
@@ -179,12 +144,11 @@ const ImprovedLightScreenTablet = () => {
     }
   };
 
-  // Preset handler for mood lighting
+  // Updated preset handlers to work with RV State Manager
   const handleMoodLighting = async () => {
     try {
       setIsLoading(true);
       
-      // Set dimmer values for mood lighting
       const moodSettings = {
         'vibe_light': 30,
         'strip_lights': 20,
@@ -192,56 +156,38 @@ const ImprovedLightScreenTablet = () => {
         'dinette_lights': 25
       };
       
-      // Turn off all other lights first
-      await LightControlService.allLightsOff();
-      
-      // Update local state to reflect all lights off
-      const newLightStates = {};
-      const newSliderValues = {};
-      
+      // Turn off all lights first in RV State Manager
       allLights.forEach(lightId => {
-        newLightStates[lightId] = false;
-        newSliderValues[lightId] = 0;
+        rvStateManager.updateLightState(lightId, false, 0);
       });
+      
+      await LightControlService.allLightsOff();
       
       // Apply mood lighting settings
       for (const [lightId, brightness] of Object.entries(moodSettings)) {
-        // Remember dimming on Firefly is limited to 1-50%
         await LightControlService.setBrightness(lightId, brightness);
-        
-        // Update local state
-        newLightStates[lightId] = true;
-        newSliderValues[lightId] = brightness * 2; // Convert from 0-50 scale to 0-100 scale
+        // Update RV State Manager
+        rvStateManager.updateLightState(lightId, true, brightness * 2);
       }
       
-      // Update state
-      setLightStates(newLightStates);
-      setSliderValues(newSliderValues);
-      setMasterLightOn(true);
-      
-      // Show success message
       setStatusMessage('Mood lighting activated');
       setShowStatus(true);
       setTimeout(() => setShowStatus(false), 3000);
       
     } catch (error) {
-      // Show error message
       setStatusMessage(`Error setting mood lighting: ${error.message}`);
       setShowStatus(true);
       setTimeout(() => setShowStatus(false), 3000);
-      
       console.error('Failed to set mood lighting:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Preset handler for evening lighting
   const handleEveningLighting = async () => {
     try {
       setIsLoading(true);
       
-      // Set dimmer values for evening lighting
       const eveningSettings = {
         'kitchen_lights': 35,
         'dinette_lights': 30,
@@ -251,44 +197,28 @@ const ImprovedLightScreenTablet = () => {
         'right_reading_lights': 40
       };
       
-      // Turn off all other lights first
-      await LightControlService.allLightsOff();
-      
-      // Update local state to reflect all lights off
-      const newLightStates = {};
-      const newSliderValues = {};
-      
+      // Turn off all lights first in RV State Manager
       allLights.forEach(lightId => {
-        newLightStates[lightId] = false;
-        newSliderValues[lightId] = 0;
+        rvStateManager.updateLightState(lightId, false, 0);
       });
+      
+      await LightControlService.allLightsOff();
       
       // Apply evening lighting settings
       for (const [lightId, brightness] of Object.entries(eveningSettings)) {
-        // Remember dimming on Firefly is limited to 1-50%
         await LightControlService.setBrightness(lightId, brightness);
-        
-        // Update local state
-        newLightStates[lightId] = true;
-        newSliderValues[lightId] = brightness * 2; // Convert from 0-50 scale to 0-100 scale
+        // Update RV State Manager
+        rvStateManager.updateLightState(lightId, true, brightness * 2);
       }
       
-      // Update state
-      setLightStates(newLightStates);
-      setSliderValues(newSliderValues);
-      setMasterLightOn(true);
-      
-      // Show success message
       setStatusMessage('Evening lighting activated');
       setShowStatus(true);
       setTimeout(() => setShowStatus(false), 3000);
       
     } catch (error) {
-      // Show error message
       setStatusMessage(`Error setting evening lighting: ${error.message}`);
       setShowStatus(true);
       setTimeout(() => setShowStatus(false), 3000);
-      
       console.error('Failed to set evening lighting:', error);
     } finally {
       setIsLoading(false);
@@ -386,7 +316,7 @@ const ImprovedLightScreenTablet = () => {
       )}
       
       {/* Master Light Control Row */}
-      <Row size={5} style={{ justifyContent: "center", alignItems: "center",  }}>
+      <Row size={5} style={{ justifyContent: "center", alignItems: "center" }}>
         <Col
           style={{
             width: "40%",
@@ -396,7 +326,6 @@ const ImprovedLightScreenTablet = () => {
             justifyContent: "center",
             padding: 20,
             bottom: 220,
-            
           }}
         >
           <View
@@ -456,7 +385,7 @@ const ImprovedLightScreenTablet = () => {
                 <Text style={{ color: '#FFB267' }}>Evening</Text>
               </TouchableOpacity>
               
-              {/* REPLACED Toggle switch with ON/OFF buttons */}
+              {/* Master ON/OFF buttons */}
               <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 10 }}>
                 {isLoading ? (
                   <ActivityIndicator size="small" color="#FFB267" />
@@ -473,7 +402,7 @@ const ImprovedLightScreenTablet = () => {
                         marginRight: 1,
                       }}
                       onPress={handleAllLightsOn}
-                      disabled={isLoading || masterLightOn}
+                      disabled={isLoading}
                     >
                       <Text style={{ color: masterLightOn ? '#000' : '#FFF' }}>ON</Text>
                     </TouchableOpacity>
@@ -488,7 +417,7 @@ const ImprovedLightScreenTablet = () => {
                         borderBottomRightRadius: 20,
                       }}
                       onPress={handleAllLightsOff}
-                      disabled={isLoading || !masterLightOn}
+                      disabled={isLoading}
                     >
                       <Text style={{ color: !masterLightOn ? '#000' : '#FFF' }}>OFF</Text>
                     </TouchableOpacity>
@@ -528,10 +457,10 @@ const ImprovedLightScreenTablet = () => {
               marginRight: 30,
               bottom: 140,
               shadowColor: "#FFF",
-                            shadowOffset: { width: 0, height: 6 },
-                            shadowOpacity: 1,
-                            shadowRadius: 4,
-                            elevation: 6,
+              shadowOffset: { width: 0, height: 6 },
+              shadowOpacity: 1,
+              shadowRadius: 4,
+              elevation: 6,
             }}
           >
             <Text
@@ -565,10 +494,8 @@ const ImprovedLightScreenTablet = () => {
                   lightId={lightId}
                   min={0}
                   max={100}
-                  value={sliderValues[lightId] || 0}
+                  value={100} // Always default to 100% when on
                   isOn={lightStates[lightId] || false}
-                  onToggle={(isOn) => handleLightToggle(lightId, isOn)}
-                  onValueChange={(value) => handleSliderChange(lightId, value)}
                   supportsDimming={supportsDimming}
                 />
               ))}
@@ -587,10 +514,10 @@ const ImprovedLightScreenTablet = () => {
               marginRight: 30,
               bottom: 140,
               shadowColor: "#FFF",
-                            shadowOffset: { width: 0, height: 6 },
-                            shadowOpacity: 1,
-                            shadowRadius: 4,
-                            elevation: 6,
+              shadowOffset: { width: 0, height: 6 },
+              shadowOpacity: 1,
+              shadowRadius: 4,
+              elevation: 6,
             }}
           >
             <Text
@@ -624,10 +551,8 @@ const ImprovedLightScreenTablet = () => {
                   lightId={lightId}
                   min={0}
                   max={100}
-                  value={sliderValues[lightId] || 0}
+                  value={100} // Always default to 100% when on
                   isOn={lightStates[lightId] || false}
-                  onToggle={(isOn) => handleLightToggle(lightId, isOn)}
-                  onValueChange={(value) => handleSliderChange(lightId, value)}
                   supportsDimming={supportsDimming}
                 />
               ))}
@@ -645,10 +570,10 @@ const ImprovedLightScreenTablet = () => {
               padding: 20,
               bottom: 140,
               shadowColor: "#FFF",
-                            shadowOffset: { width: 0, height: 6 },
-                            shadowOpacity: 1,
-                            shadowRadius: 4,
-                            elevation: 6,
+              shadowOffset: { width: 0, height: 6 },
+              shadowOpacity: 1,
+              shadowRadius: 4,
+              elevation: 6,
             }}
           >
             <Text
@@ -683,10 +608,8 @@ const ImprovedLightScreenTablet = () => {
                   lightId={lightId}
                   min={0}
                   max={100}
-                  value={sliderValues[lightId] || 0}
+                  value={100} // Always default to 100% when on
                   isOn={lightStates[lightId] || false}
-                  onToggle={(isOn) => handleLightToggle(lightId, isOn)}
-                  onValueChange={(value) => handleSliderChange(lightId, value)}
                   supportsDimming={supportsDimming}
                 />
               ))}
