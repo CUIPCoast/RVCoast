@@ -1,9 +1,10 @@
-// Service/CANBusListener.js - Fixed version with better message parsing
+// Service/CANBusListener.js - Updated with state change detection and reduced frequency
 import { EventEmitter } from 'events';
 
 /**
  * CAN Bus Listener for capturing real-time RV system state changes
  * Works with your existing WebSocket CAN monitoring system
+ * Only emits messages when actual state changes occur
  */
 class CANBusListener extends EventEmitter {
   constructor() {
@@ -15,6 +16,22 @@ class CANBusListener extends EventEmitter {
     this.maxReconnectAttempts = 5;
     this.reconnectDelay = 2000;
     this.baseUrl = 'http://192.168.8.200:3000'; // Match your server.js configuration
+    
+    // State tracking for change detection
+    this.lastKnownStates = {
+      lights: {}, // lightId: { isOn, brightness, lastUpdate }
+      water: {},  // device: { isOn, lastUpdate }
+      climate: {} // various climate states
+    };
+    
+    // Message throttling
+    this.messageBuffer = new Map(); // Store recent messages to detect duplicates
+    this.bufferTimeout = 2000; // Clear buffer every 2 seconds
+    this.lastHeartbeat = Date.now();
+    this.heartbeatInterval = 30000; // Send heartbeat every 30 seconds if no changes
+    
+    // Start buffer cleanup
+    this.startBufferCleanup();
   }
   
   /**
@@ -22,6 +39,31 @@ class CANBusListener extends EventEmitter {
    */
   start() {
     this.setupWebSocket();
+  }
+  
+  /**
+   * Start buffer cleanup and heartbeat
+   */
+  startBufferCleanup() {
+    // Clean message buffer periodically
+    setInterval(() => {
+      const now = Date.now();
+      for (const [key, timestamp] of this.messageBuffer.entries()) {
+        if (now - timestamp > this.bufferTimeout) {
+          this.messageBuffer.delete(key);
+        }
+      }
+      
+      // Send heartbeat if no changes for a while
+      if (now - this.lastHeartbeat > this.heartbeatInterval) {
+        this.emit('heartbeat', { 
+          timestamp: now, 
+          connected: this.connected,
+          bufferSize: this.messageBuffer.size 
+        });
+        this.lastHeartbeat = now;
+      }
+    }, this.bufferTimeout);
   }
   
   /**
@@ -55,15 +97,12 @@ class CANBusListener extends EventEmitter {
           
           // Check if the message is empty or just whitespace
           if (!messageData || messageData.trim() === '') {
-            console.log('CANBusListener: Received empty message, ignoring');
-            return;
+            return; // Silently ignore empty messages
           }
           
           // Check if the message starts with non-JSON characters
           const trimmedData = messageData.trim();
           if (!trimmedData.startsWith('{') && !trimmedData.startsWith('[')) {
-            console.log('CANBusListener: Received non-JSON message:', trimmedData);
-            
             // Try to handle raw CAN data format if it looks like CAN data
             if (this.isCANDataFormat(trimmedData)) {
               this.handleRawCANData(trimmedData);
@@ -76,14 +115,12 @@ class CANBusListener extends EventEmitter {
           try {
             message = JSON.parse(trimmedData);
           } catch (jsonError) {
-            console.warn('CANBusListener: Failed to parse JSON:', jsonError.message);
-            console.log('CANBusListener: Raw message data:', trimmedData);
-            return;
+            return; // Silently ignore unparseable JSON
           }
           
           this.handleCANMessage(message);
         } catch (error) {
-          console.error('CANBusListener: Error handling message:', error);
+          console.error('CANBusListener: Error processing message:', error);
         }
       };
       
@@ -164,24 +201,61 @@ class CANBusListener extends EventEmitter {
         const canData = message.data;
         this.parseCANMessage(canData);
       } else if (message.type === 'commandExecuted') {
-        // Handle command execution confirmations
+        // Handle command execution confirmations - always emit these
         console.log('CANBusListener: Command executed:', message.command);
         this.emit('commandExecuted', {
           command: message.command,
           timestamp: message.timestamp
         });
+        this.lastHeartbeat = Date.now();
       } else if (message.type === 'initialState') {
-        // Handle initial state from server
+        // Handle initial state from server - always emit these
         console.log('CANBusListener: Initial state received');
         this.emit('initialState', message);
-      } else {
-        // Log unhandled message types for debugging
-        console.log('CANBusListener: Unhandled message type:', message.type || 'unknown');
-        console.log('CANBusListener: Message content:', message);
+        this.lastHeartbeat = Date.now();
       }
     } catch (error) {
       console.error('CANBusListener: Error handling message:', error);
     }
+  }
+  
+  /**
+   * Check if a state change has occurred and should be emitted
+   */
+  shouldEmitStateChange(category, key, newState) {
+    const stateKey = `${category}_${key}`;
+    const bufferKey = `${stateKey}_${JSON.stringify(newState)}`;
+    
+    // Check if we've seen this exact state recently
+    if (this.messageBuffer.has(bufferKey)) {
+      return false; // Duplicate message, don't emit
+    }
+    
+    // Check if the state actually changed
+    const lastState = this.lastKnownStates[category][key];
+    if (lastState) {
+      // For lights, check both on/off and brightness
+      if (category === 'lights') {
+        const isOnChanged = lastState.isOn !== newState.isOn;
+        const brightnessChanged = Math.abs((lastState.brightness || 0) - (newState.brightness || 0)) > 2; // Allow 2% tolerance
+        
+        if (!isOnChanged && !brightnessChanged) {
+          return false; // No significant change
+        }
+      }
+      // For water systems, check on/off state
+      else if (category === 'water') {
+        if (lastState.isOn === newState.isOn) {
+          return false; // No change
+        }
+      }
+    }
+    
+    // Record the message in buffer and update last known state
+    this.messageBuffer.set(bufferKey, Date.now());
+    this.lastKnownStates[category][key] = { ...newState, lastUpdate: Date.now() };
+    
+    return true; // State changed, should emit
   }
   
   /**
@@ -199,7 +273,6 @@ class CANBusListener extends EventEmitter {
       const { id, data, interface: canInterface } = canData;
       
       if (!id || !data) {
-        console.log('CANBusListener: Invalid CAN data format:', canData);
         return;
       }
       
@@ -221,32 +294,55 @@ class CANBusListener extends EventEmitter {
             const percentage = Math.round((brightness / 200) * 100);
             const isOn = percentage > 0;
             
-            console.log(`CANBusListener: Light update - ${lightId}: ${percentage}% (${isOn ? 'ON' : 'OFF'})`);
-            
-            this.emit('message', {
-              dgn: '1FEDA',
-              instance: instance,
-              operating_status: percentage,
-              load_status: isOn ? '01' : '00',
-              lightId: lightId,
+            const newState = {
+              isOn: isOn,
               brightness: percentage,
-              isOn: isOn
-            });
+              instance: instance
+            };
+            
+            // Only emit if state actually changed
+            if (this.shouldEmitStateChange('lights', lightId, newState)) {
+              console.log(`CANBusListener: Light state changed - ${lightId}: ${percentage}% (${isOn ? 'ON' : 'OFF'})`);
+              
+              this.emit('message', {
+                dgn: '1FEDA',
+                instance: instance,
+                operating_status: percentage,
+                load_status: isOn ? '01' : '00',
+                lightId: lightId,
+                brightness: percentage,
+                isOn: isOn,
+                stateChange: true
+              });
+              
+              this.lastHeartbeat = Date.now();
+            }
           }
         }
       }
       
-      // Check for climate control messages
+      // Check for climate control messages - only emit on significant changes
       else if (id && (id.startsWith('19FEF9') || id.startsWith('19FED9') || id.startsWith('19FFE2'))) {
-        // Parse climate control status
-        console.log('CANBusListener: Climate control message detected:', id);
-        this.emit('message', {
-          dgn: '19FEF9',
-          type: 'climate',
+        // For climate, we'll be less aggressive about filtering since these are less frequent
+        const climateKey = `climate_${id}`;
+        const newState = {
           rawData: data,
-          canId: id,
-          timestamp: Date.now()
-        });
+          canId: id
+        };
+        
+        if (this.shouldEmitStateChange('climate', climateKey, newState)) {
+          console.log('CANBusListener: Climate control state changed:', id);
+          this.emit('message', {
+            dgn: '19FEF9',
+            type: 'climate',
+            rawData: data,
+            canId: id,
+            timestamp: Date.now(),
+            stateChange: true
+          });
+          
+          this.lastHeartbeat = Date.now();
+        }
       }
       
       // Check for water system messages (looking for DC_DIMMER_COMMAND_2)
@@ -261,15 +357,26 @@ class CANBusListener extends EventEmitter {
           const deviceType = instance === 44 ? 'water_pump' : 'water_heater';
           const isOn = data[2] && this.hexToDecimal(data[2]) > 0;
           
-          console.log(`CANBusListener: Water system update - ${deviceType}: ${isOn ? 'ON' : 'OFF'}`);
-          
-          this.emit('message', {
-            dgn: '1FEDB',
-            type: 'water',
-            device: deviceType,
+          const newState = {
             isOn: isOn,
             instance: instance
-          });
+          };
+          
+          // Only emit if state actually changed
+          if (this.shouldEmitStateChange('water', deviceType, newState)) {
+            console.log(`CANBusListener: Water system state changed - ${deviceType}: ${isOn ? 'ON' : 'OFF'}`);
+            
+            this.emit('message', {
+              dgn: '1FEDB',
+              type: 'water',
+              device: deviceType,
+              isOn: isOn,
+              instance: instance,
+              stateChange: true
+            });
+            
+            this.lastHeartbeat = Date.now();
+          }
         }
       }
       
@@ -354,6 +461,37 @@ class CANBusListener extends EventEmitter {
       console.log('CANBusListener: Maximum reconnection attempts reached');
       this.emit('maxReconnectAttemptsReached');
     }
+  }
+  
+  /**
+   * Get current state summary for debugging
+   */
+  getStateSummary() {
+    const summary = {
+      connected: this.connected,
+      lastHeartbeat: new Date(this.lastHeartbeat).toISOString(),
+      bufferSize: this.messageBuffer.size,
+      knownStates: {
+        lights: Object.keys(this.lastKnownStates.lights).length,
+        water: Object.keys(this.lastKnownStates.water).length,
+        climate: Object.keys(this.lastKnownStates.climate).length
+      }
+    };
+    
+    return summary;
+  }
+  
+  /**
+   * Clear all known states (useful for testing)
+   */
+  clearStates() {
+    this.lastKnownStates = {
+      lights: {},
+      water: {},
+      climate: {}
+    };
+    this.messageBuffer.clear();
+    console.log('CANBusListener: All states cleared');
   }
   
   /**
