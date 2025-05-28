@@ -1,4 +1,4 @@
-// screens/LightScreenTablet.jsx - Updated to use HoldToDimLight component
+// screens/LightScreenTablet.jsx - Updated with removed scenes and separate master control
 import React, { useState, useEffect } from "react";
 import { View, Text, Image, ScrollView, Alert, ActivityIndicator, TouchableOpacity } from "react-native";
 import { Col, Row, Grid } from "react-native-easy-grid";
@@ -18,16 +18,12 @@ const ImprovedLightScreenTablet = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [activeDimmingLights, setActiveDimmingLights] = useState(new Set());
   
-  // State for master light switch - now derived from RV State Manager
+  // State for master light switch - independent from individual lights
   const [masterLightOn, setMasterLightOn] = useState(false);
   
   // Status messages
   const [statusMessage, setStatusMessage] = useState('');
   const [showStatus, setShowStatus] = useState(false);
-  
-  // Scene selection
-  const [activeScene, setActiveScene] = useState(null);
-  const [isApplyingScene, setIsApplyingScene] = useState(false);
   
   // Get all available lights
   const allLights = LightControlService.getAllLights();
@@ -39,7 +35,7 @@ const ImprovedLightScreenTablet = () => {
   const [lightStates, setLightStates] = useState({});
   const [lightBrightness, setLightBrightness] = useState({});
 
-  // Subscribe to RV State Manager for light states
+  // Subscribe to RV State Manager for light states (but don't affect master)
   useEffect(() => {
     const unsubscribe = rvStateManager.subscribe(({ category, state }) => {
       if (category === 'lights') {
@@ -55,9 +51,7 @@ const ImprovedLightScreenTablet = () => {
         setLightStates(newLightStates);
         setLightBrightness(newLightBrightness);
         
-        // Update master state based on any lights being on
-        const anyLightOn = Object.values(newLightStates).some(isOn => isOn);
-        setMasterLightOn(anyLightOn);
+        // Master state is now independent - don't update based on individual lights
       }
     });
 
@@ -73,10 +67,6 @@ const ImprovedLightScreenTablet = () => {
     
     setLightStates(initialLightStates);
     setLightBrightness(initialLightBrightness);
-    
-    // Set initial master state
-    const anyLightOn = Object.values(initialLightStates).some(isOn => isOn);
-    setMasterLightOn(anyLightOn);
 
     return unsubscribe;
   }, []);
@@ -167,59 +157,6 @@ const ImprovedLightScreenTablet = () => {
     }
   };
 
-  // Apply lighting scene
-  const handleApplyScene = async (sceneKey) => {
-    try {
-      setIsApplyingScene(true);
-      setActiveScene(sceneKey);
-      
-      const scene = LightingScenes.scenes[sceneKey];
-      if (!scene) {
-        throw new Error(`Unknown scene: ${sceneKey}`);
-      }
-      
-      showStatusMessage(`Applying ${scene.name}...`, 5000);
-      
-      // Turn off all lights first if specified
-      if (scene.resetFirst) {
-        await handleAllLightsOff();
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-      
-      // Apply each light setting individually using the light control service
-      for (const [lightId, brightness] of Object.entries(scene.lights)) {
-        try {
-          if (brightness > 0) {
-            // Turn on the light first
-            await LightControlService.turnOnLight(lightId);
-            await new Promise(resolve => setTimeout(resolve, 300));
-            
-            // Update state manager
-            rvStateManager.updateLightState(lightId, true, brightness);
-          } else {
-            // Turn off the light
-            await LightControlService.turnOffLight(lightId);
-            await new Promise(resolve => setTimeout(resolve, 200));
-            
-            // Update state manager
-            rvStateManager.updateLightState(lightId, false, 0);
-          }
-        } catch (lightError) {
-          console.error(`Error setting ${lightId} for scene:`, lightError);
-        }
-      }
-      
-      showStatusMessage(`${scene.name} applied successfully`);
-    } catch (error) {
-      showStatusMessage(`Error applying scene: ${error.message}`);
-      console.error('Error applying scene:', error);
-    } finally {
-      setIsApplyingScene(false);
-      // Clear active scene after a delay
-      setTimeout(() => setActiveScene(null), 2000);
-    }
-  };
-
   // Group lights by category
   const lightGroups = {
     kitchen: [
@@ -265,34 +202,6 @@ const ImprovedLightScreenTablet = () => {
     
     return nameMap[lightId] || lightId;
   };
-
-  // Scene button component
-  const SceneButton = ({ sceneKey, label, color = '#FFB267' }) => (
-    <TouchableOpacity
-      style={{
-        backgroundColor: activeScene === sceneKey ? color : '#333',
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 15,
-        marginRight: 10,
-        opacity: isApplyingScene && activeScene !== sceneKey ? 0.5 : 1
-      }}
-      onPress={() => handleApplyScene(sceneKey)}
-      disabled={isApplyingScene}
-    >
-      {isApplyingScene && activeScene === sceneKey ? (
-        <ActivityIndicator size="small" color="#000" />
-      ) : (
-        <Text style={{ 
-          color: activeScene === sceneKey ? '#000' : '#FFF',
-          fontSize: 12,
-          fontWeight: 'bold'
-        }}>
-          {label}
-        </Text>
-      )}
-    </TouchableOpacity>
-  );
 
   return (
     <Grid className="bg-black">
@@ -385,62 +294,50 @@ const ImprovedLightScreenTablet = () => {
               </Text>
             </View>
             
+            {/* Master ON/OFF buttons with even spacing */}
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              {/* Scene Buttons */}
-              <ScrollView 
-                horizontal 
-                showsHorizontalScrollIndicator={false}
-                style={{ maxWidth: 300, marginRight: 15 }}
-              >
-                <View style={{ flexDirection: 'row' }}>
-                  <SceneButton sceneKey="mood" label="Mood" />
-                  <SceneButton sceneKey="evening" label="Evening" />
-                  <SceneButton sceneKey="reading" label="Reading" />
-                  <SceneButton sceneKey="nightLight" label="Night" />
-                  <SceneButton sceneKey="cooking" label="Cooking" />
-                  <SceneButton sceneKey="movie" label="Movie" />
-                </View>
-              </ScrollView>
-              
-              {/* Master ON/OFF buttons */}
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                {isLoading ? (
-                  <ActivityIndicator size="small" color="#FFB267" />
-                ) : (
-                  <>
-                    {/* ON Button */}
-                    <TouchableOpacity
-                      style={{
-                        backgroundColor: masterLightOn ? '#FFB267' : '#444',
-                        paddingHorizontal: 15,
-                        paddingVertical: 8,
-                        borderTopLeftRadius: 20,
-                        borderBottomLeftRadius: 20,
-                        marginRight: 1,
-                      }}
-                      onPress={handleAllLightsOn}
-                      disabled={isLoading || isApplyingScene}
-                    >
-                      <Text style={{ color: masterLightOn ? '#000' : '#FFF' }}>ON</Text>
-                    </TouchableOpacity>
-                    
-                    {/* OFF Button */}
-                    <TouchableOpacity
-                      style={{
-                        backgroundColor: !masterLightOn ? '#FFB267' : '#444',
-                        paddingHorizontal: 15,
-                        paddingVertical: 8,
-                        borderTopRightRadius: 20,
-                        borderBottomRightRadius: 20,
-                      }}
-                      onPress={handleAllLightsOff}
-                      disabled={isLoading || isApplyingScene}
-                    >
-                      <Text style={{ color: !masterLightOn ? '#000' : '#FFF' }}>OFF</Text>
-                    </TouchableOpacity>
-                  </>
-                )}
-              </View>
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#FFB267" />
+              ) : (
+                <>
+                  {/* ON Button */}
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: masterLightOn ? '#FFB267' : '#444',
+                      paddingHorizontal: 20,
+                      paddingVertical: 10,
+                      borderTopLeftRadius: 20,
+                      borderBottomLeftRadius: 20,
+                      marginRight: 1,
+                    }}
+                    onPress={handleAllLightsOn}
+                    disabled={isLoading}
+                  >
+                    <Text style={{ 
+                      color: masterLightOn ? '#000' : '#FFF',
+                      fontWeight: 'bold'
+                    }}>ON</Text>
+                  </TouchableOpacity>
+                  
+                  {/* OFF Button */}
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: !masterLightOn ? '#FFB267' : '#444',
+                      paddingHorizontal: 20,
+                      paddingVertical: 10,
+                      borderTopRightRadius: 20,
+                      borderBottomRightRadius: 20,
+                    }}
+                    onPress={handleAllLightsOff}
+                    disabled={isLoading}
+                  >
+                    <Text style={{ 
+                      color: !masterLightOn ? '#000' : '#FFF',
+                      fontWeight: 'bold'
+                    }}>OFF</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           </View>
         </Col>

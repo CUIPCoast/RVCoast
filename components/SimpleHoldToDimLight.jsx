@@ -1,4 +1,5 @@
-// components/SimpleHoldToDimLight.jsx - Minimal fix for single cycle button
+
+// components/SimpleHoldToDimLight.jsx - Updated with circular buttons and no OFF text
 import React, { useState, useEffect, useRef } from "react";
 import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
 import { LightControlService } from "../Service/LightControlService";
@@ -115,7 +116,7 @@ const SimpleHoldToDimLight = ({
           setLocalIsOn(false);
           setLocalBrightness(0);
         } else {
-          setError(`Failed to turn off`);
+          setError("Failed to turn off");
         }
       } else {
         // Turn on
@@ -128,7 +129,7 @@ const SimpleHoldToDimLight = ({
           setLocalIsOn(true);
           setLocalBrightness(brightness);
         } else {
-          setError(`Failed to turn on`);
+          setError("Failed to turn on");
         }
       }
     } catch (error) {
@@ -174,7 +175,7 @@ const SimpleHoldToDimLight = ({
 
     } catch (error) {
       setError(`Dimming failed: ${error.message}`);
-      console.error(`Error starting cycle dimming:`, error);
+      console.error("Error starting cycle dimming:", error);
       stopDimming();
     }
   };
@@ -200,7 +201,7 @@ const SimpleHoldToDimLight = ({
         console.log(`🛑 Stopped dimming for ${lightId}`);
       }
     } catch (error) {
-      console.error(`Error stopping dimming:`, error);
+      console.error("Error stopping dimming:", error);
     } finally {
       setIsDimming(false);
       setDimmingDirection(null);
@@ -222,13 +223,13 @@ const SimpleHoldToDimLight = ({
 
         // Auto-stop at limits
         if (currentBrightness <= 5) {
-          console.log(`Reached minimum brightness, stopping`);
+          console.log("Reached minimum brightness, stopping");
           stopDimming();
           return;
         }
         
         if (currentBrightness >= 95) {
-          console.log(`Reached maximum brightness, stopping`);
+          console.log("Reached maximum brightness, stopping");
           stopDimming();
           return;
         }
@@ -237,7 +238,7 @@ const SimpleHoldToDimLight = ({
         if (Math.abs(currentBrightness - lastBrightness) < 2) {
           unchangedCount++;
           if (unchangedCount >= 20) { // 2 seconds of no change
-            console.log(`Brightness stuck, stopping`);
+            console.log("Brightness stuck, stopping");
             stopDimming();
             return;
           }
@@ -248,13 +249,13 @@ const SimpleHoldToDimLight = ({
 
         // Safety timeout
         if (checkCount >= 100) { // 10 seconds max
-          console.log(`Dimming timeout, stopping`);
+          console.log("Dimming timeout, stopping");
           stopDimming();
           return;
         }
 
       } catch (error) {
-        console.error(`Error monitoring dimming:`, error);
+        console.error("Error monitoring dimming:", error);
         stopDimming();
       }
     }, 100);
@@ -262,12 +263,12 @@ const SimpleHoldToDimLight = ({
 
   // Handle cycle button press and release
   const handleCycleButtonPress = () => {
-    console.log(`🔄 Cycle button pressed`);
+    console.log("🔄 Cycle button pressed");
     startCycleDimming();
   };
 
   const handleCycleButtonRelease = () => {
-    console.log(`🔄 Cycle button released`);
+    console.log("🔄 Cycle button released");
     if (rampingRef.current) {
       stopDimming();
     }
@@ -281,13 +282,13 @@ const SimpleHoldToDimLight = ({
     return "#666"; // Gray when off
   };
 
-  // Get brightness text
+  // Get brightness text - removed OFF text
   const getBrightnessText = () => {
     if (error) return "ERROR";
     if (isDimming) {
       return `${Math.round(localBrightness)}% ⟲`;
     }
-    return localIsOn ? `${Math.round(localBrightness)}%` : "OFF";
+    return localIsOn ? `${Math.round(localBrightness)}%` : "";
   };
 
   return (
@@ -318,31 +319,27 @@ const SimpleHoldToDimLight = ({
           {getBrightnessText()}
         </Text>
         
-        {/* Main toggle button */}
+        {/* Circular toggle button */}
         <TouchableOpacity
           style={{
-            backgroundColor: localIsOn ? "#FFB267" : "#444",
-            paddingHorizontal: 12,
-            paddingVertical: 6,
-            borderRadius: 15,
-            minWidth: 50,
+            backgroundColor: localIsOn ? "#FFB267" : "#666",
+            width: 40,
+            height: 40,
+            borderRadius: 20,
             alignItems: 'center',
-            justifyContent: 'center'
+            justifyContent: 'center',
+            shadowColor: localIsOn ? "#FFB267" : "transparent",
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: localIsOn ? 0.8 : 0,
+            shadowRadius: localIsOn ? 8 : 0,
+            elevation: localIsOn ? 8 : 0,
           }}
           onPress={handleTap}
           disabled={isToggling || isDimming}
         >
           {isToggling ? (
             <ActivityIndicator size="small" color={localIsOn ? "#000" : "#FFF"} />
-          ) : (
-            <Text style={{ 
-              color: localIsOn ? "#000" : "#FFF", 
-              fontSize: 12,
-              fontWeight: 'bold'
-            }}>
-              {localIsOn ? "ON" : "OFF"}
-            </Text>
-          )}
+          ) : null}
         </TouchableOpacity>
       </View>
 
@@ -392,19 +389,7 @@ const SimpleHoldToDimLight = ({
         </View>
       )}
 
-      {/* Instructions */}
-      {supportsDimming && localIsOn && !isDimming && !error && (
-        <View style={{ marginTop: 8 }}>
-          <Text style={{ 
-            color: "#999", 
-            fontSize: 10,
-            textAlign: 'center',
-            fontStyle: 'italic'
-          }}>
-            Hold button to cycle brightness (like Firefly tablet)
-          </Text>
-        </View>
-      )}
+      
     </View>
   );
 };
