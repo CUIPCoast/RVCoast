@@ -1,10 +1,10 @@
-// components/HoldToDimLight.jsx - Hold-to-dim button implementation
+// components/SimpleHoldToDimLight.jsx - Simplified working version
 import React, { useState, useEffect, useRef } from "react";
-import { View, Text, TouchableOpacity, ActivityIndicator, PanResponder } from "react-native";
+import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
 import { LightControlService } from "../Service/LightControlService";
 import rvStateManager from "../API/RVStateManager/RVStateManager";
 
-const HoldToDimLight = ({ 
+const SimpleHoldToDimLight = ({ 
   name, 
   lightId, 
   isOn = false,
@@ -16,14 +16,31 @@ const HoldToDimLight = ({
   const [localBrightness, setLocalBrightness] = useState(value);
   const [isToggling, setIsToggling] = useState(false);
   const [isDimming, setIsDimming] = useState(false);
-  const [dimmingDirection, setDimmingDirection] = useState(null); // 'up' or 'down'
+  const [dimmingDirection, setDimmingDirection] = useState(null);
   const [error, setError] = useState(null);
   
   // Refs for hold-to-dim functionality
   const holdTimeoutRef = useRef(null);
   const rampingRef = useRef(false);
-  const startBrightnessRef = useRef(50);
-  const targetBrightnessRef = useRef(50);
+  const monitoringIntervalRef = useRef(null);
+
+  // Light ID to hex prefix mapping
+  const lightPrefixMap = {
+    bath_light: '15',
+    vibe_light: '16',
+    vanity_light: '17',
+    dinette_lights: '18',
+    awning_lights: '19',
+    kitchen_lights: '1A',
+    bed_ovhd_light: '1B',
+    shower_lights: '1C',
+    under_cab_lights: '1D',
+    hitch_lights: '1E',
+    porch_lights: '1F',
+    strip_lights: '20',
+    left_reading_lights: '22',
+    right_reading_lights: '23',
+  };
 
   // Clear error after some time
   useEffect(() => {
@@ -32,6 +49,19 @@ const HoldToDimLight = ({
       return () => clearTimeout(timer);
     }
   }, [error]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (holdTimeoutRef.current) {
+        clearTimeout(holdTimeoutRef.current);
+      }
+      if (monitoringIntervalRef.current) {
+        clearInterval(monitoringIntervalRef.current);
+      }
+      rampingRef.current = false;
+    };
+  }, []);
 
   // Sync with global state from RV State Manager
   useEffect(() => {
@@ -55,6 +85,18 @@ const HoldToDimLight = ({
     return unsubscribe;
   }, [lightId]);
 
+  // Execute raw CAN command
+  const executeRawCommand = async (command) => {
+    try {
+      console.log(`Executing: ${command}`);
+      const result = await LightControlService._executeRawCommand(command);
+      return result;
+    } catch (error) {
+      console.error(`Failed to execute ${command}:`, error);
+      throw error;
+    }
+  };
+
   // Handle tap (toggle on/off)
   const handleTap = async () => {
     if (isToggling || isDimming) return;
@@ -73,21 +115,20 @@ const HoldToDimLight = ({
           setLocalIsOn(false);
           setLocalBrightness(0);
         } else {
-          setError(`Failed to turn off: ${result?.error || 'Unknown error'}`);
+          setError(`Failed to turn off`);
         }
       } else {
-        // Turn on to previous brightness or 75%
-        const targetBrightness = localBrightness > 20 ? localBrightness : 75;
-        console.log(`Turning on ${lightId} to ${targetBrightness}%`);
-        
+        // Turn on
+        console.log(`Turning on ${lightId}`);
         const result = await LightControlService.turnOnLight(lightId);
         
         if (result && result.success) {
-          rvStateManager.updateLightState(lightId, true, targetBrightness);
+          const brightness = 75; // Default brightness
+          rvStateManager.updateLightState(lightId, true, brightness);
           setLocalIsOn(true);
-          setLocalBrightness(targetBrightness);
+          setLocalBrightness(brightness);
         } else {
-          setError(`Failed to turn on: ${result?.error || 'Unknown error'}`);
+          setError(`Failed to turn on`);
         }
       }
     } catch (error) {
@@ -98,8 +139,8 @@ const HoldToDimLight = ({
     }
   };
 
-  // Start ramping in a direction
-  const startRamping = async (direction) => {
+  // Start dimming (hold down)
+  const startDimming = async (direction) => {
     if (!supportsDimming || !localIsOn || isDimming) return;
 
     try {
@@ -107,185 +148,113 @@ const HoldToDimLight = ({
       setIsDimming(true);
       setDimmingDirection(direction);
       rampingRef.current = true;
-      startBrightnessRef.current = localBrightness;
 
-      console.log(`Starting ramp ${direction} for ${lightId} from ${localBrightness}%`);
-
-      // Start the ramp command (command 15 = ramp)
-      const prefix = getLightPrefix(lightId);
+      const prefix = lightPrefixMap[lightId];
       if (!prefix) {
         throw new Error(`Unknown light: ${lightId}`);
       }
 
-      const rampCommand = `19FEDB9F#${prefix}FF00150000FFFF`;
-      await LightControlService._executeRawCommand(rampCommand);
+      console.log(`🚀 Starting ${direction} dimming for ${lightId}`);
 
-      // Monitor the ramping with progress updates
-      monitorRamping(direction);
+      // Use the working generic ramp command (0x15) that we know works
+      const rampCommand = `19FEDB9F#${prefix}FF00150000FFFF`;
+      await executeRawCommand(rampCommand);
+
+      // Start monitoring for auto-stop
+      startMonitoring(direction);
+
     } catch (error) {
-      setError(`Dimming error: ${error.message}`);
-      console.error(`Error starting ramp for ${lightId}:`, error);
-      stopRamping();
+      setError(`Dimming failed: ${error.message}`);
+      console.error(`Error starting dimming:`, error);
+      stopDimming();
     }
   };
 
-  // Stop ramping
-  const stopRamping = async () => {
+  // Stop dimming
+  const stopDimming = async () => {
     if (!rampingRef.current) return;
 
     try {
       rampingRef.current = false;
       
-      const prefix = getLightPrefix(lightId);
+      // Clear monitoring
+      if (monitoringIntervalRef.current) {
+        clearInterval(monitoringIntervalRef.current);
+        monitoringIntervalRef.current = null;
+      }
+
+      const prefix = lightPrefixMap[lightId];
       if (prefix) {
-        // Send stop command (command 4 = stop)
+        // Send stop command
         const stopCommand = `19FEDB9F#${prefix}FF00040000FFFF`;
-        await LightControlService._executeRawCommand(stopCommand);
-        console.log(`Stopped ramping for ${lightId} at ${localBrightness}%`);
+        await executeRawCommand(stopCommand);
+        console.log(`🛑 Stopped dimming for ${lightId}`);
       }
     } catch (error) {
-      console.error(`Error stopping ramp for ${lightId}:`, error);
+      console.error(`Error stopping dimming:`, error);
     } finally {
       setIsDimming(false);
       setDimmingDirection(null);
     }
   };
 
-  // Monitor ramping progress
-  const monitorRamping = async (direction) => {
-    let lastBrightness = startBrightnessRef.current;
-    let stuckCount = 0;
-    const maxStuckChecks = 20; // Stop if brightness doesn't change for 2 seconds
+  // Monitor dimming progress
+  const startMonitoring = (direction) => {
+    let lastBrightness = localBrightness;
+    let unchangedCount = 0;
 
-    const checkProgress = async () => {
+    monitoringIntervalRef.current = setInterval(async () => {
       if (!rampingRef.current) return;
 
       try {
-        // Get current brightness from CAN bus or state
-        const currentBrightness = await getCurrentBrightness();
-        
-        // Update local state with current brightness
-        setLocalBrightness(currentBrightness);
-        rvStateManager.updateLightState(lightId, currentBrightness > 0, currentBrightness);
+        // For now, just auto-stop after reasonable limits
+        const currentBrightness = localBrightness;
 
-        // Check if brightness stopped changing
-        if (Math.abs(currentBrightness - lastBrightness) < 1) {
-          stuckCount++;
-          if (stuckCount >= maxStuckChecks) {
-            console.log(`Brightness stuck at ${currentBrightness}%, stopping ramp`);
-            stopRamping();
-            return;
-          }
-        } else {
-          stuckCount = 0;
-          lastBrightness = currentBrightness;
-        }
-
-        // Check for minimum/maximum limits
+        // Auto-stop at limits
         if (direction === 'down' && currentBrightness <= 10) {
-          console.log(`Reached minimum brightness, stopping ramp`);
-          stopRamping();
+          console.log(`Reached minimum brightness, stopping`);
+          stopDimming();
           return;
         }
         
         if (direction === 'up' && currentBrightness >= 95) {
-          console.log(`Reached maximum brightness, stopping ramp`);
-          stopRamping();
+          console.log(`Reached maximum brightness, stopping`);
+          stopDimming();
           return;
         }
 
-        // Continue monitoring
-        if (rampingRef.current) {
-          setTimeout(checkProgress, 100);
+        // Stop if brightness hasn't changed for a while (stuck)
+        if (Math.abs(currentBrightness - lastBrightness) < 2) {
+          unchangedCount++;
+          if (unchangedCount >= 10) { // 1 second of no change
+            console.log(`Brightness stuck, stopping`);
+            stopDimming();
+            return;
+          }
+        } else {
+          unchangedCount = 0;
+          lastBrightness = currentBrightness;
         }
-      } catch (error) {
-        console.error(`Error monitoring ramp progress:`, error);
-        stopRamping();
-      }
-    };
 
-    // Start monitoring after a short delay
-    setTimeout(checkProgress, 200);
+      } catch (error) {
+        console.error(`Error monitoring dimming:`, error);
+        stopDimming();
+      }
+    }, 100);
   };
 
-  // Get current brightness (simplified version)
-  const getCurrentBrightness = async () => {
-    try {
-      // Try to get from state manager first
-      const currentState = rvStateManager.getCategoryState('lights')?.[lightId];
-      if (currentState && currentState.brightness !== undefined) {
-        return currentState.brightness;
-      }
-      
-      // Fallback to last known brightness
-      return localBrightness;
-    } catch (error) {
-      return localBrightness;
+  // Handle button press and hold
+  const handleDimButtonPress = (direction) => {
+    console.log(`🖱️ Button press: ${direction}`);
+    startDimming(direction);
+  };
+
+  const handleDimButtonRelease = (direction) => {
+    console.log(`🖱️ Button release: ${direction}`);
+    if (rampingRef.current) {
+      stopDimming();
     }
   };
-
-  // Get light prefix for CAN commands
-  const getLightPrefix = (lightId) => {
-    const lightPrefixMap = {
-      bath_light: '15',
-      vibe_light: '16',
-      vanity_light: '17',
-      dinette_lights: '18',
-      awning_lights: '19',
-      kitchen_lights: '1A',
-      bed_ovhd_light: '1B',
-      shower_lights: '1C',
-      under_cab_lights: '1D',
-      hitch_lights: '1E',
-      porch_lights: '1F',
-      strip_lights: '20',
-      left_reading_lights: '22',
-      right_reading_lights: '23',
-    };
-    return lightPrefixMap[lightId];
-  };
-
-  // Create pan responder for hold-to-dim functionality
-  const createDimPanResponder = (direction) => {
-    return PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => false,
-      
-      onPanResponderGrant: () => {
-        // Start ramping after a short delay to distinguish from tap
-        holdTimeoutRef.current = setTimeout(() => {
-          startRamping(direction);
-        }, 200);
-      },
-      
-      onPanResponderRelease: () => {
-        // Clear timeout and stop ramping
-        if (holdTimeoutRef.current) {
-          clearTimeout(holdTimeoutRef.current);
-          holdTimeoutRef.current = null;
-        }
-        
-        if (rampingRef.current) {
-          stopRamping();
-        }
-      },
-      
-      onPanResponderTerminate: () => {
-        // Handle interruption
-        if (holdTimeoutRef.current) {
-          clearTimeout(holdTimeoutRef.current);
-          holdTimeoutRef.current = null;
-        }
-        
-        if (rampingRef.current) {
-          stopRamping();
-        }
-      }
-    });
-  };
-
-  const dimUpResponder = createDimPanResponder('up');
-  const dimDownResponder = createDimPanResponder('down');
 
   // Get display color based on state
   const getDisplayColor = () => {
@@ -382,7 +351,7 @@ const HoldToDimLight = ({
           paddingHorizontal: 20
         }}>
           {/* Dim Down Button */}
-          <View
+          <TouchableOpacity
             style={{
               backgroundColor: isDimming && dimmingDirection === 'down' ? "#FFB267" : "#444",
               paddingHorizontal: 20,
@@ -392,19 +361,21 @@ const HoldToDimLight = ({
               marginRight: 10,
               alignItems: 'center'
             }}
-            {...dimDownResponder.panHandlers}
+            onPressIn={() => handleDimButtonPress('down')}
+            onPressOut={() => handleDimButtonRelease('down')}
+            disabled={isDimming && dimmingDirection !== 'down'}
           >
             <Text style={{ 
               color: isDimming && dimmingDirection === 'down' ? "#000" : "#FFF",
               fontSize: 12,
               fontWeight: 'bold'
             }}>
-              {isDimming && dimmingDirection === 'down' ? 'DIMMING ↘' : 'HOLD TO DIM ↓'}
+              {isDimming && dimmingDirection === 'down' ? 'DIMMING ↘' : 'HOLD ↓'}
             </Text>
-          </View>
+          </TouchableOpacity>
           
           {/* Dim Up Button */}
-          <View
+          <TouchableOpacity
             style={{
               backgroundColor: isDimming && dimmingDirection === 'up' ? "#FFB267" : "#444",
               paddingHorizontal: 20,
@@ -414,20 +385,22 @@ const HoldToDimLight = ({
               marginLeft: 10,
               alignItems: 'center'
             }}
-            {...dimUpResponder.panHandlers}
+            onPressIn={() => handleDimButtonPress('up')}
+            onPressOut={() => handleDimButtonRelease('up')}
+            disabled={isDimming && dimmingDirection !== 'up'}
           >
             <Text style={{ 
               color: isDimming && dimmingDirection === 'up' ? "#000" : "#FFF",
               fontSize: 12,
               fontWeight: 'bold'
             }}>
-              {isDimming && dimmingDirection === 'up' ? 'DIMMING ↗' : 'HOLD TO DIM ↑'}
+              {isDimming && dimmingDirection === 'up' ? 'DIMMING ↗' : 'HOLD ↑'}
             </Text>
-          </View>
+          </TouchableOpacity>
         </View>
       )}
 
-      {/* Instructions (show once) */}
+      {/* Instructions */}
       {supportsDimming && localIsOn && !isDimming && !error && (
         <View style={{ marginTop: 5 }}>
           <Text style={{ 
@@ -436,7 +409,7 @@ const HoldToDimLight = ({
             textAlign: 'center',
             fontStyle: 'italic'
           }}>
-            Tap to toggle • Hold dimming buttons to adjust brightness
+            Hold dimming buttons to adjust brightness
           </Text>
         </View>
       )}
@@ -444,4 +417,4 @@ const HoldToDimLight = ({
   );
 };
 
-export default HoldToDimLight;
+export default SimpleHoldToDimLight;

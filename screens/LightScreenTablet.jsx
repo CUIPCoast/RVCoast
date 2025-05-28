@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { View, Text, Image, ScrollView, Alert, ActivityIndicator, TouchableOpacity } from "react-native";
 import { Col, Row, Grid } from "react-native-easy-grid";
 import moment from "moment";
-import HoldToDimLight from "../components/HoldToDimLight.jsx"; // Updated import
+import SimpleHoldToDimLight from "../components/SimpleHoldToDimLight.jsx";
 import { LightControlService } from "../Service/LightControlService.js";
 import { CANBusMonitor } from "../Service/CANBusMonitor.js";
 import { LightingScenes } from "../API/rvAPI.js";
@@ -505,7 +505,7 @@ const ImprovedLightScreenTablet = () => {
 
             <ScrollView style={{ marginTop: 35 }}>
               {lightGroups.kitchen.map((lightId) => (
-                <HoldToDimLight
+                <SimpleHoldToDimLight
                   key={lightId}
                   name={getLightDisplayName(lightId)}
                   lightId={lightId}
@@ -560,7 +560,7 @@ const ImprovedLightScreenTablet = () => {
 
             <ScrollView style={{ marginTop: 35 }}>
               {lightGroups.bedroom.map((lightId) => (
-                <HoldToDimLight
+                <SimpleHoldToDimLight
                   key={lightId}
                   name={getLightDisplayName(lightId)}
                   lightId={lightId}
@@ -615,7 +615,7 @@ const ImprovedLightScreenTablet = () => {
 
             <ScrollView style={{ marginTop: 35 }}>
               {lightGroups.bathroom.map((lightId) => (
-                <HoldToDimLight
+                <SimpleHoldToDimLight
                   key={lightId}
                   name={getLightDisplayName(lightId)}
                   lightId={lightId}
