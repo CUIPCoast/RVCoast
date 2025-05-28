@@ -1,3 +1,4 @@
+// screens/LightScreenTablet.jsx - Updated with Firefly Ramp Dimming Support
 import React, { useState, useEffect } from "react";
 import { View, Text, Image, ScrollView, Alert, ActivityIndicator, TouchableOpacity } from "react-native";
 import { Col, Row, Grid } from "react-native-easy-grid";
@@ -5,22 +6,28 @@ import moment from "moment";
 import EnhancedMainLight from "../components/EnhancedMainLight.jsx";
 import { LightControlService } from "../Service/LightControlService.js";
 import { CANBusMonitor } from "../Service/CANBusMonitor.js";
-import rvStateManager from "../API/RVStateManager/RVStateManager"; // Add this import
+import { LightingScenes } from "../API/rvAPI.js";
+import rvStateManager from "../API/RVStateManager/RVStateManager";
 
 const ImprovedLightScreenTablet = () => {
   // Current date/time
   const currentDate = moment().format("MMMM Do, YYYY");
   const dayOfTheWeek = moment().format("dddd");
 
-  // State for loading indicator
+  // State for loading and operations
   const [isLoading, setIsLoading] = useState(false);
+  const [activeDimmingLights, setActiveDimmingLights] = useState(new Set());
   
   // State for master light switch - now derived from RV State Manager
   const [masterLightOn, setMasterLightOn] = useState(false);
   
-  // Add state for status messages
+  // Status messages
   const [statusMessage, setStatusMessage] = useState('');
   const [showStatus, setShowStatus] = useState(false);
+  
+  // Scene selection
+  const [activeScene, setActiveScene] = useState(null);
+  const [isApplyingScene, setIsApplyingScene] = useState(false);
   
   // Get all available lights
   const allLights = LightControlService.getAllLights();
@@ -28,45 +35,61 @@ const ImprovedLightScreenTablet = () => {
   // Check if dimming is supported
   const supportsDimming = LightControlService.supportsDimming();
   
-  // Remove local light state management - use RV State Manager instead
+  // Individual light states from RV State Manager
   const [lightStates, setLightStates] = useState({});
+  const [lightBrightness, setLightBrightness] = useState({});
 
-  // Subscribe to RV State Manager for individual light states only
+  // Subscribe to RV State Manager for light states
   useEffect(() => {
     const unsubscribe = rvStateManager.subscribe(({ category, state }) => {
       if (category === 'lights') {
-        // Update local light states for UI consistency (but NOT master control)
         const currentLights = state.lights || {};
         const newLightStates = {};
+        const newLightBrightness = {};
+        
         Object.entries(currentLights).forEach(([lightId, lightState]) => {
           newLightStates[lightId] = lightState.isOn;
+          newLightBrightness[lightId] = lightState.brightness || 0;
         });
-        setLightStates(newLightStates);
         
-        console.log('Individual light states updated');
+        setLightStates(newLightStates);
+        setLightBrightness(newLightBrightness);
+        
+        // Update master state based on any lights being on
+        const anyLightOn = Object.values(newLightStates).some(isOn => isOn);
+        setMasterLightOn(anyLightOn);
       }
     });
 
-    // Initialize individual light states on component mount (but NOT master state)
+    // Initialize light states on component mount
     const currentLights = rvStateManager.getCategoryState('lights');
     const initialLightStates = {};
+    const initialLightBrightness = {};
+    
     Object.entries(currentLights).forEach(([lightId, lightState]) => {
       initialLightStates[lightId] = lightState ? lightState.isOn : false;
+      initialLightBrightness[lightId] = lightState ? lightState.brightness || 0 : 0;
     });
+    
     setLightStates(initialLightStates);
+    setLightBrightness(initialLightBrightness);
+    
+    // Set initial master state
+    const anyLightOn = Object.values(initialLightStates).some(isOn => isOn);
+    setMasterLightOn(anyLightOn);
 
     return unsubscribe;
   }, []);
 
-  // Subscribe to CAN bus updates (keep existing functionality)
+  // Subscribe to CAN bus updates
   useEffect(() => {
     const subscription = CANBusMonitor.subscribeToDimmingUpdates((updates) => {
-      Object.entries(updates).forEach(([lightId, brightness]) => {
-        const isOn = brightness > 0;
-        const brightnessPercent = brightness > 0 ? brightness * 2 : 0;
+      Object.entries(updates).forEach(([lightId, updateData]) => {
+        const brightness = updateData.brightness || 0;
+        const isOn = updateData.isOn || brightness > 0;
         
         // Update RV State Manager
-        rvStateManager.updateLightState(lightId, isOn, brightnessPercent);
+        rvStateManager.updateLightState(lightId, isOn, brightness);
       });
     });
     
@@ -75,48 +98,56 @@ const ImprovedLightScreenTablet = () => {
     };
   }, []);
 
-  // Turn all lights on - Only changes master state when explicitly called
+  // Show status message helper
+  const showStatusMessage = (message, duration = 3000) => {
+    setStatusMessage(message);
+    setShowStatus(true);
+    setTimeout(() => setShowStatus(false), duration);
+  };
+
+  // Turn all lights on with ramp dimming
   const handleAllLightsOn = async () => {
     try {
       setIsLoading(true);
       
+      // Use the traditional all lights on command first
       const result = await LightControlService.allLightsOn();
-      console.log('allLightsOn result:', JSON.stringify(result));
       
       if (result.success) {
         // Update RV State Manager for all lights
         allLights.forEach(lightId => {
-          rvStateManager.updateLightState(lightId, true, 100); // Turn on at 100%
+          rvStateManager.updateLightState(lightId, true, 100);
         });
         
-        // Only update master state when using master control
         setMasterLightOn(true);
-        
-        // Show success message
-        setStatusMessage('All lights turned ON');
-        setShowStatus(true);
-        setTimeout(() => setShowStatus(false), 3000);
+        showStatusMessage('All lights turned ON');
       } else {
-        setStatusMessage('Failed to turn all lights ON');
-        setShowStatus(true);
-        setTimeout(() => setShowStatus(false), 3000);
+        showStatusMessage('Failed to turn all lights ON');
       }
     } catch (error) {
-      setStatusMessage(`Error: ${error.message}`);
-      setShowStatus(true);
-      setTimeout(() => setShowStatus(false), 3000);
+      showStatusMessage(`Error: ${error.message}`);
+      console.error('Error turning all lights on:', error);
     } finally {
       setIsLoading(false);
     }
   };
   
-  // Turn all lights off - Only changes master state when explicitly called
+  // Turn all lights off
   const handleAllLightsOff = async () => {
     try {
       setIsLoading(true);
       
+      // Cancel any active dimming operations first
+      for (const lightId of activeDimmingLights) {
+        try {
+          await LightControlService.cancelDimming(lightId);
+        } catch (cancelError) {
+          console.warn(`Could not cancel dimming for ${lightId}:`, cancelError);
+        }
+      }
+      setActiveDimmingLights(new Set());
+      
       const result = await LightControlService.allLightsOff();
-      console.log('allLightsOff result:', JSON.stringify(result));
       
       if (result.success) {
         // Update RV State Manager for all lights
@@ -124,105 +155,75 @@ const ImprovedLightScreenTablet = () => {
           rvStateManager.updateLightState(lightId, false, 0);
         });
         
-        // Only update master state when using master control
         setMasterLightOn(false);
-        
-        setStatusMessage('All lights turned OFF');
-        setShowStatus(true);
-        setTimeout(() => setShowStatus(false), 3000);
+        showStatusMessage('All lights turned OFF');
       } else {
-        setStatusMessage('Failed to turn all lights OFF');
-        setShowStatus(true);
-        setTimeout(() => setShowStatus(false), 3000);
+        showStatusMessage('Failed to turn all lights OFF');
       }
     } catch (error) {
-      setStatusMessage(`Error: ${error.message}`);
-      setShowStatus(true);
-      setTimeout(() => setShowStatus(false), 3000);
+      showStatusMessage(`Error: ${error.message}`);
+      console.error('Error turning all lights off:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Updated preset handlers to work with RV State Manager
-  const handleMoodLighting = async () => {
+  // Apply lighting scene
+  const handleApplyScene = async (sceneKey) => {
     try {
-      setIsLoading(true);
+      setIsApplyingScene(true);
+      setActiveScene(sceneKey);
       
-      const moodSettings = {
-        'vibe_light': 30,
-        'strip_lights': 20,
-        'under_cab_lights': 15,
-        'dinette_lights': 25
-      };
-      
-      // Turn off all lights first in RV State Manager
-      allLights.forEach(lightId => {
-        rvStateManager.updateLightState(lightId, false, 0);
-      });
-      
-      await LightControlService.allLightsOff();
-      
-      // Apply mood lighting settings
-      for (const [lightId, brightness] of Object.entries(moodSettings)) {
-        await LightControlService.setBrightness(lightId, brightness);
-        // Update RV State Manager
-        rvStateManager.updateLightState(lightId, true, brightness * 2);
+      const scene = LightingScenes.scenes[sceneKey];
+      if (!scene) {
+        throw new Error(`Unknown scene: ${sceneKey}`);
       }
       
-      setStatusMessage('Mood lighting activated');
-      setShowStatus(true);
-      setTimeout(() => setShowStatus(false), 3000);
+      showStatusMessage(`Applying ${scene.name}...`, 5000);
       
+      // Apply the scene with fade transition
+      const result = await LightingScenes.applyScene(scene, true);
+      
+      if (result.success) {
+        // Update RV State Manager with scene settings
+        Object.entries(scene.lights).forEach(([lightId, brightness]) => {
+          rvStateManager.updateLightState(lightId, brightness > 0, brightness);
+        });
+        
+        // Turn off lights not in the scene if resetFirst is true
+        if (scene.resetFirst) {
+          allLights.forEach(lightId => {
+            if (!scene.lights[lightId]) {
+              rvStateManager.updateLightState(lightId, false, 0);
+            }
+          });
+        }
+        
+        showStatusMessage(`${scene.name} applied successfully`);
+      } else {
+        showStatusMessage(`Failed to apply ${scene.name}`);
+      }
     } catch (error) {
-      setStatusMessage(`Error setting mood lighting: ${error.message}`);
-      setShowStatus(true);
-      setTimeout(() => setShowStatus(false), 3000);
-      console.error('Failed to set mood lighting:', error);
+      showStatusMessage(`Error applying scene: ${error.message}`);
+      console.error('Error applying scene:', error);
     } finally {
-      setIsLoading(false);
+      setIsApplyingScene(false);
+      // Clear active scene after a delay
+      setTimeout(() => setActiveScene(null), 2000);
     }
   };
 
-  const handleEveningLighting = async () => {
-    try {
-      setIsLoading(true);
-      
-      const eveningSettings = {
-        'kitchen_lights': 35,
-        'dinette_lights': 30,
-        'bath_light': 25,
-        'vibe_light': 20,
-        'left_reading_lights': 40,
-        'right_reading_lights': 40
-      };
-      
-      // Turn off all lights first in RV State Manager
-      allLights.forEach(lightId => {
-        rvStateManager.updateLightState(lightId, false, 0);
-      });
-      
-      await LightControlService.allLightsOff();
-      
-      // Apply evening lighting settings
-      for (const [lightId, brightness] of Object.entries(eveningSettings)) {
-        await LightControlService.setBrightness(lightId, brightness);
-        // Update RV State Manager
-        rvStateManager.updateLightState(lightId, true, brightness * 2);
+  // Handle individual light dimming progress
+  const handleDimmingProgress = (lightId, isActive) => {
+    setActiveDimmingLights(prev => {
+      const newSet = new Set(prev);
+      if (isActive) {
+        newSet.add(lightId);
+      } else {
+        newSet.delete(lightId);
       }
-      
-      setStatusMessage('Evening lighting activated');
-      setShowStatus(true);
-      setTimeout(() => setShowStatus(false), 3000);
-      
-    } catch (error) {
-      setStatusMessage(`Error setting evening lighting: ${error.message}`);
-      setShowStatus(true);
-      setTimeout(() => setShowStatus(false), 3000);
-      console.error('Failed to set evening lighting:', error);
-    } finally {
-      setIsLoading(false);
-    }
+      return newSet;
+    });
   };
 
   // Group lights by category
@@ -271,6 +272,34 @@ const ImprovedLightScreenTablet = () => {
     return nameMap[lightId] || lightId;
   };
 
+  // Scene button component
+  const SceneButton = ({ sceneKey, label, color = '#FFB267' }) => (
+    <TouchableOpacity
+      style={{
+        backgroundColor: activeScene === sceneKey ? color : '#333',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 15,
+        marginRight: 10,
+        opacity: isApplyingScene && activeScene !== sceneKey ? 0.5 : 1
+      }}
+      onPress={() => handleApplyScene(sceneKey)}
+      disabled={isApplyingScene}
+    >
+      {isApplyingScene && activeScene === sceneKey ? (
+        <ActivityIndicator size="small" color="#000" />
+      ) : (
+        <Text style={{ 
+          color: activeScene === sceneKey ? '#000' : '#FFF',
+          fontSize: 12,
+          fontWeight: 'bold'
+        }}>
+          {label}
+        </Text>
+      )}
+    </TouchableOpacity>
+  );
+
   return (
     <Grid className="bg-black">
       {/* Header row */}
@@ -304,7 +333,7 @@ const ImprovedLightScreenTablet = () => {
           top: '50%',
           left: '50%',
           transform: [{ translateX: -150 }, { translateY: -25 }],
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
           padding: 15,
           borderRadius: 10,
           zIndex: 1000,
@@ -319,8 +348,8 @@ const ImprovedLightScreenTablet = () => {
       <Row size={5} style={{ justifyContent: "center", alignItems: "center" }}>
         <Col
           style={{
-            width: "40%",
-            height: 60,
+            width: "50%",
+            height: 80,
             backgroundColor: "#1B1B1B",
             borderRadius: 10,
             justifyContent: "center",
@@ -352,41 +381,35 @@ const ImprovedLightScreenTablet = () => {
                 }}
               />
               <Text className="text-white">Light Master</Text>
+              {activeDimmingLights.size > 0 && (
+                <View style={{ marginLeft: 10, flexDirection: 'row', alignItems: 'center' }}>
+                  <ActivityIndicator size="small" color="#FFB267" />
+                  <Text style={{ color: '#FFB267', fontSize: 10, marginLeft: 5 }}>
+                    Dimming ({activeDimmingLights.size})
+                  </Text>
+                </View>
+              )}
             </View>
             
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              {/* Mood Lighting Button */}
-              <TouchableOpacity
-                style={{
-                  backgroundColor: '#222',
-                  paddingHorizontal: 15,
-                  paddingVertical: 8,
-                  borderRadius: 20,
-                  marginRight: 15,
-                }}
-                onPress={handleMoodLighting}
-                disabled={isLoading}
+              {/* Scene Buttons */}
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                style={{ maxWidth: 300, marginRight: 15 }}
               >
-                <Text style={{ color: '#FFB267' }}>Mood</Text>
-              </TouchableOpacity>
-              
-              {/* Evening Lighting Button */}
-              <TouchableOpacity
-                style={{
-                  backgroundColor: '#222',
-                  paddingHorizontal: 15,
-                  paddingVertical: 8,
-                  borderRadius: 20,
-                  marginRight: 15,
-                }}
-                onPress={handleEveningLighting}
-                disabled={isLoading}
-              >
-                <Text style={{ color: '#FFB267' }}>Evening</Text>
-              </TouchableOpacity>
+                <View style={{ flexDirection: 'row' }}>
+                  <SceneButton sceneKey="mood" label="Mood" />
+                  <SceneButton sceneKey="evening" label="Evening" />
+                  <SceneButton sceneKey="reading" label="Reading" />
+                  <SceneButton sceneKey="nightLight" label="Night" />
+                  <SceneButton sceneKey="cooking" label="Cooking" />
+                  <SceneButton sceneKey="movie" label="Movie" />
+                </View>
+              </ScrollView>
               
               {/* Master ON/OFF buttons */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 10 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 {isLoading ? (
                   <ActivityIndicator size="small" color="#FFB267" />
                 ) : (
@@ -402,7 +425,7 @@ const ImprovedLightScreenTablet = () => {
                         marginRight: 1,
                       }}
                       onPress={handleAllLightsOn}
-                      disabled={isLoading}
+                      disabled={isLoading || isApplyingScene}
                     >
                       <Text style={{ color: masterLightOn ? '#000' : '#FFF' }}>ON</Text>
                     </TouchableOpacity>
@@ -417,7 +440,7 @@ const ImprovedLightScreenTablet = () => {
                         borderBottomRightRadius: 20,
                       }}
                       onPress={handleAllLightsOff}
-                      disabled={isLoading}
+                      disabled={isLoading || isApplyingScene}
                     >
                       <Text style={{ color: !masterLightOn ? '#000' : '#FFF' }}>OFF</Text>
                     </TouchableOpacity>
@@ -494,9 +517,10 @@ const ImprovedLightScreenTablet = () => {
                   lightId={lightId}
                   min={0}
                   max={100}
-                  value={100} // Always default to 100% when on
+                  value={lightBrightness[lightId] || 0}
                   isOn={lightStates[lightId] || false}
                   supportsDimming={supportsDimming}
+                  onDimmingStatusChange={(isActive) => handleDimmingProgress(lightId, isActive)}
                 />
               ))}
             </ScrollView>
@@ -551,9 +575,10 @@ const ImprovedLightScreenTablet = () => {
                   lightId={lightId}
                   min={0}
                   max={100}
-                  value={100} // Always default to 100% when on
+                  value={lightBrightness[lightId] || 0}
                   isOn={lightStates[lightId] || false}
                   supportsDimming={supportsDimming}
+                  onDimmingStatusChange={(isActive) => handleDimmingProgress(lightId, isActive)}
                 />
               ))}
             </ScrollView>
@@ -608,9 +633,10 @@ const ImprovedLightScreenTablet = () => {
                   lightId={lightId}
                   min={0}
                   max={100}
-                  value={100} // Always default to 100% when on
+                  value={lightBrightness[lightId] || 0}
                   isOn={lightStates[lightId] || false}
                   supportsDimming={supportsDimming}
+                  onDimmingStatusChange={(isActive) => handleDimmingProgress(lightId, isActive)}
                 />
               ))}
             </ScrollView>
