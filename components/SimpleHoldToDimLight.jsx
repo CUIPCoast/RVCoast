@@ -1,4 +1,4 @@
-// components/SimpleHoldToDimLight.jsx - Simplified working version
+// components/SimpleHoldToDimLight.jsx - Minimal fix for single cycle button
 import React, { useState, useEffect, useRef } from "react";
 import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
 import { LightControlService } from "../Service/LightControlService";
@@ -139,14 +139,13 @@ const SimpleHoldToDimLight = ({
     }
   };
 
-  // Start dimming (hold down)
-  const startDimming = async (direction) => {
+  // Start cycle dimming - determines direction automatically
+  const startCycleDimming = async () => {
     if (!supportsDimming || !localIsOn || isDimming) return;
 
     try {
       setError(null);
       setIsDimming(true);
-      setDimmingDirection(direction);
       rampingRef.current = true;
 
       const prefix = lightPrefixMap[lightId];
@@ -154,18 +153,28 @@ const SimpleHoldToDimLight = ({
         throw new Error(`Unknown light: ${lightId}`);
       }
 
-      console.log(`🚀 Starting ${direction} dimming for ${lightId}`);
+      // Determine direction based on current brightness (like Firefly tablet)
+      let direction;
+      if (localBrightness > 50) {
+        direction = 'down'; // Start by dimming if bright
+      } else {
+        direction = 'up';   // Start by brightening if dim
+      }
 
-      // Use the working generic ramp command (0x15) that we know works
+      setDimmingDirection(direction);
+
+      console.log(`🔄 Starting cycle dimming for ${lightId} - direction: ${direction} (brightness: ${localBrightness}%)`);
+
+      // Use the working generic ramp command that was working before
       const rampCommand = `19FEDB9F#${prefix}FF00150000FFFF`;
       await executeRawCommand(rampCommand);
 
-      // Start monitoring for auto-stop
-      startMonitoring(direction);
+      // Start monitoring for auto-stop and direction changes
+      startMonitoring();
 
     } catch (error) {
       setError(`Dimming failed: ${error.message}`);
-      console.error(`Error starting dimming:`, error);
+      console.error(`Error starting cycle dimming:`, error);
       stopDimming();
     }
   };
@@ -198,26 +207,27 @@ const SimpleHoldToDimLight = ({
     }
   };
 
-  // Monitor dimming progress
-  const startMonitoring = (direction) => {
+  // Monitor dimming progress - simplified version
+  const startMonitoring = () => {
     let lastBrightness = localBrightness;
     let unchangedCount = 0;
+    let checkCount = 0;
 
     monitoringIntervalRef.current = setInterval(async () => {
       if (!rampingRef.current) return;
 
       try {
-        // For now, just auto-stop after reasonable limits
+        checkCount++;
         const currentBrightness = localBrightness;
 
         // Auto-stop at limits
-        if (direction === 'down' && currentBrightness <= 10) {
+        if (currentBrightness <= 5) {
           console.log(`Reached minimum brightness, stopping`);
           stopDimming();
           return;
         }
         
-        if (direction === 'up' && currentBrightness >= 95) {
+        if (currentBrightness >= 95) {
           console.log(`Reached maximum brightness, stopping`);
           stopDimming();
           return;
@@ -226,7 +236,7 @@ const SimpleHoldToDimLight = ({
         // Stop if brightness hasn't changed for a while (stuck)
         if (Math.abs(currentBrightness - lastBrightness) < 2) {
           unchangedCount++;
-          if (unchangedCount >= 10) { // 1 second of no change
+          if (unchangedCount >= 20) { // 2 seconds of no change
             console.log(`Brightness stuck, stopping`);
             stopDimming();
             return;
@@ -236,6 +246,13 @@ const SimpleHoldToDimLight = ({
           lastBrightness = currentBrightness;
         }
 
+        // Safety timeout
+        if (checkCount >= 100) { // 10 seconds max
+          console.log(`Dimming timeout, stopping`);
+          stopDimming();
+          return;
+        }
+
       } catch (error) {
         console.error(`Error monitoring dimming:`, error);
         stopDimming();
@@ -243,14 +260,14 @@ const SimpleHoldToDimLight = ({
     }, 100);
   };
 
-  // Handle button press and hold
-  const handleDimButtonPress = (direction) => {
-    console.log(`🖱️ Button press: ${direction}`);
-    startDimming(direction);
+  // Handle cycle button press and release
+  const handleCycleButtonPress = () => {
+    console.log(`🔄 Cycle button pressed`);
+    startCycleDimming();
   };
 
-  const handleDimButtonRelease = (direction) => {
-    console.log(`🖱️ Button release: ${direction}`);
+  const handleCycleButtonRelease = () => {
+    console.log(`🔄 Cycle button released`);
     if (rampingRef.current) {
       stopDimming();
     }
@@ -268,7 +285,7 @@ const SimpleHoldToDimLight = ({
   const getBrightnessText = () => {
     if (error) return "ERROR";
     if (isDimming) {
-      return `${Math.round(localBrightness)}% ${dimmingDirection === 'up' ? '↗' : '↘'}`;
+      return `${Math.round(localBrightness)}% ⟲`;
     }
     return localIsOn ? `${Math.round(localBrightness)}%` : "OFF";
   };
@@ -342,59 +359,34 @@ const SimpleHoldToDimLight = ({
         </View>
       )}
 
-      {/* Dimming controls (only show if dimming is supported and light is on) */}
+      {/* Single cycle dimming control */}
       {supportsDimming && localIsOn && !error && (
         <View style={{ 
           flexDirection: 'row', 
-          justifyContent: 'space-between',
+          justifyContent: 'center',
           marginTop: 10,
           paddingHorizontal: 20
         }}>
-          {/* Dim Down Button */}
+          {/* Single Cycle Button */}
           <TouchableOpacity
             style={{
-              backgroundColor: isDimming && dimmingDirection === 'down' ? "#FFB267" : "#444",
-              paddingHorizontal: 20,
-              paddingVertical: 10,
-              borderRadius: 20,
-              flex: 1,
-              marginRight: 10,
-              alignItems: 'center'
+              backgroundColor: isDimming ? "#FFB267" : "#444",
+              paddingHorizontal: 30,
+              paddingVertical: 12,
+              borderRadius: 25,
+              alignItems: 'center',
+              minWidth: 200
             }}
-            onPressIn={() => handleDimButtonPress('down')}
-            onPressOut={() => handleDimButtonRelease('down')}
-            disabled={isDimming && dimmingDirection !== 'down'}
+            onPressIn={handleCycleButtonPress}
+            onPressOut={handleCycleButtonRelease}
+            disabled={false}
           >
             <Text style={{ 
-              color: isDimming && dimmingDirection === 'down' ? "#000" : "#FFF",
-              fontSize: 12,
+              color: isDimming ? "#000" : "#FFF",
+              fontSize: 14,
               fontWeight: 'bold'
             }}>
-              {isDimming && dimmingDirection === 'down' ? 'DIMMING ↘' : 'HOLD ↓'}
-            </Text>
-          </TouchableOpacity>
-          
-          {/* Dim Up Button */}
-          <TouchableOpacity
-            style={{
-              backgroundColor: isDimming && dimmingDirection === 'up' ? "#FFB267" : "#444",
-              paddingHorizontal: 20,
-              paddingVertical: 10,
-              borderRadius: 20,
-              flex: 1,
-              marginLeft: 10,
-              alignItems: 'center'
-            }}
-            onPressIn={() => handleDimButtonPress('up')}
-            onPressOut={() => handleDimButtonRelease('up')}
-            disabled={isDimming && dimmingDirection !== 'up'}
-          >
-            <Text style={{ 
-              color: isDimming && dimmingDirection === 'up' ? "#000" : "#FFF",
-              fontSize: 12,
-              fontWeight: 'bold'
-            }}>
-              {isDimming && dimmingDirection === 'up' ? 'DIMMING ↗' : 'HOLD ↑'}
+              {isDimming ? 'CYCLING ⟲' : 'HOLD TO CYCLE ⟲'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -402,14 +394,14 @@ const SimpleHoldToDimLight = ({
 
       {/* Instructions */}
       {supportsDimming && localIsOn && !isDimming && !error && (
-        <View style={{ marginTop: 5 }}>
+        <View style={{ marginTop: 8 }}>
           <Text style={{ 
             color: "#999", 
             fontSize: 10,
             textAlign: 'center',
             fontStyle: 'italic'
           }}>
-            Hold dimming buttons to adjust brightness
+            Hold button to cycle brightness (like Firefly tablet)
           </Text>
         </View>
       )}
