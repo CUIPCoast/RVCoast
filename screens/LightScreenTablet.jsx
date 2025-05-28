@@ -1,9 +1,9 @@
-// screens/LightScreenTablet.jsx - Updated with Firefly Ramp Dimming Support
+// screens/LightScreenTablet.jsx - Updated to use HoldToDimLight component
 import React, { useState, useEffect } from "react";
 import { View, Text, Image, ScrollView, Alert, ActivityIndicator, TouchableOpacity } from "react-native";
 import { Col, Row, Grid } from "react-native-easy-grid";
 import moment from "moment";
-import EnhancedMainLight from "../components/EnhancedMainLight.jsx";
+import HoldToDimLight from "../components/HoldToDimLight.jsx"; // Updated import
 import { LightControlService } from "../Service/LightControlService.js";
 import { CANBusMonitor } from "../Service/CANBusMonitor.js";
 import { LightingScenes } from "../API/rvAPI.js";
@@ -105,18 +105,17 @@ const ImprovedLightScreenTablet = () => {
     setTimeout(() => setShowStatus(false), duration);
   };
 
-  // Turn all lights on with ramp dimming
+  // Turn all lights on
   const handleAllLightsOn = async () => {
     try {
       setIsLoading(true);
       
-      // Use the traditional all lights on command first
       const result = await LightControlService.allLightsOn();
       
       if (result.success) {
         // Update RV State Manager for all lights
         allLights.forEach(lightId => {
-          rvStateManager.updateLightState(lightId, true, 100);
+          rvStateManager.updateLightState(lightId, true, 75); // Default to 75% brightness
         });
         
         setMasterLightOn(true);
@@ -181,28 +180,36 @@ const ImprovedLightScreenTablet = () => {
       
       showStatusMessage(`Applying ${scene.name}...`, 5000);
       
-      // Apply the scene with fade transition
-      const result = await LightingScenes.applyScene(scene, true);
-      
-      if (result.success) {
-        // Update RV State Manager with scene settings
-        Object.entries(scene.lights).forEach(([lightId, brightness]) => {
-          rvStateManager.updateLightState(lightId, brightness > 0, brightness);
-        });
-        
-        // Turn off lights not in the scene if resetFirst is true
-        if (scene.resetFirst) {
-          allLights.forEach(lightId => {
-            if (!scene.lights[lightId]) {
-              rvStateManager.updateLightState(lightId, false, 0);
-            }
-          });
-        }
-        
-        showStatusMessage(`${scene.name} applied successfully`);
-      } else {
-        showStatusMessage(`Failed to apply ${scene.name}`);
+      // Turn off all lights first if specified
+      if (scene.resetFirst) {
+        await handleAllLightsOff();
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
+      
+      // Apply each light setting individually using the light control service
+      for (const [lightId, brightness] of Object.entries(scene.lights)) {
+        try {
+          if (brightness > 0) {
+            // Turn on the light first
+            await LightControlService.turnOnLight(lightId);
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+            // Update state manager
+            rvStateManager.updateLightState(lightId, true, brightness);
+          } else {
+            // Turn off the light
+            await LightControlService.turnOffLight(lightId);
+            await new Promise(resolve => setTimeout(resolve, 200));
+            
+            // Update state manager
+            rvStateManager.updateLightState(lightId, false, 0);
+          }
+        } catch (lightError) {
+          console.error(`Error setting ${lightId} for scene:`, lightError);
+        }
+      }
+      
+      showStatusMessage(`${scene.name} applied successfully`);
     } catch (error) {
       showStatusMessage(`Error applying scene: ${error.message}`);
       console.error('Error applying scene:', error);
@@ -211,19 +218,6 @@ const ImprovedLightScreenTablet = () => {
       // Clear active scene after a delay
       setTimeout(() => setActiveScene(null), 2000);
     }
-  };
-
-  // Handle individual light dimming progress
-  const handleDimmingProgress = (lightId, isActive) => {
-    setActiveDimmingLights(prev => {
-      const newSet = new Set(prev);
-      if (isActive) {
-        newSet.add(lightId);
-      } else {
-        newSet.delete(lightId);
-      }
-      return newSet;
-    });
   };
 
   // Group lights by category
@@ -381,14 +375,14 @@ const ImprovedLightScreenTablet = () => {
                 }}
               />
               <Text className="text-white">Light Master</Text>
-              {activeDimmingLights.size > 0 && (
-                <View style={{ marginLeft: 10, flexDirection: 'row', alignItems: 'center' }}>
-                  <ActivityIndicator size="small" color="#FFB267" />
-                  <Text style={{ color: '#FFB267', fontSize: 10, marginLeft: 5 }}>
-                    Dimming ({activeDimmingLights.size})
-                  </Text>
-                </View>
-              )}
+              <Text style={{ 
+                color: '#FFB267', 
+                fontSize: 12, 
+                marginLeft: 10,
+                fontStyle: 'italic'
+              }}>
+                Hold-to-Dim Mode
+              </Text>
             </View>
             
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -511,16 +505,13 @@ const ImprovedLightScreenTablet = () => {
 
             <ScrollView style={{ marginTop: 35 }}>
               {lightGroups.kitchen.map((lightId) => (
-                <EnhancedMainLight
+                <HoldToDimLight
                   key={lightId}
                   name={getLightDisplayName(lightId)}
                   lightId={lightId}
-                  min={0}
-                  max={100}
                   value={lightBrightness[lightId] || 0}
                   isOn={lightStates[lightId] || false}
                   supportsDimming={supportsDimming}
-                  onDimmingStatusChange={(isActive) => handleDimmingProgress(lightId, isActive)}
                 />
               ))}
             </ScrollView>
@@ -569,16 +560,13 @@ const ImprovedLightScreenTablet = () => {
 
             <ScrollView style={{ marginTop: 35 }}>
               {lightGroups.bedroom.map((lightId) => (
-                <EnhancedMainLight
+                <HoldToDimLight
                   key={lightId}
                   name={getLightDisplayName(lightId)}
                   lightId={lightId}
-                  min={0}
-                  max={100}
                   value={lightBrightness[lightId] || 0}
                   isOn={lightStates[lightId] || false}
                   supportsDimming={supportsDimming}
-                  onDimmingStatusChange={(isActive) => handleDimmingProgress(lightId, isActive)}
                 />
               ))}
             </ScrollView>
@@ -627,16 +615,13 @@ const ImprovedLightScreenTablet = () => {
 
             <ScrollView style={{ marginTop: 35 }}>
               {lightGroups.bathroom.map((lightId) => (
-                <EnhancedMainLight
+                <HoldToDimLight
                   key={lightId}
                   name={getLightDisplayName(lightId)}
                   lightId={lightId}
-                  min={0}
-                  max={100}
                   value={lightBrightness[lightId] || 0}
                   isOn={lightStates[lightId] || false}
                   supportsDimming={supportsDimming}
-                  onDimmingStatusChange={(isActive) => handleDimmingProgress(lightId, isActive)}
                 />
               ))}
             </ScrollView>

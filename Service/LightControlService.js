@@ -1,25 +1,45 @@
-// Service/LightControlService.js - Fixed version with proper method definitions
+// Service/LightControlService.js - Updated with _executeRawCommand method
 import { RVControlService } from '../API/rvAPI';
 
 // Make the API base URL accessible
-RVControlService.baseURL = 'http://192.168.8.200:3000/api';
+if (!RVControlService.baseURL) {
+  RVControlService.baseURL = 'http://192.168.8.200:3000/api';
+}
 
 // Store active dimming operations to prevent conflicts
 const activeDimmingOperations = new Map();
 
+// Light ID to hex prefix mapping
+const lightPrefixMap = {
+  bath_light: '15',
+  vibe_light: '16',
+  vanity_light: '17',
+  dinette_lights: '18',
+  awning_lights: '19',
+  kitchen_lights: '1A',
+  bed_ovhd_light: '1B',
+  shower_lights: '1C',
+  under_cab_lights: '1D',
+  hitch_lights: '1E',
+  porch_lights: '1F',
+  strip_lights: '20',
+  left_reading_lights: '22',
+  right_reading_lights: '23',
+};
+
 export const LightControlService = {
   /**
-   * Toggle a light on or off
-   * @param {string} lightId
+   * Execute a raw CAN command (internal method)
+   * @private
    */
-  toggleLight: async (lightId) => {
+  _executeRawCommand: async function(command) {
     try {
-      const toggleCommand = `${lightId}_toggle`;
-      const result = await RVControlService.executeCommand(toggleCommand);
-      return { success: true, result };
+      console.log(`Executing raw command: ${command}`);
+      const result = await RVControlService.executeRawCommand(command);
+      return result;
     } catch (error) {
-      console.error(`Failed to toggle light (${lightId}):`, error);
-      return { success: false, error: error.message };
+      console.error(`Failed to execute raw command ${command}:`, error);
+      throw error;
     }
   },
 
@@ -27,36 +47,24 @@ export const LightControlService = {
    * Turn on a light to full brightness
    * @param {string} lightId
    */
-  turnOnLight: async (lightId) => {
+  turnOnLight: async function(lightId) {
     try {
-      const lightPrefixMap = {
-        bath_light: '15',
-        vibe_light: '16',
-        vanity_light: '17',
-        dinette_lights: '18',
-        awning_lights: '19',
-        kitchen_lights: '1A',
-        bed_ovhd_light: '1B',
-        shower_lights: '1C',
-        under_cab_lights: '1D',
-        hitch_lights: '1E',
-        porch_lights: '1F',
-        strip_lights: '20',
-        left_reading_lights: '22',
-        right_reading_lights: '23',
-      };
+      console.log(`LightControlService: Turning on ${lightId}`);
       
       const prefix = lightPrefixMap[lightId];
-      if (!prefix) throw new Error(`Unknown light: ${lightId}`);
+      if (!prefix) {
+        throw new Error(`Unknown light: ${lightId}`);
+      }
 
       // Use command 1 (ON) to turn light to 100%: XXFFC801FF00FFFF
       const onCmd = `19FEDB9F#${prefix}FFC801FF00FFFF`;
       console.log(`→ Turning ON ${lightId} → ${onCmd}`);
 
-      const result = await RVControlService.executeRawCommand(onCmd);
+      const result = await this._executeRawCommand(onCmd);
+      console.log(`✓ Successfully turned on ${lightId}`);
       return { success: true, result };
     } catch (error) {
-      console.error(`Failed to turn on light (${lightId}):`, error);
+      console.error(`✗ Failed to turn on light (${lightId}):`, error);
       return { success: false, error: error.message };
     }
   },
@@ -65,41 +73,135 @@ export const LightControlService = {
    * Turn off a light
    * @param {string} lightId
    */
-  turnOffLight: async (lightId) => {
+  turnOffLight: async function(lightId) {
     try {
+      console.log(`LightControlService: Turning off ${lightId}`);
+      
       // Cancel any active dimming operation first
       if (activeDimmingOperations.has(lightId)) {
         activeDimmingOperations.delete(lightId);
       }
 
-      const lightPrefixMap = {
-        bath_light: '15',
-        vibe_light: '16',
-        vanity_light: '17',
-        dinette_lights: '18',
-        awning_lights: '19',
-        kitchen_lights: '1A',
-        bed_ovhd_light: '1B',
-        shower_lights: '1C',
-        under_cab_lights: '1D',
-        hitch_lights: '1E',
-        porch_lights: '1F',
-        strip_lights: '20',
-        left_reading_lights: '22',
-        right_reading_lights: '23',
-      };
-      
       const prefix = lightPrefixMap[lightId];
-      if (!prefix) throw new Error(`Unknown light: ${lightId}`);
+      if (!prefix) {
+        throw new Error(`Unknown light: ${lightId}`);
+      }
 
       // Use command 3 (OFF): XXFF0003FF00FFFF
       const offCmd = `19FEDB9F#${prefix}FF0003FF00FFFF`;
       console.log(`→ Turning OFF ${lightId} → ${offCmd}`);
 
-      const result = await RVControlService.executeRawCommand(offCmd);
+      const result = await this._executeRawCommand(offCmd);
+      console.log(`✓ Successfully turned off ${lightId}`);
       return { success: true, result };
     } catch (error) {
-      console.error(`Failed to turn off light (${lightId}):`, error);
+      console.error(`✗ Failed to turn off light (${lightId}):`, error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
+   * Toggle a light on or off
+   * @param {string} lightId
+   */
+  toggleLight: async function(lightId) {
+    try {
+      console.log(`LightControlService: Toggling ${lightId}`);
+      
+      const toggleCommand = `${lightId}_toggle`;
+      const result = await RVControlService.executeCommand(toggleCommand);
+      console.log(`✓ Successfully toggled ${lightId}`);
+      return { success: true, result };
+    } catch (error) {
+      console.error(`✗ Failed to toggle light (${lightId}):`, error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
+   * Start ramping a light up (for hold-to-dim functionality)
+   * @param {string} lightId
+   */
+  startRampingUp: async function(lightId) {
+    try {
+      console.log(`LightControlService: Starting ramp UP for ${lightId}`);
+      
+      const prefix = lightPrefixMap[lightId];
+      if (!prefix) {
+        throw new Error(`Unknown light: ${lightId}`);
+      }
+
+      // Use command 13 (0x0D) for ramp up: XXFF000D0000FFFF
+      const rampUpCmd = `19FEDB9F#${prefix}FF000D0000FFFF`;
+      console.log(`→ Starting ramp UP for ${lightId} → ${rampUpCmd}`);
+
+      const result = await this._executeRawCommand(rampUpCmd);
+      console.log(`✓ Successfully started ramping UP ${lightId}`);
+      return { success: true, result };
+    } catch (error) {
+      console.error(`✗ Failed to start ramping UP (${lightId}):`, error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
+   * Start ramping a light down (for hold-to-dim functionality)
+   * @param {string} lightId
+   */
+  startRampingDown: async function(lightId) {
+    try {
+      console.log(`LightControlService: Starting ramp DOWN for ${lightId}`);
+      
+      const prefix = lightPrefixMap[lightId];
+      if (!prefix) {
+        throw new Error(`Unknown light: ${lightId}`);
+      }
+
+      // Use command 14 (0x0E) for ramp down: XXFF000E0000FFFF
+      const rampDownCmd = `19FEDB9F#${prefix}FF000E0000FFFF`;
+      console.log(`→ Starting ramp DOWN for ${lightId} → ${rampDownCmd}`);
+
+      const result = await this._executeRawCommand(rampDownCmd);
+      console.log(`✓ Successfully started ramping DOWN ${lightId}`);
+      return { success: true, result };
+    } catch (error) {
+      console.error(`✗ Failed to start ramping DOWN (${lightId}):`, error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
+   * Start ramping a light (for hold-to-dim functionality) - DEPRECATED
+   * Use startRampingUp or startRampingDown instead
+   * @param {string} lightId
+   */
+  startRamping: async function(lightId) {
+    console.warn('startRamping is deprecated, use startRampingUp or startRampingDown instead');
+    return await this.startRampingUp(lightId);
+  },
+
+  /**
+   * Stop ramping a light
+   * @param {string} lightId
+   */
+  stopRamping: async function(lightId) {
+    try {
+      console.log(`LightControlService: Stopping ramp for ${lightId}`);
+      
+      const prefix = lightPrefixMap[lightId];
+      if (!prefix) {
+        throw new Error(`Unknown light: ${lightId}`);
+      }
+
+      // Use command 4 (stop): XXFF00040000FFFF
+      const stopCmd = `19FEDB9F#${prefix}FF00040000FFFF`;
+      console.log(`→ Stopping ramp for ${lightId} → ${stopCmd}`);
+
+      const result = await this._executeRawCommand(stopCmd);
+      console.log(`✓ Successfully stopped ramping ${lightId}`);
+      return { success: true, result };
+    } catch (error) {
+      console.error(`✗ Failed to stop ramping (${lightId}):`, error);
       return { success: false, error: error.message };
     }
   },
@@ -110,34 +212,20 @@ export const LightControlService = {
    * @param {number} targetPercentage 0–100
    * @param {function} onProgress Optional callback for progress updates
    */
-  setBrightness: async (lightId, targetPercentage, onProgress = null) => {
+  setBrightness: async function(lightId, targetPercentage, onProgress = null) {
     try {
+      console.log(`LightControlService: Setting brightness for ${lightId} to ${targetPercentage}%`);
+      
       // Prevent multiple dimming operations on the same light
       if (activeDimmingOperations.has(lightId)) {
         console.log(`Dimming operation already in progress for ${lightId}`);
         return { success: false, error: 'Dimming operation already in progress' };
       }
 
-      // Map logical ID to Firefly instance hex
-      const lightPrefixMap = {
-        bath_light: '15',
-        vibe_light: '16', 
-        vanity_light: '17',
-        dinette_lights: '18',
-        awning_lights: '19',
-        kitchen_lights: '1A',
-        bed_ovhd_light: '1B',
-        shower_lights: '1C',
-        under_cab_lights: '1D',
-        hitch_lights: '1E',
-        porch_lights: '1F',
-        strip_lights: '20',
-        left_reading_lights: '22',
-        right_reading_lights: '23',
-      };
-
       const prefix = lightPrefixMap[lightId];
-      if (!prefix) throw new Error(`Unknown light: ${lightId}`);
+      if (!prefix) {
+        throw new Error(`Unknown light: ${lightId}`);
+      }
 
       // Handle turning off
       if (targetPercentage <= 0) {
@@ -146,6 +234,7 @@ export const LightControlService = {
 
       // Ensure light is on first if targeting a brightness > 0
       if (targetPercentage > 0) {
+        console.log(`Ensuring ${lightId} is on before dimming`);
         await this.turnOnLight(lightId);
         // Small delay to ensure light is on before dimming
         await new Promise(resolve => setTimeout(resolve, 200));
@@ -163,6 +252,7 @@ export const LightControlService = {
       try {
         // Start the ramping process
         const result = await this._performRampDimming(lightId, prefix, targetPercentage, onProgress);
+        console.log(`✓ Brightness set for ${lightId}: ${JSON.stringify(result)}`);
         return result;
       } finally {
         // Always clean up the active operation
@@ -170,7 +260,7 @@ export const LightControlService = {
       }
 
     } catch (error) {
-      console.error(`Failed to set brightness for ${lightId}:`, error);
+      console.error(`✗ Failed to set brightness for ${lightId}:`, error);
       activeDimmingOperations.delete(lightId);
       return { success: false, error: error.message };
     }
@@ -180,7 +270,7 @@ export const LightControlService = {
    * Perform the actual ramp dimming using Firefly commands
    * @private
    */
-  _performRampDimming: async (lightId, prefix, targetPercentage, onProgress) => {
+  _performRampDimming: async function(lightId, prefix, targetPercentage, onProgress) {
     // Get current brightness by monitoring CAN bus
     let currentBrightness = await this._getCurrentBrightness(lightId);
     console.log(`Current brightness for ${lightId}: ${currentBrightness}%`);
@@ -200,7 +290,7 @@ export const LightControlService = {
     
     // Start ramping
     console.log(`→ Starting ramp: ${rampCommand}`);
-    await RVControlService.executeRawCommand(rampCommand);
+    await this._executeRawCommand(rampCommand);
 
     // Monitor brightness and stop when we reach target
     return new Promise(async (resolve) => {
@@ -293,12 +383,12 @@ export const LightControlService = {
    * Stop ramping by sending stop command
    * @private
    */
-  _stopRamping: async (prefix) => {
+  _stopRamping: async function(prefix) {
     try {
       // Build stop command: XXFF00040000FFFF (command 4 = 0x04 = stop)
       const stopCommand = `19FEDB9F#${prefix}FF00040000FFFF`;
       console.log(`→ Stopping ramp: ${stopCommand}`);
-      await RVControlService.executeRawCommand(stopCommand);
+      await this._executeRawCommand(stopCommand);
       
       // Small delay to ensure stop command is processed
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -312,11 +402,12 @@ export const LightControlService = {
    * Get current brightness by querying the CAN bus or using cached state
    * @private
    */
-  _getCurrentBrightness: async (lightId) => {
+  _getCurrentBrightness: async function(lightId) {
     try {
       // Try to get from RV State Manager first
       try {
-        const rvStateManager = require('../API/RVStateManager/RVStateManager').default;
+        // Use dynamic import to avoid circular dependencies
+        const rvStateManager = (await import('../API/RVStateManager/RVStateManager')).default;
         const lightState = rvStateManager.getCategoryState('lights')[lightId];
         
         if (lightState && lightState.brightness !== undefined) {
@@ -353,20 +444,12 @@ export const LightControlService = {
    * Cancel an active dimming operation
    * @param {string} lightId
    */
-  cancelDimming: async (lightId) => {
+  cancelDimming: async function(lightId) {
     if (activeDimmingOperations.has(lightId)) {
       const operation = activeDimmingOperations.get(lightId);
       activeDimmingOperations.delete(lightId);
       
       // Stop the ramping
-      const lightPrefixMap = {
-        bath_light: '15', vibe_light: '16', vanity_light: '17',
-        dinette_lights: '18', awning_lights: '19', kitchen_lights: '1A',
-        bed_ovhd_light: '1B', shower_lights: '1C', under_cab_lights: '1D',
-        hitch_lights: '1E', porch_lights: '1F', strip_lights: '20',
-        left_reading_lights: '22', right_reading_lights: '23',
-      };
-      
       const prefix = lightPrefixMap[lightId];
       if (prefix) {
         await this._stopRamping(prefix);
@@ -382,7 +465,7 @@ export const LightControlService = {
   /**
    * Get active dimming operations (for debugging)
    */
-  getActiveDimmingOperations: () => {
+  getActiveDimmingOperations: function() {
     const operations = {};
     for (const [lightId, operation] of activeDimmingOperations.entries()) {
       operations[lightId] = {
@@ -393,49 +476,69 @@ export const LightControlService = {
     return operations;
   },
 
-  allLightsOn: async () => {
+  /**
+   * Turn all lights on
+   */
+  allLightsOn: async function() {
     try {
+      console.log('LightControlService: Turning all lights on');
       const result = await RVControlService.executeCommand('all_lights_on');
+      console.log('✓ All lights turned on');
       return { success: true, result };
     } catch (error) {
-      console.error('Failed to turn all lights on:', error);
+      console.error('✗ Failed to turn all lights on:', error);
       return { success: false, error: error.message };
     }
   },
 
-  allLightsOff: async () => {
+  /**
+   * Turn all lights off
+   */
+  allLightsOff: async function() {
     try {
+      console.log('LightControlService: Turning all lights off');
+      
       // Cancel all active dimming operations
       for (const lightId of activeDimmingOperations.keys()) {
         await this.cancelDimming(lightId);
       }
       
       const result = await RVControlService.executeCommand('all_lights_off');
+      console.log('✓ All lights turned off');
       return { success: true, result };
     } catch (error) {
-      console.error('Failed to turn all lights off:', error);
+      console.error('✗ Failed to turn all lights off:', error);
       return { success: false, error: error.message };
     }
   },
 
-  supportsDimming: () => true, // Now we support ramping-based dimming!
+  /**
+   * Check if dimming is supported
+   */
+  supportsDimming: function() {
+    return true; // We now support ramping-based dimming!
+  },
 
-  getAllLights: () => [
-    'kitchen_lights',
-    'bath_light', 
-    'bed_ovhd_light',
-    'vibe_light',
-    'vanity_light',
-    'awning_lights',
-    'shower_lights',
-    'under_cab_lights',
-    'hitch_lights',
-    'porch_lights',
-    'left_reading_lights',
-    'right_reading_lights',
-    'dinette_lights',
-    'strip_lights',
-  ],
+  /**
+   * Get all available lights
+   */
+  getAllLights: function() {
+    return Object.keys(lightPrefixMap);
+  },
+
+  /**
+   * Get light prefix for a given light ID
+   */
+  getLightPrefix: function(lightId) {
+    return lightPrefixMap[lightId];
+  }
 };
+
+// Ensure all methods are properly bound
+Object.keys(LightControlService).forEach(key => {
+  if (typeof LightControlService[key] === 'function') {
+    LightControlService[key] = LightControlService[key].bind(LightControlService);
+  }
+});
 
 export default LightControlService;

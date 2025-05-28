@@ -1,4 +1,4 @@
-// components/EnhancedMainLight.jsx - Updated with Firefly Ramp Dimming Support
+// components/EnhancedMainLight.jsx - Fixed with better error handling
 import React, { useState, useEffect, useRef } from "react";
 import { View, Text, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
 import Slider from "@react-native-community/slider";
@@ -20,6 +20,7 @@ const EnhancedMainLight = ({
   const [isToggling, setIsToggling] = useState(false);
   const [isDimming, setIsDimming] = useState(false);
   const [dimmingProgress, setDimmingProgress] = useState(null);
+  const [error, setError] = useState(null);
   
   // Track last executed brightness to prevent unnecessary commands
   const [lastExecutedBrightness, setLastExecutedBrightness] = useState(value);
@@ -27,6 +28,14 @@ const EnhancedMainLight = ({
   // Debouncing for slider changes
   const sliderTimeout = useRef(null);
   const lastSliderChange = useRef(Date.now());
+
+  // Clear error after some time
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
 
   // Sync with global state from RV State Manager
   useEffect(() => {
@@ -51,11 +60,29 @@ const EnhancedMainLight = ({
     return unsubscribe;
   }, [lightId]);
 
+  // Validate that LightControlService methods exist
+  const validateService = () => {
+    if (!LightControlService) {
+      throw new Error('LightControlService is not available');
+    }
+    
+    const requiredMethods = ['turnOnLight', 'turnOffLight', 'setBrightness', 'cancelDimming'];
+    const missingMethods = requiredMethods.filter(method => 
+      typeof LightControlService[method] !== 'function'
+    );
+    
+    if (missingMethods.length > 0) {
+      throw new Error(`LightControlService missing methods: ${missingMethods.join(', ')}`);
+    }
+  };
+
   // Handle toggle (on/off)
   const handleToggle = async () => {
     if (isToggling || isDimming) return;
 
     try {
+      validateService();
+      setError(null);
       setIsToggling(true);
       
       if (localIsOn) {
@@ -63,14 +90,16 @@ const EnhancedMainLight = ({
         console.log(`Turning off ${lightId}`);
         const result = await LightControlService.turnOffLight(lightId);
         
-        if (result.success) {
+        if (result && result.success) {
           // Update RV State Manager
           rvStateManager.updateLightState(lightId, false, 0);
           setLocalIsOn(false);
           setLocalBrightness(0);
           setLastExecutedBrightness(0);
         } else {
-          Alert.alert("Error", `Failed to turn off ${name}`);
+          const errorMsg = result?.error || 'Unknown error occurred';
+          setError(`Failed to turn off: ${errorMsg}`);
+          console.error(`Failed to turn off ${name}:`, errorMsg);
         }
       } else {
         // Turn on to previous brightness or 100%
@@ -84,20 +113,23 @@ const EnhancedMainLight = ({
           // Turn on to full brightness
           const result = await LightControlService.turnOnLight(lightId);
           
-          if (result.success) {
+          if (result && result.success) {
             // Update RV State Manager
             rvStateManager.updateLightState(lightId, true, 100);
             setLocalIsOn(true);
             setLocalBrightness(100);
             setLastExecutedBrightness(100);
           } else {
-            Alert.alert("Error", `Failed to turn on ${name}`);
+            const errorMsg = result?.error || 'Unknown error occurred';
+            setError(`Failed to turn on: ${errorMsg}`);
+            console.error(`Failed to turn on ${name}:`, errorMsg);
           }
         }
       }
     } catch (error) {
+      const errorMsg = error.message || 'Unknown error occurred';
+      setError(errorMsg);
       console.error(`Error toggling ${lightId}:`, error);
-      Alert.alert("Error", `Failed to toggle ${name}: ${error.message}`);
     } finally {
       setIsToggling(false);
     }
@@ -106,6 +138,15 @@ const EnhancedMainLight = ({
   // Handle brightness changes with debouncing and ramp dimming
   const handleBrightnessChange = async (newBrightness, immediate = false) => {
     if (!supportsDimming) return;
+    
+    try {
+      validateService();
+      setError(null);
+    } catch (validationError) {
+      setError(validationError.message);
+      console.error('Service validation failed:', validationError);
+      return;
+    }
     
     // Update local state immediately for smooth UI
     setLocalBrightness(newBrightness);
@@ -150,7 +191,7 @@ const EnhancedMainLight = ({
         // Execute ramp dimming
         const result = await LightControlService.setBrightness(lightId, newBrightness, onProgress);
         
-        if (result.success) {
+        if (result && result.success) {
           const finalBrightness = result.brightness || newBrightness;
           
           // Update final state
@@ -165,19 +206,20 @@ const EnhancedMainLight = ({
             console.log(`Brightness limit reached for ${lightId}`);
           }
         } else {
-          console.error(`Failed to set brightness for ${lightId}:`, result.error);
+          const errorMsg = result?.error || 'Unknown error occurred';
+          setError(`Dimming failed: ${errorMsg}`);
+          console.error(`Failed to set brightness for ${lightId}:`, errorMsg);
           
           // Revert to last known good state
           const currentState = rvStateManager.getCategoryState('lights')?.[lightId];
           if (currentState) {
             setLocalBrightness(currentState.brightness || 0);
           }
-          
-          Alert.alert("Dimming Error", `Failed to dim ${name}: ${result.error}`);
         }
       } catch (error) {
+        const errorMsg = error.message || 'Unknown error occurred';
+        setError(`Dimming error: ${errorMsg}`);
         console.error(`Error setting brightness for ${lightId}:`, error);
-        Alert.alert("Error", `Failed to dim ${name}: ${error.message}`);
       } finally {
         setIsDimming(false);
         setDimmingProgress(null);
@@ -197,10 +239,14 @@ const EnhancedMainLight = ({
   const handleCancelDimming = async () => {
     if (isDimming) {
       try {
+        validateService();
         await LightControlService.cancelDimming(lightId);
         setIsDimming(false);
         setDimmingProgress(null);
+        setError(null);
       } catch (error) {
+        const errorMsg = error.message || 'Unknown error occurred';
+        setError(`Cancel failed: ${errorMsg}`);
         console.error(`Error cancelling dimming for ${lightId}:`, error);
       }
     }
@@ -208,6 +254,7 @@ const EnhancedMainLight = ({
 
   // Get display color based on state
   const getDisplayColor = () => {
+    if (error) return "#FF6B6B"; // Red for error
     if (isDimming) return "#FFB267"; // Orange while dimming
     if (localIsOn) return "#FFB267"; // Orange when on
     return "#666"; // Gray when off
@@ -215,6 +262,7 @@ const EnhancedMainLight = ({
 
   // Get brightness percentage for display
   const getBrightnessText = () => {
+    if (error) return "ERROR";
     if (isDimming && dimmingProgress) {
       return `${Math.round(dimmingProgress.current)}% → ${dimmingProgress.target}%`;
     }
@@ -277,8 +325,21 @@ const EnhancedMainLight = ({
         </TouchableOpacity>
       </View>
 
+      {/* Error message */}
+      {error && (
+        <View style={{ marginTop: 5 }}>
+          <Text style={{ 
+            color: "#FF6B6B", 
+            fontSize: 10,
+            textAlign: 'center'
+          }}>
+            {error}
+          </Text>
+        </View>
+      )}
+
       {/* Dimming slider (only show if dimming is supported and light is on) */}
-      {supportsDimming && localIsOn && (
+      {supportsDimming && localIsOn && !error && (
         <View style={{ marginTop: 5 }}>
           <View style={{ 
             flexDirection: 'row', 
