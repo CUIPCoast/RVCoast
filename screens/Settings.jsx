@@ -4,7 +4,7 @@ import GroupComponent from "../components/GroupComponent";
 import { Border, Color, Gap, FontSize, FontFamily , isDarkMode} from "../GlobalStyles";
 import useScreenSize from "../helper/useScreenSize.jsx";
 import { Col, Row, Grid } from "react-native-easy-grid";
-import ToggleSwitch from "../components/ToggleSwitch.jsx";
+
 import moment from 'moment'; 
 
 
