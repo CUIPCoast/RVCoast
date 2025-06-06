@@ -12,6 +12,11 @@ import {
 } from "../GlobalStyles";
 import { RadialSlider } from 'react-native-radial-slider';
 import useScreenSize from "../helper/useScreenSize.jsx";
+
+// Import RV State Management hooks
+import { useRVClimate } from "../API/RVStateManager/RVStateHooks";
+import rvStateManager from "../API/RVStateManager/RVStateManager";
+
 // Import the API services
 import { RVControlService, RVControls } from "../API/rvAPI";
 import { ClimateService } from "../API/RVControlServices";
@@ -19,66 +24,88 @@ import { ClimateService } from "../API/RVControlServices";
 const AirCon = ({ onClose }) => {
   const isTablet = useScreenSize();
   
-  // State for cooling and heating (toe kick) - both can be on at the same time now
-  const [coolingOn, setCoolingOn] = useState(false);
-  const [toeKickOn, setToeKickOn] = useState(false);
+  // Use RV state management hook for climate data
+  const { climate, setTemperature, toggleCooling, toggleHeating } = useRVClimate();
   
-  // Temperature state
+  // Local state for UI interactions and status
   const [temp, setTemp] = useState(72);
   const [lastTemp, setLastTemp] = useState(72);
-  
-  // Status message for user feedback
   const [statusMessage, setStatusMessage] = useState('');
   const [showStatus, setShowStatus] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   
-  // Load saved temperature
+  // Initialize state from RV state manager
   useEffect(() => {
-    const getTemp = async () => {
-      const savedTemp = await AsyncStorage.getItem('temperature');
-      if (savedTemp) {
-        setTemp(parseInt(savedTemp, 10));
-        setLastTemp(parseInt(savedTemp, 10));
-      } else {
+    const initializeState = async () => {
+      try {
+        // Get current climate state from RV state manager
+        const currentClimateState = rvStateManager.getCategoryState('climate');
+        
+        // Set temperature from state or AsyncStorage
+        if (currentClimateState.temperature) {
+          setTemp(currentClimateState.temperature);
+          setLastTemp(currentClimateState.temperature);
+        } else {
+          // Fall back to AsyncStorage for backwards compatibility
+          const savedTemp = await AsyncStorage.getItem('temperature');
+          if (savedTemp) {
+            const tempValue = parseInt(savedTemp, 10);
+            setTemp(tempValue);
+            setLastTemp(tempValue);
+            // Update RV state with loaded temperature
+            rvStateManager.updateClimateState({ temperature: tempValue });
+          } else {
+            setTemp(72);
+            setLastTemp(72);
+            rvStateManager.updateClimateState({ temperature: 72 });
+          }
+        }
+      } catch (error) {
+        console.error('Error initializing AirCon state:', error);
+        // Set default values on error
         setTemp(72);
         setLastTemp(72);
       }
     };
-    getTemp();
+    
+    initializeState();
   }, []);
-  
-  // Save temperature changes
+
+  // Subscribe to external state changes (from other devices/screens)
   useEffect(() => {
-    if (temp !== null) {
-      AsyncStorage.setItem('temperature', temp.toString());
-    }
+    const unsubscribe = rvStateManager.subscribeToExternalChanges((newState) => {
+      if (newState.climate) {
+        // Update local state when external changes occur
+        if (newState.climate.temperature && newState.climate.temperature !== temp) {
+          setTemp(newState.climate.temperature);
+          setLastTemp(newState.climate.temperature);
+          
+          // Show notification of external change
+          setStatusMessage(`Temperature updated remotely to ${newState.climate.temperature}°F`);
+          setShowStatus(true);
+          setTimeout(() => setShowStatus(false), 3000);
+        }
+      }
+    });
+    
+    return unsubscribe;
   }, [temp]);
-  
-  // Load cooling state
-  useEffect(() => {
-    const loadCoolingState = async () => {
-      const savedCoolingState = await AsyncStorage.getItem('coolingState');
-      setCoolingOn(savedCoolingState ? JSON.parse(savedCoolingState) : false);
-    };
-    loadCoolingState();
-  }, []);
-  
-  // Load toe kick state
-  useEffect(() => {
-    const loadToeKickState = async () => {
-      const savedToeKickState = await AsyncStorage.getItem('toeKickState');
-      setToeKickOn(savedToeKickState ? JSON.parse(savedToeKickState) : false);
-    };
-    loadToeKickState();
-  }, []);
-  
-  // Handle cooling toggle
+
+  // Handle cooling toggle with state management
   const handleCoolingToggle = async () => {
-    const newCoolingState = !coolingOn;
-    setCoolingOn(newCoolingState);
-    await AsyncStorage.setItem('coolingState', JSON.stringify(newCoolingState));
+    if (isProcessing) return;
+    
+    setIsProcessing(true);
+    const newCoolingState = !climate.coolingOn;
     
     try {
-      // Use the appropriate service method based on the state
+      // Update RV state first for immediate UI feedback
+      rvStateManager.updateClimateState({ 
+        coolingOn: newCoolingState,
+        lastUpdated: new Date().toISOString()
+      });
+      
+      // Execute API command
       if (newCoolingState) {
         await ClimateService.toggleCooling(); // Turn cooling on
       } else {
@@ -87,31 +114,47 @@ const AirCon = ({ onClose }) => {
       
       console.log(`Cooling ${newCoolingState ? 'turned on' : 'turned off'}`);
       
-      // Show status message
+      // Update AsyncStorage for backwards compatibility
+      await AsyncStorage.setItem('coolingState', JSON.stringify(newCoolingState));
+      
+      // Show success status
       setStatusMessage(`Cooling ${newCoolingState ? 'turned on' : 'turned off'}`);
       setShowStatus(true);
       setTimeout(() => setShowStatus(false), 3000);
+      
     } catch (error) {
       console.error('Error toggling cooling:', error);
-      // Revert the UI state if the API call fails
-      setCoolingOn(!newCoolingState);
-      await AsyncStorage.setItem('coolingState', JSON.stringify(!newCoolingState));
+      
+      // Revert state on error
+      rvStateManager.updateClimateState({ 
+        coolingOn: !newCoolingState,
+        lastUpdated: new Date().toISOString()
+      });
       
       // Show error message
       setStatusMessage('Failed to toggle cooling');
       setShowStatus(true);
       setTimeout(() => setShowStatus(false), 3000);
+    } finally {
+      setIsProcessing(false);
     }
   };
   
-  // Handle toe kick toggle
+  // Handle toe kick toggle with state management
   const handleToeKickToggle = async () => {
-    const newToeKickState = !toeKickOn;
-    setToeKickOn(newToeKickState);
-    await AsyncStorage.setItem('toeKickState', JSON.stringify(newToeKickState));
+    if (isProcessing) return;
+    
+    setIsProcessing(true);
+    const newToeKickState = !climate.toeKickOn;
     
     try {
-      // Use the appropriate service method based on the state
+      // Update RV state first for immediate UI feedback
+      rvStateManager.updateClimateState({ 
+        toeKickOn: newToeKickState,
+        lastUpdated: new Date().toISOString()
+      });
+      
+      // Execute API command
       if (newToeKickState) {
         await ClimateService.toggleToeKick(); // Turn toe kick on
       } else {
@@ -120,32 +163,50 @@ const AirCon = ({ onClose }) => {
       
       console.log(`Toe Kick ${newToeKickState ? 'turned on' : 'turned off'}`);
       
-      // Show status message
+      // Update AsyncStorage for backwards compatibility
+      await AsyncStorage.setItem('toeKickState', JSON.stringify(newToeKickState));
+      
+      // Show success status
       setStatusMessage(`Toe Kick ${newToeKickState ? 'turned on' : 'turned off'}`);
       setShowStatus(true);
       setTimeout(() => setShowStatus(false), 3000);
+      
     } catch (error) {
       console.error('Error toggling toe kick:', error);
-      // Revert the UI state if the API call fails
-      setToeKickOn(!newToeKickState);
-      await AsyncStorage.setItem('toeKickState', JSON.stringify(!newToeKickState));
+      
+      // Revert state on error
+      rvStateManager.updateClimateState({ 
+        toeKickOn: !newToeKickState,
+        lastUpdated: new Date().toISOString()
+      });
       
       // Show error message
       setStatusMessage('Failed to toggle toe kick');
       setShowStatus(true);
       setTimeout(() => setShowStatus(false), 3000);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  // Handle temperature change with debounce
+  // Handle temperature change with debounce and state management
   const handleTempChange = (newTemp) => {
     setTemp(newTemp);
+    
+    // Update RV state immediately for UI responsiveness
+    rvStateManager.updateClimateState({ 
+      temperature: newTemp,
+      lastUpdated: new Date().toISOString()
+    });
   };
   
   // Send temperature changes to API when temp changes
   useEffect(() => {
     const sendTempChange = async () => {
-      if (temp === lastTemp || (!coolingOn && !toeKickOn)) return;
+      if (temp === lastTemp || (!climate.coolingOn && !climate.toeKickOn)) return;
+      if (isProcessing) return;
+      
+      setIsProcessing(true);
       
       try {
         // Determine if we need to increase or decrease temperature
@@ -158,11 +219,6 @@ const AirCon = ({ onClose }) => {
             await new Promise(resolve => setTimeout(resolve, 100));
           }
           console.log(`Temperature increased to ${temp}°F`);
-          
-          // Show status message
-          setStatusMessage(`Temperature set to ${temp}°F`);
-          setShowStatus(true);
-          setTimeout(() => setShowStatus(false), 2000);
         } else {
           // Send temperature decrease command based on the difference
           const steps = lastTemp - temp;
@@ -172,30 +228,47 @@ const AirCon = ({ onClose }) => {
             await new Promise(resolve => setTimeout(resolve, 100));
           }
           console.log(`Temperature decreased to ${temp}°F`);
-          
-          // Show status message
-          setStatusMessage(`Temperature set to ${temp}°F`);
-          setShowStatus(true);
-          setTimeout(() => setShowStatus(false), 2000);
         }
         
         setLastTemp(temp);
+        
+        // Update AsyncStorage for backwards compatibility
+        await AsyncStorage.setItem('temperature', temp.toString());
+        
+        // Update RV state with confirmed temperature
+        rvStateManager.updateClimateState({ 
+          temperature: temp,
+          lastUpdated: new Date().toISOString()
+        });
+        
+        // Show success status
+        setStatusMessage(`Temperature set to ${temp}°F`);
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 2000);
+        
       } catch (error) {
         console.error('Failed to change temperature:', error);
+        
         // Revert to last successful temperature
         setTemp(lastTemp);
+        rvStateManager.updateClimateState({ 
+          temperature: lastTemp,
+          lastUpdated: new Date().toISOString()
+        });
         
         // Show error message
         setStatusMessage('Failed to change temperature');
         setShowStatus(true);
         setTimeout(() => setShowStatus(false), 3000);
+      } finally {
+        setIsProcessing(false);
       }
     };
     
     // Debounce the temperature change to avoid too many API calls
     const timeoutId = setTimeout(sendTempChange, 800);
     return () => clearTimeout(timeoutId);
-  }, [temp, lastTemp, coolingOn, toeKickOn]);
+  }, [temp, lastTemp, climate.coolingOn, climate.toeKickOn, isProcessing]);
 
   const dismissKeyboard = () => {
     Keyboard.dismiss();
@@ -233,14 +306,24 @@ const AirCon = ({ onClose }) => {
 
           <View style={tabletStyles.buttonsContainer}>
             <TouchableOpacity
-              style={[tabletStyles.button, coolingOn ? tabletStyles.activeButton : null]}
+              style={[
+                tabletStyles.button, 
+                climate.coolingOn ? tabletStyles.activeButton : null,
+                isProcessing ? tabletStyles.disabledButton : null
+              ]}
               onPress={handleCoolingToggle}
+              disabled={isProcessing}
             >
               <Text style={tabletStyles.buttonText}>Cooling</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[tabletStyles.button, toeKickOn ? tabletStyles.activeButton : null]}
+              style={[
+                tabletStyles.button, 
+                climate.toeKickOn ? tabletStyles.activeButton : null,
+                isProcessing ? tabletStyles.disabledButton : null
+              ]}
               onPress={handleToeKickToggle}
+              disabled={isProcessing}
             >
               <Text style={tabletStyles.buttonText}>Toe Kick</Text>
             </TouchableOpacity>
@@ -250,6 +333,13 @@ const AirCon = ({ onClose }) => {
           {showStatus && (
             <View style={tabletStyles.statusContainer}>
               <Text style={tabletStyles.statusText}>{statusMessage}</Text>
+            </View>
+          )}
+          
+          {/* Processing indicator */}
+          {isProcessing && (
+            <View style={tabletStyles.processingContainer}>
+              <Text style={tabletStyles.processingText}>Processing...</Text>
             </View>
           )}
         </View>
@@ -289,14 +379,24 @@ const AirCon = ({ onClose }) => {
         {/* Cooling and Toe Kick Switch Buttons */}
         <View style={styles.buttonsContainer}>
           <TouchableOpacity
-            style={[styles.button, coolingOn ? styles.activeButton : null]}
+            style={[
+              styles.button, 
+              climate.coolingOn ? styles.activeButton : null,
+              isProcessing ? styles.disabledButton : null
+            ]}
             onPress={handleCoolingToggle}
+            disabled={isProcessing}
           >
             <Text style={styles.buttonText}>Cooling</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.button, toeKickOn ? styles.activeButton : null]}
+            style={[
+              styles.button, 
+              climate.toeKickOn ? styles.activeButton : null,
+              isProcessing ? styles.disabledButton : null
+            ]}
             onPress={handleToeKickToggle}
+            disabled={isProcessing}
           >
             <Text style={styles.buttonText}>Toe Kick</Text>
           </TouchableOpacity>
@@ -308,11 +408,17 @@ const AirCon = ({ onClose }) => {
             <Text style={styles.statusText}>{statusMessage}</Text>
           </View>
         )}
+        
+        {/* Processing indicator */}
+        {isProcessing && (
+          <View style={styles.processingContainer}>
+            <Text style={styles.processingText}>Processing...</Text>
+          </View>
+        )}
       </View>
     </TouchableWithoutFeedback>
   );
 };
-
 
 const tabletStyles = StyleSheet.create({
   container: {
@@ -359,6 +465,9 @@ const tabletStyles = StyleSheet.create({
   activeButton: {
     backgroundColor: '#FFB267',
   },
+  disabledButton: {
+    opacity: 0.6,
+  },
   buttonText: {
     fontSize: 16,
   },
@@ -375,8 +484,20 @@ const tabletStyles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
   },
+  processingContainer: {
+    position: 'absolute',
+    top: '50%',
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 5,
+    alignSelf: 'center',
+  },
+  processingText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
 });
-
 
 const styles = StyleSheet.create({
   container: {
@@ -424,6 +545,9 @@ const styles = StyleSheet.create({
   activeButton: {
     backgroundColor: '#FFB267',
   },
+  disabledButton: {
+    opacity: 0.6,
+  },
   buttonText: {
     fontSize: 16,
   },
@@ -437,6 +561,19 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   statusText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  processingContainer: {
+    position: 'absolute',
+    top: '50%',
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 5,
+    alignSelf: 'center',
+  },
+  processingText: {
     color: 'white',
     fontWeight: 'bold',
   },

@@ -8,11 +8,7 @@ const GroupComponent = () => {
   const [pushNotificationsEnabled, setPushNotificationsEnabled] = React.useState(false);
   const [isOn, setIsOn] = useState(false);
 
-  // const [darkModeEnabled, setDarkModeEnabled] = React.useState(isDarkMode);
-  // const handleToggle = (value) => {
-  //   setDarkModeEnabled(value); // Update local state
-  //   toggleTheme(); // Call toggleTheme to update global dark mode state
-  // };
+  
   
   return (
     <View style={styles.accountSettingsParent}>
