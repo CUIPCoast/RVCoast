@@ -61,19 +61,7 @@ const Home = () => {
     const tempF = (((item.main.temp - 273.15) * 9/5) + 32).toFixed(0);
     const weatherIcon = getWeatherIcon(item.weather[0].main);
 
-    if (isTablet) {
-      return (
-        <View style={styles.weatherTabletContainer}>
-          <Text style={styles.weatherIconTablet}>{weatherIcon}</Text>
-          <View style={styles.weatherInfoTablet}>
-            <Text style={styles.weatherTempTablet}>{tempF}°F</Text>
-            <Text style={styles.weatherDescTablet}>
-              Forecasted to be {item.weather[0].description}
-            </Text>
-          </View>
-        </View>
-      );
-    }
+    
 
     return (
       <View style={styles.weatherItemContainer}>
@@ -244,46 +232,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   
-  // Tablet Styles
-  tabletContainer: {
-    flex: 1,
-    padding: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  
-  weatherTabletContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  
-  weatherIconTablet: {
-    fontSize: 80,
-    marginBottom: 10,
-  },
-  
-  weatherInfoTablet: {
-    alignItems: 'center',
-    backgroundColor: isDarkMode ? Color.colorGray_100 : Color.colorSilver,
-    borderRadius: Border.br_5xl,
-    padding: 20,
-    width: 200,
-  },
-  
-  weatherTempTablet: {
-    color: isDarkMode ? Color.colorWhitesmoke_100 : Color.colorDarkslategray_200,
-    fontSize: FontSize.size_17xl,
-    fontFamily: FontFamily.manropeBold,
-    marginBottom: 8,
-  },
-  
-  weatherDescTablet: {
-    color: isDarkMode ? Color.colorWhitesmoke_100 : Color.colorDarkslategray_200,
-    fontSize: FontSize.size_mid,
-    fontFamily: FontFamily.manropeRegular,
-    textAlign: 'center',
-  },
+ 
 
   // Phone Layout Styles
   imageContainer: {
