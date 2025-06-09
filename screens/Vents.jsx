@@ -5,10 +5,16 @@ import { Col, Row, Grid } from 'react-native-easy-grid';
 import moment from 'moment';
 import { FanService } from '../API/RVControlServices';
 import { Feather as Icon } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Import RV State Management
+import rvStateManager from '../API/RVStateManager/RVStateManager';
 
 const Vents = () => {
+  // Fan states - these will be managed by RV state manager
   const [isBathroomFanOn, setBathroomFanOn] = useState(false);
   const [isBayVentFanOn, setBayVentFanOn] = useState(false);
+  
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [showStatus, setShowStatus] = useState(false);
@@ -17,54 +23,191 @@ const Vents = () => {
   const DayOfTheWeek = moment().format('dddd');
   const isTablet = useScreenSize();
 
-  const toggleBathroomFan = async () => {
-    setIsLoading(true);
-    try {
-      const result = await FanService.toggleBathroomFan();
-      if (result.success) {
-        setBathroomFanOn(prev => !prev);
-        setStatusMessage(`Bathroom fan ${!isBathroomFanOn ? 'turned on' : 'turned off'}`);
-      } else {
-        setStatusMessage('Failed to toggle bathroom fan');
-      }
-    } catch (error) {
-      setStatusMessage(`Error: ${error.message}`);
-    } finally {
-      setShowStatus(true);
-      setTimeout(() => setShowStatus(false), 3000);
-      setIsLoading(false);
-    }
-  };
-
-  const toggleBayVentFan = async () => {
-    setIsLoading(true);
-    try {
-      const result = await FanService.toggleBayVentFan();
-      if (result.success) {
-        setBayVentFanOn(prev => !prev);
-        setStatusMessage(`Bay vent fan ${!isBayVentFanOn ? 'turned on' : 'turned off'}`);
-      } else {
-        setStatusMessage('Failed to toggle bay vent fan');
-      }
-    } catch (error) {
-      setStatusMessage(`Error: ${error.message}`);
-    } finally {
-      setShowStatus(true);
-      setTimeout(() => setShowStatus(false), 3000);
-      setIsLoading(false);
-    }
-  };
-
+  // Initialize fan states from RV state manager
   useEffect(() => {
-    const loadSavedFanStates = async () => {
+    const initializeState = async () => {
       try {
-        // TODO: load any saved states via AsyncStorage
+        // Get current fan states from RV state manager
+        // Note: We could create a dedicated fan category in RV state manager
+        // For now, we'll use a general approach and fall back to AsyncStorage
+        
+        // Try to get from AsyncStorage first and sync to RV state manager
+        const savedBathroomFan = await AsyncStorage.getItem('bathroomFanState');
+        const savedBayVentFan = await AsyncStorage.getItem('bayVentFanState');
+        
+        if (savedBathroomFan !== null) {
+          const fanState = JSON.parse(savedBathroomFan);
+          setBathroomFanOn(fanState);
+          // Update RV state manager with saved state
+          rvStateManager.updateState('fans', { 
+            bathroomFan: { isOn: fanState, lastUpdated: new Date().toISOString() }
+          });
+        }
+        
+        if (savedBayVentFan !== null) {
+          const fanState = JSON.parse(savedBayVentFan);
+          setBayVentFanOn(fanState);
+          // Update RV state manager with saved state
+          rvStateManager.updateState('fans', { 
+            bayVentFan: { isOn: fanState, lastUpdated: new Date().toISOString() }
+          });
+        }
+        
       } catch (error) {
-        console.error('Error loading saved fan states:', error);
+        console.error('Error initializing Vents state:', error);
       }
     };
-    loadSavedFanStates();
+    
+    initializeState();
   }, []);
+
+  // Subscribe to external state changes from RV state manager
+  useEffect(() => {
+    const unsubscribe = rvStateManager.subscribeToExternalChanges((newState) => {
+      if (newState.fans) {
+        // Update fan states when external changes occur
+        if (newState.fans.bathroomFan && newState.fans.bathroomFan.isOn !== isBathroomFanOn) {
+          setBathroomFanOn(newState.fans.bathroomFan.isOn);
+          setStatusMessage(`Bathroom fan ${newState.fans.bathroomFan.isOn ? 'turned on' : 'turned off'} remotely`);
+          setShowStatus(true);
+          setTimeout(() => setShowStatus(false), 3000);
+        }
+        
+        if (newState.fans.bayVentFan && newState.fans.bayVentFan.isOn !== isBayVentFanOn) {
+          setBayVentFanOn(newState.fans.bayVentFan.isOn);
+          setStatusMessage(`Bay vent fan ${newState.fans.bayVentFan.isOn ? 'turned on' : 'turned off'} remotely`);
+          setShowStatus(true);
+          setTimeout(() => setShowStatus(false), 3000);
+        }
+      }
+    });
+    
+    return unsubscribe;
+  }, [isBathroomFanOn, isBayVentFanOn]);
+
+  // Save fan states to AsyncStorage when they change (backwards compatibility)
+  useEffect(() => {
+    const saveFanStates = async () => {
+      try {
+        await AsyncStorage.setItem('bathroomFanState', JSON.stringify(isBathroomFanOn));
+        await AsyncStorage.setItem('bayVentFanState', JSON.stringify(isBayVentFanOn));
+      } catch (error) {
+        console.error('Error saving fan states:', error);
+      }
+    };
+    
+    saveFanStates();
+  }, [isBathroomFanOn, isBayVentFanOn]);
+
+  // Handle bathroom fan toggle with RV state management
+  const toggleBathroomFan = async () => {
+    setIsLoading(true);
+    const newState = !isBathroomFanOn;
+    
+    try {
+      // Update RV state first for immediate UI feedback
+      rvStateManager.updateState('fans', {
+        bathroomFan: { 
+          isOn: newState, 
+          lastUpdated: new Date().toISOString() 
+        }
+      });
+      setBathroomFanOn(newState);
+      
+      const result = await FanService.toggleBathroomFan();
+      if (result.success) {
+        // Show success status
+        setStatusMessage(`Bathroom fan ${newState ? 'turned on' : 'turned off'}`);
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+      } else {
+        // Revert state on error
+        rvStateManager.updateState('fans', {
+          bathroomFan: { 
+            isOn: !newState, 
+            lastUpdated: new Date().toISOString() 
+          }
+        });
+        setBathroomFanOn(!newState);
+        
+        console.error('Failed to toggle bathroom fan:', result.error);
+        setStatusMessage('Failed to toggle bathroom fan');
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+      }
+    } catch (error) {
+      // Revert state on error
+      rvStateManager.updateState('fans', {
+        bathroomFan: { 
+          isOn: !newState, 
+          lastUpdated: new Date().toISOString() 
+        }
+      });
+      setBathroomFanOn(!newState);
+      
+      console.error('Error toggling bathroom fan:', error);
+      setStatusMessage(`Error: ${error.message}`);
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle bay vent fan toggle with RV state management
+  const toggleBayVentFan = async () => {
+    setIsLoading(true);
+    const newState = !isBayVentFanOn;
+    
+    try {
+      // Update RV state first for immediate UI feedback
+      rvStateManager.updateState('fans', {
+        bayVentFan: { 
+          isOn: newState, 
+          lastUpdated: new Date().toISOString() 
+        }
+      });
+      setBayVentFanOn(newState);
+      
+      const result = await FanService.toggleBayVentFan();
+      if (result.success) {
+        // Show success status
+        setStatusMessage(`Bay vent fan ${newState ? 'turned on' : 'turned off'}`);
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+      } else {
+        // Revert state on error
+        rvStateManager.updateState('fans', {
+          bayVentFan: { 
+            isOn: !newState, 
+            lastUpdated: new Date().toISOString() 
+          }
+        });
+        setBayVentFanOn(!newState);
+        
+        console.error('Failed to toggle bay vent fan:', result.error);
+        setStatusMessage('Failed to toggle bay vent fan');
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+      }
+    } catch (error) {
+      // Revert state on error
+      rvStateManager.updateState('fans', {
+        bayVentFan: { 
+          isOn: !newState, 
+          lastUpdated: new Date().toISOString() 
+        }
+      });
+      setBayVentFanOn(!newState);
+      
+      console.error('Error toggling bay vent fan:', error);
+      setStatusMessage(`Error: ${error.message}`);
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const renderControls = () => (
     <View style={styles.fanControlsContainer}>
@@ -116,34 +259,39 @@ const Vents = () => {
     return (
       <Grid style={styles.container}>
         <Row size={10}>
-                        <Row className="bg-black" size={9}>
-                            <Col className="m-1 ml-3">
-                                <Text className="text-3xl text-white">{DayOfTheWeek}</Text>
-                                <Text className="text-lg text-white">{currentDate}</Text>
-                            </Col>
-                        </Row>
-                        <Row
-                            className="bg-black"
-                            size={1}
-                        >
-                            <View className="pt-3 pl-3">
-                            <Image
-                                source={require("../assets/images/icon.png")}
-                                style={{
-                                    width: 70,
-                                    height: 45,
-                                    right: 0,
-                                    paddingTop: 10,
-                                    backgroundColor: "white"
-                                }}
-                            />
-                            </View>
-                        </Row>
-                    </Row>
+          <Row className="bg-black" size={9}>
+            <Col className="m-1 ml-3">
+              <Text className="text-3xl text-white">{DayOfTheWeek}</Text>
+              <Text className="text-lg text-white">{currentDate}</Text>
+            </Col>
+          </Row>
+          <Row className="bg-black" size={1}>
+            <View className="pt-3 pl-3">
+              <Image
+                source={require("../assets/images/icon.png")}
+                style={{
+                  width: 70,
+                  height: 45,
+                  right: 0,
+                  paddingTop: 10,
+                  backgroundColor: "white"
+                }}
+              />
+            </View>
+          </Row>
+        </Row>
 
+        {/* Status message */}
         {showStatus && (
           <View style={styles.statusContainer}>
             <Text style={styles.statusText}>{statusMessage}</Text>
+          </View>
+        )}
+
+        {/* Loading indicator */}
+        {isLoading && (
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>Processing command...</Text>
           </View>
         )}
 
@@ -161,12 +309,17 @@ const Vents = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.headerText}>Fan Controls</Text>
+      
+      {/* Status message */}
       {showStatus && (
         <View style={styles.mobileStatusContainer}>
           <Text style={styles.statusText}>{statusMessage}</Text>
         </View>
       )}
+      
       {renderControls()}
+      
+      {/* Loading indicator */}
       {isLoading && <ActivityIndicator size="large" color="#FF8200" style={styles.loadingIndicator} />}
     </View>
   );
@@ -248,7 +401,6 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 16,
     fontWeight: '600',
-
   },
   statusIndicator: {
     paddingHorizontal: 12,
@@ -286,6 +438,22 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 5,
     alignSelf: 'center',
+    zIndex: 1000,
+  },
+  loadingContainer: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -50 }, { translateY: -25 }],
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: 20,
+    borderRadius: 10,
+    zIndex: 1000,
+  },
+  loadingText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   loadingIndicator: {
     marginVertical: 20,

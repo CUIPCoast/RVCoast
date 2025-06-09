@@ -15,6 +15,10 @@ import { WaterService } from '../API/RVControlServices.js';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 
+// Import RV State Management hooks
+import { useRVWater } from "../API/RVStateManager/RVStateHooks";
+import rvStateManager from "../API/RVStateManager/RVStateManager";
+
 const MainScreen = () => {
     
     var currentDate = moment().format("MMMM Do, YYYY");
@@ -24,12 +28,39 @@ const MainScreen = () => {
     const [isOn, setIsOn] = useState(false);
     const [isOnGray, setIsOnGray] = useState(false);
 
+    // Use RV State Management hook for water systems
+    const { water, toggleWaterPump, toggleWaterHeater } = useRVWater();
+
+    // Tank heater states (these could be moved to RV state manager too if needed)
     const [isFreshHeaterOn, setFreshHeaterOn] = useState(false);
     const [isGreyHeaterOn, setGreyHeaterOn] = useState(false);
-    const [isWaterHeaterOn, setWaterHeaterOn] = useState(false);
-    const [isWaterPumpOn, setWaterPumpOn] = useState(false);
+    
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState(null);
+    const [statusMessage, setStatusMessage] = useState('');
+    const [showStatus, setShowStatus] = useState(false);
+
+    // Subscribe to external state changes from RV state manager
+    useEffect(() => {
+        const unsubscribe = rvStateManager.subscribeToExternalChanges((newState) => {
+            if (newState.water) {
+                // Show notifications when water systems are changed remotely
+                if (newState.water.pumpOn !== undefined) {
+                    setStatusMessage(`Water pump ${newState.water.pumpOn ? 'turned on' : 'turned off'} remotely`);
+                    setShowStatus(true);
+                    setTimeout(() => setShowStatus(false), 3000);
+                }
+                
+                if (newState.water.heaterOn !== undefined) {
+                    setStatusMessage(`Water heater ${newState.water.heaterOn ? 'turned on' : 'turned off'} remotely`);
+                    setShowStatus(true);
+                    setTimeout(() => setShowStatus(false), 3000);
+                }
+            }
+        });
+        
+        return unsubscribe;
+    }, []);
   
     // Clear error message after 5 seconds
     useEffect(() => {
@@ -41,37 +72,97 @@ const MainScreen = () => {
         }
     }, [errorMessage]);
 
-    // Handle water pump toggle
+    // Handle water pump toggle with RV state management
     const handleWaterPumpToggle = async () => {
         setIsLoading(true);
+        const newState = !water.pumpOn;
+        
         try {
+            // Update RV state first for immediate UI feedback
+            rvStateManager.updateWaterState({ 
+                pumpOn: newState,
+                lastUpdated: new Date().toISOString()
+            });
+            
             const result = await WaterService.toggleWaterPump();
             if (result.success) {
-                setWaterPumpOn(!isWaterPumpOn);
+                // Show success status
+                setStatusMessage(`Water pump ${newState ? 'turned on' : 'turned off'}`);
+                setShowStatus(true);
+                setTimeout(() => setShowStatus(false), 3000);
+                
                 setErrorMessage(null);
             } else {
+                // Revert state on error
+                rvStateManager.updateWaterState({ 
+                    pumpOn: !newState,
+                    lastUpdated: new Date().toISOString()
+                });
+                
                 setErrorMessage(`Failed to toggle water pump: ${result.error}`);
+                setStatusMessage('Failed to toggle water pump');
+                setShowStatus(true);
+                setTimeout(() => setShowStatus(false), 3000);
             }
         } catch (error) {
+            // Revert state on error
+            rvStateManager.updateWaterState({ 
+                pumpOn: !newState,
+                lastUpdated: new Date().toISOString()
+            });
+            
             setErrorMessage(`Error: ${error.message}`);
+            setStatusMessage(`Error: ${error.message}`);
+            setShowStatus(true);
+            setTimeout(() => setShowStatus(false), 3000);
         } finally {
             setIsLoading(false);
         }
     };
     
-    // Handle water heater toggle
+    // Handle water heater toggle with RV state management
     const handleWaterHeaterToggle = async () => {
         setIsLoading(true);
+        const newState = !water.heaterOn;
+        
         try {
+            // Update RV state first for immediate UI feedback
+            rvStateManager.updateWaterState({ 
+                heaterOn: newState,
+                lastUpdated: new Date().toISOString()
+            });
+            
             const result = await WaterService.toggleWaterHeater();
             if (result.success) {
-                setWaterHeaterOn(!isWaterHeaterOn);
+                // Show success status
+                setStatusMessage(`Water heater ${newState ? 'turned on' : 'turned off'}`);
+                setShowStatus(true);
+                setTimeout(() => setShowStatus(false), 3000);
+                
                 setErrorMessage(null);
             } else {
+                // Revert state on error
+                rvStateManager.updateWaterState({ 
+                    heaterOn: !newState,
+                    lastUpdated: new Date().toISOString()
+                });
+                
                 setErrorMessage(`Failed to toggle water heater: ${result.error}`);
+                setStatusMessage('Failed to toggle water heater');
+                setShowStatus(true);
+                setTimeout(() => setShowStatus(false), 3000);
             }
         } catch (error) {
+            // Revert state on error
+            rvStateManager.updateWaterState({ 
+                heaterOn: !newState,
+                lastUpdated: new Date().toISOString()
+            });
+            
             setErrorMessage(`Error: ${error.message}`);
+            setStatusMessage(`Error: ${error.message}`);
+            setShowStatus(true);
+            setTimeout(() => setShowStatus(false), 3000);
         } finally {
             setIsLoading(false);
         }
@@ -109,6 +200,19 @@ const MainScreen = () => {
             {errorMessage && (
                 <View style={styles.errorContainer}>
                     <Text style={styles.errorText}>{errorMessage}</Text>
+                    <TouchableOpacity 
+                        style={styles.dismissButton}
+                        onPress={() => setErrorMessage(null)}
+                    >
+                        <Text style={styles.dismissButtonText}>Dismiss</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
+
+            {/* Status message */}
+            {showStatus && (
+                <View style={styles.statusContainer}>
+                    <Text style={styles.statusText}>{statusMessage}</Text>
                 </View>
             )}
 
@@ -163,7 +267,7 @@ const MainScreen = () => {
                     
                     <View className="mt-5 space-y-2 mb-5">
                     
-                  {/* Water Heater Button */}
+                  {/* Water Heater Button with RV State Management */}
       <TouchableOpacity
         onPress={handleWaterHeaterToggle}
         disabled={isLoading}
@@ -171,14 +275,14 @@ const MainScreen = () => {
       >
         <LinearGradient
           colors={
-            isWaterHeaterOn
+            water.heaterOn
               ? ['#00C6FB', '#005BEA']
               : ['#1A1A1D', '#1A1A1D']
           }
           style={styles.waterbutton}
         >
           <Ionicons
-            name={isWaterHeaterOn ? 'water' : 'water-outline'}
+            name={water.heaterOn ? 'water' : 'water-outline'}
             size={32}
             color="#FFF"
             style={styles.icon}
@@ -187,7 +291,7 @@ const MainScreen = () => {
         </LinearGradient>
       </TouchableOpacity>
 
-      {/* Water Pump Button */}
+      {/* Water Pump Button with RV State Management */}
       <TouchableOpacity
         onPress={handleWaterPumpToggle}
         disabled={isLoading}
@@ -195,15 +299,15 @@ const MainScreen = () => {
       >
         <LinearGradient
           colors={
-            isWaterPumpOn
+            water.pumpOn
               ? ['#00C6FB', '#005BEA']
               : ['#1A1A1D', '#1A1A1D']
           }
           style={styles.waterbutton}
         >
           <Ionicons
-            // you can swap this for a “pump” icon if you find one
-            name={isWaterPumpOn ? 'pie-chart' : 'pie-chart-outline'}
+            // you can swap this for a "pump" icon if you find one
+            name={water.pumpOn ? 'pie-chart' : 'pie-chart-outline'}
             size={32}
             color="#FFF"
             style={styles.icon}
@@ -371,16 +475,44 @@ const styles = {
       },
     errorContainer: {
         backgroundColor: "rgba(255, 0, 0, 0.1)",
-        padding: 10,
+        padding: 15,
         margin: 10,
         borderRadius: 5,
         borderWidth: 1,
         borderColor: "red",
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
         zIndex: 1000,
     },
     errorText: {
         color: "white",
-        textAlign: "center",
+        textAlign: "left",
+        flex: 1,
+    },
+    dismissButton: {
+        backgroundColor: "rgba(255, 255, 255, 0.2)",
+        padding: 5,
+        borderRadius: 3,
+        marginLeft: 10,
+    },
+    dismissButtonText: {
+        color: "white",
+        fontSize: 12,
+    },
+    statusContainer: {
+        position: "absolute",
+        bottom: 80,
+        backgroundColor: "rgba(0,0,0,0.7)",
+        paddingHorizontal: 15,
+        paddingVertical: 8,
+        borderRadius: 5,
+        alignSelf: "center",
+        zIndex: 1000,
+    },
+    statusText: {
+        color: "white",
+        fontWeight: "bold",
     },
     loadingOverlay: {
         position: "absolute",

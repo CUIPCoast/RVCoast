@@ -85,6 +85,19 @@ const AirCon = ({ onClose }) => {
           setShowStatus(true);
           setTimeout(() => setShowStatus(false), 3000);
         }
+        
+        // Update cooling and toe kick states if they changed externally
+        if (newState.climate.coolingOn !== undefined) {
+          setStatusMessage(`Cooling ${newState.climate.coolingOn ? 'turned on' : 'turned off'} remotely`);
+          setShowStatus(true);
+          setTimeout(() => setShowStatus(false), 3000);
+        }
+        
+        if (newState.climate.toeKickOn !== undefined) {
+          setStatusMessage(`Toe Kick ${newState.climate.toeKickOn ? 'turned on' : 'turned off'} remotely`);
+          setShowStatus(true);
+          setTimeout(() => setShowStatus(false), 3000);
+        }
       }
     });
     

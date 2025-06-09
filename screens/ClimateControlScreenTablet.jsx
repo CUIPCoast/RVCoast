@@ -9,7 +9,14 @@ import { ClimateService } from '../API/RVControlServices.js';
 import { RVControlService } from "../API/rvAPI";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// Import RV State Management hooks
+import { useRVClimate } from "../API/RVStateManager/RVStateHooks";
+import rvStateManager from "../API/RVStateManager/RVStateManager";
+
 const ClimateControlScreenTablet = () => {
+  // Use RV state management hook for climate data
+  const { climate, setTemperature, toggleCooling, toggleHeating } = useRVClimate();
+  
   const [activeButtons, setActiveButtons] = useState([]); // State for active buttons
   const [speed, setSpeed] = useState(0);
   const [isNightToggled, setIsNightToggled] = useState(false);
@@ -30,7 +37,7 @@ const ClimateControlScreenTablet = () => {
   const [weatherData, setWeatherData] = useState(null);
   const [weatherError, setWeatherError] = useState(false);
 
-  // Temperature state with loading from AsyncStorage
+  // Temperature state with loading from RV state manager
   const [temp, setTemp] = useState(72);
   const [lastTemp, setLastTemp] = useState(72);
   
@@ -51,35 +58,117 @@ const ClimateControlScreenTablet = () => {
 
   const isTablet = useScreenSize(); // Check if the screen is large enough to be considered a tablet
 
-  // Load saved temperature from AsyncStorage
+  // Initialize state from RV state manager
   useEffect(() => {
-    const getTemp = async () => {
-      const savedTemp = await AsyncStorage.getItem('temperature');
-      if (savedTemp) {
-        setTemp(parseInt(savedTemp, 10));
-        setLastTemp(parseInt(savedTemp, 10));
-      } else {
-        setTemp(72);
-        setLastTemp(72);
+    const initializeState = async () => {
+      try {
+        // Get current climate state from RV state manager
+        const currentClimateState = rvStateManager.getCategoryState('climate');
+        
+        // Set temperature from state
+        if (currentClimateState.temperature) {
+          setTemp(currentClimateState.temperature);
+          setLastTemp(currentClimateState.temperature);
+        } else {
+          // Fall back to AsyncStorage for backwards compatibility
+          const savedTemp = await AsyncStorage.getItem('temperature');
+          if (savedTemp) {
+            const tempValue = parseInt(savedTemp, 10);
+            setTemp(tempValue);
+            setLastTemp(tempValue);
+            // Update RV state with loaded temperature
+            rvStateManager.updateClimateState({ temperature: tempValue });
+          } else {
+            setTemp(72);
+            setLastTemp(72);
+            rvStateManager.updateClimateState({ temperature: 72 });
+          }
+        }
+        
+        // Set climate control states from RV state manager
+        if (currentClimateState.coolingOn !== undefined) {
+          setIsCoolToggled(currentClimateState.coolingOn);
+        }
+        if (currentClimateState.toeKickOn !== undefined) {
+          setIsToekickToggled(currentClimateState.toeKickOn);
+        }
+        if (currentClimateState.heatingOn !== undefined) {
+          setIsFurnaceToggled(currentClimateState.heatingOn);
+        }
+        if (currentClimateState.nightMode !== undefined) {
+          setIsNightToggled(currentClimateState.nightMode);
+        }
+        if (currentClimateState.dehumidifyMode !== undefined) {
+          setIsDehumidToggled(currentClimateState.dehumidifyMode);
+        }
+        if (currentClimateState.autoMode !== undefined) {
+          setIsAutoModeActive(currentClimateState.autoMode);
+        }
+        if (currentClimateState.fanSpeed) {
+          setSpeed(currentClimateState.fanSpeed);
+        }
+        
+      } catch (error) {
+        console.error('Error initializing ClimateControlScreenTablet state:', error);
       }
     };
-    getTemp();
+    
+    initializeState();
   }, []);
-  
-  // Save temperature changes to AsyncStorage
+
+  // Subscribe to external state changes (from other devices/screens)
   useEffect(() => {
-    if (temp !== null) {
-      AsyncStorage.setItem('temperature', temp.toString());
-    }
-  }, [temp]);
+    const unsubscribe = rvStateManager.subscribeToExternalChanges((newState) => {
+      if (newState.climate) {
+        // Update local state when external changes occur
+        if (newState.climate.temperature && newState.climate.temperature !== temp) {
+          setTemp(newState.climate.temperature);
+          setLastTemp(newState.climate.temperature);
+          
+          // Show notification of external change
+          setStatusMessage(`Temperature updated remotely to ${newState.climate.temperature}°F`);
+          setShowStatus(true);
+          setTimeout(() => setShowStatus(false), 3000);
+        }
+        
+        // Update other climate states if they changed externally
+        if (newState.climate.coolingOn !== undefined && newState.climate.coolingOn !== isCoolToggled) {
+          setIsCoolToggled(newState.climate.coolingOn);
+          setStatusMessage(`Cooling ${newState.climate.coolingOn ? 'turned on' : 'turned off'} remotely`);
+          setShowStatus(true);
+          setTimeout(() => setShowStatus(false), 3000);
+        }
+        
+        if (newState.climate.toeKickOn !== undefined && newState.climate.toeKickOn !== isToekickToggled) {
+          setIsToekickToggled(newState.climate.toeKickOn);
+          setStatusMessage(`Toe Kick ${newState.climate.toeKickOn ? 'turned on' : 'turned off'} remotely`);
+          setShowStatus(true);
+          setTimeout(() => setShowStatus(false), 3000);
+        }
+        
+        if (newState.climate.heatingOn !== undefined && newState.climate.heatingOn !== isFurnaceToggled) {
+          setIsFurnaceToggled(newState.climate.heatingOn);
+          setStatusMessage(`Furnace ${newState.climate.heatingOn ? 'turned on' : 'turned off'} remotely`);
+          setShowStatus(true);
+          setTimeout(() => setShowStatus(false), 3000);
+        }
+      }
+    });
+    
+    return unsubscribe;
+  }, [temp, isCoolToggled, isToekickToggled, isFurnaceToggled]);
 
   // Handle temperature change from RadialSlider
   const handleTempChange = (newTemp) => {
     setTemp(newTemp);
+    
+    // Update RV state immediately for UI responsiveness
+    rvStateManager.updateClimateState({ 
+      temperature: newTemp,
+      lastUpdated: new Date().toISOString()
+    });
   };
   
-  
-
   // Temperature change implementation from AirCon.jsx
   useEffect(() => {
     const sendTempChange = async () => {
@@ -120,12 +209,28 @@ const ClimateControlScreenTablet = () => {
         }
         
         setLastTemp(temp);
+        
+        // Update AsyncStorage for backwards compatibility
+        await AsyncStorage.setItem('temperature', temp.toString());
+        
+        // Update RV state with confirmed temperature
+        rvStateManager.updateClimateState({ 
+          temperature: temp,
+          lastUpdated: new Date().toISOString()
+        });
+        
         // Clear any error messages
         setErrorMessage(null);
       } catch (error) {
         console.error('Failed to change temperature:', error);
         // Revert to last successful temperature
         setTemp(lastTemp);
+        
+        // Revert RV state
+        rvStateManager.updateClimateState({ 
+          temperature: lastTemp,
+          lastUpdated: new Date().toISOString()
+        });
         
         // Check if it's a network error
         const isNetworkError = error.message.includes('Network') || 
@@ -173,32 +278,52 @@ const ClimateControlScreenTablet = () => {
     Keyboard.dismiss();
   };
 
-  // Night Setting Toggle - Using service
+  // Night Setting Toggle - Using service with RV state management
   const handleNightPress = async () => {
     setIsLoading(true);
+    const newNightState = !isNightToggled;
+    
     try {
+      // Update RV state first for immediate UI feedback
+      rvStateManager.updateClimateState({ 
+        nightMode: newNightState,
+        lastUpdated: new Date().toISOString()
+      });
+      setIsNightToggled(newNightState);
+      
       const result = await ClimateService.setNightMode();
       if (result.success) {
-        setIsNightToggled(!isNightToggled);
+        // Save to AsyncStorage for backwards compatibility
+        await AsyncStorage.setItem('nightMode', JSON.stringify(newNightState));
         
-        // Add status message - from AirCon
-        setStatusMessage(`Night mode ${!isNightToggled ? 'enabled' : 'disabled'}`);
+        // Add status message
+        setStatusMessage(`Night mode ${newNightState ? 'enabled' : 'disabled'}`);
         setShowStatus(true);
         setTimeout(() => setShowStatus(false), 3000);
         
         setErrorMessage(null);
       } else {
-        setErrorMessage(`Failed to set night mode: ${result.error}`);
+        // Revert state on error
+        rvStateManager.updateClimateState({ 
+          nightMode: !newNightState,
+          lastUpdated: new Date().toISOString()
+        });
+        setIsNightToggled(!newNightState);
         
-        // Add status message - from AirCon
+        setErrorMessage(`Failed to set night mode: ${result.error}`);
         setStatusMessage('Failed to toggle night mode');
         setShowStatus(true);
         setTimeout(() => setShowStatus(false), 3000);
       }
     } catch (error) {
-      setErrorMessage(`Error: ${error.message}`);
+      // Revert state on error
+      rvStateManager.updateClimateState({ 
+        nightMode: !newNightState,
+        lastUpdated: new Date().toISOString()
+      });
+      setIsNightToggled(!newNightState);
       
-      // Add status message - from AirCon
+      setErrorMessage(`Error: ${error.message}`);
       setStatusMessage('Failed to toggle night mode');
       setShowStatus(true);
       setTimeout(() => setShowStatus(false), 3000);
@@ -207,32 +332,52 @@ const ClimateControlScreenTablet = () => {
     }
   };
 
-  // Dehumid Setting Toggle - Using service
+  // Dehumid Setting Toggle - Using service with RV state management
   const handleDehumidPress = async () => {
     setIsLoading(true);
+    const newDehumidState = !isDehumidToggled;
+    
     try {
+      // Update RV state first for immediate UI feedback
+      rvStateManager.updateClimateState({ 
+        dehumidifyMode: newDehumidState,
+        lastUpdated: new Date().toISOString()
+      });
+      setIsDehumidToggled(newDehumidState);
+      
       const result = await ClimateService.setDehumidifyMode();
       if (result.success) {
-        setIsDehumidToggled(!isDehumidToggled);
+        // Save to AsyncStorage for backwards compatibility
+        await AsyncStorage.setItem('dehumidMode', JSON.stringify(newDehumidState));
         
-        // Add status message - from AirCon
-        setStatusMessage(`Dehumidify mode ${!isDehumidToggled ? 'enabled' : 'disabled'}`);
+        // Add status message
+        setStatusMessage(`Dehumidify mode ${newDehumidState ? 'enabled' : 'disabled'}`);
         setShowStatus(true);
         setTimeout(() => setShowStatus(false), 3000);
         
         setErrorMessage(null);
       } else {
-        setErrorMessage(`Failed to set dehumidify mode: ${result.error}`);
+        // Revert state on error
+        rvStateManager.updateClimateState({ 
+          dehumidifyMode: !newDehumidState,
+          lastUpdated: new Date().toISOString()
+        });
+        setIsDehumidToggled(!newDehumidState);
         
-        // Add status message - from AirCon
+        setErrorMessage(`Failed to set dehumidify mode: ${result.error}`);
         setStatusMessage('Failed to toggle dehumidify mode');
         setShowStatus(true);
         setTimeout(() => setShowStatus(false), 3000);
       }
     } catch (error) {
-      setErrorMessage(`Error: ${error.message}`);
+      // Revert state on error
+      rvStateManager.updateClimateState({ 
+        dehumidifyMode: !newDehumidState,
+        lastUpdated: new Date().toISOString()
+      });
+      setIsDehumidToggled(!newDehumidState);
       
-      // Add status message - from AirCon
+      setErrorMessage(`Error: ${error.message}`);
       setStatusMessage('Failed to toggle dehumidify mode');
       setShowStatus(true);
       setTimeout(() => setShowStatus(false), 3000);
@@ -240,8 +385,6 @@ const ClimateControlScreenTablet = () => {
       setIsLoading(false);
     }
   };
-
-
 
   // Handle feature button press (Cool, Toe Kick, Furnace) with improved implementation from AirCon
   const handleButtonPress = async (label) => {
@@ -252,48 +395,88 @@ const ClimateControlScreenTablet = () => {
     
     try {
       let result;
+      let newState;
       
       // Execute corresponding service methods based on the button label
       switch (label) {
         case "Cool":
+          newState = !isCoolToggled;
+          // Update RV state first for immediate UI feedback
+          rvStateManager.updateClimateState({ 
+            coolingOn: newState,
+            lastUpdated: new Date().toISOString()
+          });
+          setIsCoolToggled(newState);
+          
           result = await ClimateService.toggleCooling();
           if (result.success) {
-            setIsCoolToggled(!isCoolToggled);
-            
             // Update AsyncStorage to match AirCon implementation
-            await AsyncStorage.setItem('coolingState', JSON.stringify(!isCoolToggled));
+            await AsyncStorage.setItem('coolingState', JSON.stringify(newState));
             
-            // Add status message - from AirCon
-            setStatusMessage(`Cooling ${!isCoolToggled ? 'turned on' : 'turned off'}`);
+            // Add status message
+            setStatusMessage(`Cooling ${newState ? 'turned on' : 'turned off'}`);
             setShowStatus(true);
             setTimeout(() => setShowStatus(false), 3000);
+          } else {
+            // Revert state on error
+            rvStateManager.updateClimateState({ 
+              coolingOn: !newState,
+              lastUpdated: new Date().toISOString()
+            });
+            setIsCoolToggled(!newState);
           }
           break;
           
         case "Toe Kick":
+          newState = !isToekickToggled;
+          // Update RV state first for immediate UI feedback
+          rvStateManager.updateClimateState({ 
+            toeKickOn: newState,
+            lastUpdated: new Date().toISOString()
+          });
+          setIsToekickToggled(newState);
+          
           result = await ClimateService.toggleToeKick();
           if (result.success) {
-            setIsToekickToggled(!isToekickToggled);
-            
             // Update AsyncStorage to match AirCon implementation
-            await AsyncStorage.setItem('toeKickState', JSON.stringify(!isToekickToggled));
+            await AsyncStorage.setItem('toeKickState', JSON.stringify(newState));
             
-            // Add status message - from AirCon
-            setStatusMessage(`Toe Kick ${!isToekickToggled ? 'turned on' : 'turned off'}`);
+            // Add status message
+            setStatusMessage(`Toe Kick ${newState ? 'turned on' : 'turned off'}`);
             setShowStatus(true);
             setTimeout(() => setShowStatus(false), 3000);
+          } else {
+            // Revert state on error
+            rvStateManager.updateClimateState({ 
+              toeKickOn: !newState,
+              lastUpdated: new Date().toISOString()
+            });
+            setIsToekickToggled(!newState);
           }
           break;
           
         case "Furnace":
+          newState = !isFurnaceToggled;
+          // Update RV state first for immediate UI feedback
+          rvStateManager.updateClimateState({ 
+            heatingOn: newState,
+            lastUpdated: new Date().toISOString()
+          });
+          setIsFurnaceToggled(newState);
+          
           result = await ClimateService.toggleFurnace();
           if (result.success) {
-            setIsFurnaceToggled(!isFurnaceToggled);
-            
-            // Add status message - from AirCon
-            setStatusMessage(`Furnace ${!isFurnaceToggled ? 'turned on' : 'turned off'}`);
+            // Add status message
+            setStatusMessage(`Furnace ${newState ? 'turned on' : 'turned off'}`);
             setShowStatus(true);
             setTimeout(() => setShowStatus(false), 3000);
+          } else {
+            // Revert state on error
+            rvStateManager.updateClimateState({ 
+              heatingOn: !newState,
+              lastUpdated: new Date().toISOString()
+            });
+            setIsFurnaceToggled(!newState);
           }
           break;
           
@@ -314,7 +497,7 @@ const ClimateControlScreenTablet = () => {
       } else if (result) {
         setErrorMessage(`Error: ${result.error}`);
         
-        // Add status message - from AirCon
+        // Add status message
         setStatusMessage(`Failed to toggle ${label}`);
         setShowStatus(true);
         setTimeout(() => setShowStatus(false), 3000);
@@ -322,7 +505,7 @@ const ClimateControlScreenTablet = () => {
     } catch (error) {
       setErrorMessage(`Unexpected error: ${error.message}`);
       
-      // Add status message - from AirCon
+      // Add status message
       setStatusMessage(`Failed to toggle ${label}`);
       setShowStatus(true);
       setTimeout(() => setShowStatus(false), 3000);
@@ -331,76 +514,92 @@ const ClimateControlScreenTablet = () => {
     }
   };
 
-  // Handle fan speed button press
-const handleFanSpeedPress = async (speed) => {
-  setIsLoading(true);
-  try {
-    let result;
+  // Handle fan speed button press with RV state management
+  const handleFanSpeedPress = async (speed) => {
+    setIsLoading(true);
+    const previousSpeed = speed;
     
-    switch (speed) {
-      case "Low":
-        // Use the direct raw command approach that's working
-        result = await setLowFanSpeed();
-        break;
-      case "Med":
-        result = await ClimateService.setMediumFanSpeed();
-        break;
-      case "High":
-        result = await ClimateService.setHighFanSpeed();
-        break;
-      case "Auto":
-        // Use direct raw command approach for auto setting
-        result = await setAutoMode();
-        break;
-      default:
-        setErrorMessage(`Unknown fan speed: ${speed}`);
-        setIsLoading(false);
-        return;
-    }
-    
-    if (result && result.success) {
-      // Update fan speed state
+    try {
+      // Update RV state first for immediate UI feedback
+      rvStateManager.updateClimateState({ 
+        fanSpeed: speed,
+        autoMode: speed === "Auto",
+        lastUpdated: new Date().toISOString()
+      });
       setSpeed(speed);
-      
-      // Update auto mode state
       if (speed === "Auto") {
         setIsAutoModeActive(true);
-        // Store auto mode state
-        await AsyncStorage.setItem('autoModeState', JSON.stringify(true));
       } else {
-        // If another speed was selected, auto mode is no longer active
         setIsAutoModeActive(false);
-        await AsyncStorage.setItem('autoModeState', JSON.stringify(false));
       }
       
-      // Store the selected fan speed
-      await AsyncStorage.setItem('fanSpeed', speed);
+      let result;
       
-      setErrorMessage(null);
+      switch (speed) {
+        case "Low":
+          // Use the direct raw command approach that's working
+          result = await setLowFanSpeed();
+          break;
+        case "Med":
+          result = await ClimateService.setMediumFanSpeed();
+          break;
+        case "High":
+          result = await ClimateService.setHighFanSpeed();
+          break;
+        case "Auto":
+          // Use direct raw command approach for auto setting
+          result = await setAutoMode();
+          break;
+        default:
+          setErrorMessage(`Unknown fan speed: ${speed}`);
+          setIsLoading(false);
+          return;
+      }
       
-      // Add status message - from AirCon
-      setStatusMessage(`Fan speed set to ${speed}`);
-      setShowStatus(true);
-      setTimeout(() => setShowStatus(false), 3000);
-    } else if (result) {
-      setErrorMessage(`Error setting fan speed: ${result.error}`);
+      if (result && result.success) {
+        // Store the selected fan speed and auto mode state
+        await AsyncStorage.setItem('fanSpeed', speed);
+        await AsyncStorage.setItem('autoModeState', JSON.stringify(speed === "Auto"));
+        
+        setErrorMessage(null);
+        
+        // Add status message
+        setStatusMessage(`Fan speed set to ${speed}`);
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+      } else if (result) {
+        // Revert state on error
+        rvStateManager.updateClimateState({ 
+          fanSpeed: previousSpeed,
+          autoMode: previousSpeed === "Auto",
+          lastUpdated: new Date().toISOString()
+        });
+        setSpeed(previousSpeed);
+        setIsAutoModeActive(previousSpeed === "Auto");
+        
+        setErrorMessage(`Error setting fan speed: ${result.error}`);
+        setStatusMessage(`Failed to set fan speed to ${speed}`);
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+      }
+    } catch (error) {
+      // Revert state on error
+      rvStateManager.updateClimateState({ 
+        fanSpeed: previousSpeed,
+        autoMode: previousSpeed === "Auto",
+        lastUpdated: new Date().toISOString()
+      });
+      setSpeed(previousSpeed);
+      setIsAutoModeActive(previousSpeed === "Auto");
       
-      // Add status message - from AirCon
+      setErrorMessage(`Unexpected error: ${error.message}`);
       setStatusMessage(`Failed to set fan speed to ${speed}`);
       setShowStatus(true);
       setTimeout(() => setShowStatus(false), 3000);
+    } finally {
+      setIsLoading(false);
     }
-  } catch (error) {
-    setErrorMessage(`Unexpected error: ${error.message}`);
-    
-    // Add status message - from AirCon
-    setStatusMessage(`Failed to set fan speed to ${speed}`);
-    setShowStatus(true);
-    setTimeout(() => setShowStatus(false), 3000);
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
   
   // Direct implementation of low fan speed using raw commands
   const setLowFanSpeed = async () => {
@@ -463,64 +662,103 @@ const handleFanSpeedPress = async (speed) => {
     }
   };
 
-  // Load saved states on component mount - taken from AirCon implementation
-  // Update the loadSavedStates function inside the useEffect
-useEffect(() => {
-  const loadSavedStates = async () => {
-    try {
-      // Load cooling state
-      const savedCoolingState = await AsyncStorage.getItem('coolingState');
-      if (savedCoolingState !== null) {
-        const coolingState = JSON.parse(savedCoolingState);
-        setIsCoolToggled(coolingState);
+  // Load saved states on component mount - updated with RV state management
+  useEffect(() => {
+    const loadSavedStates = async () => {
+      try {
+        // First, try to get states from RV state manager
+        const currentClimateState = rvStateManager.getCategoryState('climate');
         
-        // Update active buttons if needed
-        if (coolingState && !activeButtons.includes("Cool")) {
-          setActiveButtons(prev => [...prev, "Cool"]);
+        // Load cooling state
+        if (currentClimateState.coolingOn !== undefined) {
+          setIsCoolToggled(currentClimateState.coolingOn);
+          if (currentClimateState.coolingOn && !activeButtons.includes("Cool")) {
+            setActiveButtons(prev => [...prev, "Cool"]);
+          }
+        } else {
+          // Fall back to AsyncStorage
+          const savedCoolingState = await AsyncStorage.getItem('coolingState');
+          if (savedCoolingState !== null) {
+            const coolingState = JSON.parse(savedCoolingState);
+            setIsCoolToggled(coolingState);
+            rvStateManager.updateClimateState({ coolingOn: coolingState });
+            
+            if (coolingState && !activeButtons.includes("Cool")) {
+              setActiveButtons(prev => [...prev, "Cool"]);
+            }
+          }
         }
-      }
-      
-      // Load toe kick state
-      const savedToeKickState = await AsyncStorage.getItem('toeKickState');
-      if (savedToeKickState !== null) {
-        const toeKickState = JSON.parse(savedToeKickState);
-        setIsToekickToggled(toeKickState);
         
-        // Update active buttons if needed
-        if (toeKickState && !activeButtons.includes("Toe Kick")) {
-          setActiveButtons(prev => [...prev, "Toe Kick"]);
+        // Load toe kick state
+        if (currentClimateState.toeKickOn !== undefined) {
+          setIsToekickToggled(currentClimateState.toeKickOn);
+          if (currentClimateState.toeKickOn && !activeButtons.includes("Toe Kick")) {
+            setActiveButtons(prev => [...prev, "Toe Kick"]);
+          }
+        } else {
+          // Fall back to AsyncStorage
+          const savedToeKickState = await AsyncStorage.getItem('toeKickState');
+          if (savedToeKickState !== null) {
+            const toeKickState = JSON.parse(savedToeKickState);
+            setIsToekickToggled(toeKickState);
+            rvStateManager.updateClimateState({ toeKickOn: toeKickState });
+            
+            if (toeKickState && !activeButtons.includes("Toe Kick")) {
+              setActiveButtons(prev => [...prev, "Toe Kick"]);
+            }
+          }
         }
+        
+        // Load other states with RV state manager fallback to AsyncStorage
+        if (currentClimateState.nightMode !== undefined) {
+          setIsNightToggled(currentClimateState.nightMode);
+        } else {
+          const savedNightMode = await AsyncStorage.getItem('nightMode');
+          if (savedNightMode !== null) {
+            const nightMode = JSON.parse(savedNightMode);
+            setIsNightToggled(nightMode);
+            rvStateManager.updateClimateState({ nightMode });
+          }
+        }
+        
+        if (currentClimateState.dehumidifyMode !== undefined) {
+          setIsDehumidToggled(currentClimateState.dehumidifyMode);
+        } else {
+          const savedDehumidMode = await AsyncStorage.getItem('dehumidMode');
+          if (savedDehumidMode !== null) {
+            const dehumidMode = JSON.parse(savedDehumidMode);
+            setIsDehumidToggled(dehumidMode);
+            rvStateManager.updateClimateState({ dehumidifyMode: dehumidMode });
+          }
+        }
+        
+        if (currentClimateState.autoMode !== undefined) {
+          setIsAutoModeActive(currentClimateState.autoMode);
+        } else {
+          const savedAutoMode = await AsyncStorage.getItem('autoModeState');
+          if (savedAutoMode !== null) {
+            const autoMode = JSON.parse(savedAutoMode);
+            setIsAutoModeActive(autoMode);
+            rvStateManager.updateClimateState({ autoMode });
+          }
+        }
+        
+        if (currentClimateState.fanSpeed) {
+          setSpeed(currentClimateState.fanSpeed);
+        } else {
+          const savedFanSpeed = await AsyncStorage.getItem('fanSpeed');
+          if (savedFanSpeed !== null) {
+            setSpeed(savedFanSpeed);
+            rvStateManager.updateClimateState({ fanSpeed: savedFanSpeed });
+          }
+        }
+      } catch (error) {
+        console.error('Error loading saved states:', error);
       }
-      
-      // Load night mode and dehumidify states if they exist
-      const savedNightMode = await AsyncStorage.getItem('nightMode');
-      if (savedNightMode !== null) {
-        setIsNightToggled(JSON.parse(savedNightMode));
-      }
-      
-      const savedDehumidMode = await AsyncStorage.getItem('dehumidMode');
-      if (savedDehumidMode !== null) {
-        setIsDehumidToggled(JSON.parse(savedDehumidMode));
-      }
-      
-      // Load auto mode state
-      const savedAutoMode = await AsyncStorage.getItem('autoModeState');
-      if (savedAutoMode !== null) {
-        setIsAutoModeActive(JSON.parse(savedAutoMode));
-      }
-      
-      // Load fan speed state
-      const savedFanSpeed = await AsyncStorage.getItem('fanSpeed');
-      if (savedFanSpeed !== null) {
-        setSpeed(savedFanSpeed);
-      }
-    } catch (error) {
-      console.error('Error loading saved states:', error);
-    }
-  };
-  
-  loadSavedStates();
-}, []);
+    };
+    
+    loadSavedStates();
+  }, []);
 
   // Add useEffect to check for and apply pending temperature changes
   useEffect(() => {
@@ -548,6 +786,12 @@ useEffect(() => {
             // Update UI temperature immediately
             setTemp(pendingTemp);
             
+            // Update RV state
+            rvStateManager.updateClimateState({ 
+              temperature: pendingTemp,
+              lastUpdated: new Date().toISOString()
+            });
+            
             // Clear the pending change since we're applying it now
             await AsyncStorage.removeItem('pendingTempChange');
             
@@ -565,8 +809,6 @@ useEffect(() => {
     // Run on mount and when climate control mode changes
     checkPendingChanges();
   }, [isCoolToggled, isToekickToggled, isFurnaceToggled, isLoading]);
-
- 
 
   // If the screen is a tablet, render the climate control interface
   if (isTablet) {
@@ -1093,7 +1335,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 76,
     margin: 2,
-    // no backgroundColor here — it’s set dynamically
+    // no backgroundColor here — it's set dynamically
   },
   autoSpeedButton: {
     marginTop: 5,
