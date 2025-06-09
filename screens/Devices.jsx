@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { StyleSheet, View, Text, Pressable, TouchableOpacity, Image, ScrollView, Modal, Button, ActivityIndicator } from "react-native";
-import EnhancedMainLight from "../components/EnhancedMainLight.jsx";
+import SimpleHoldToDimLight from "../components/SimpleHoldToDimLight.jsx";
 
 import useScreenSize from "../helper/useScreenSize.jsx";
 import AwningControlModal from "../components/AwningControlModal";
@@ -15,6 +15,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 // Import RV State Management hooks
 import { useRVLights, useRVWater } from "../API/RVStateManager/RVStateHooks";
 import rvStateManager from "../API/RVStateManager/RVStateManager";
+import { LightControlService } from "../Service/LightControlService.js";
 
 import {
   Padding,
@@ -49,26 +50,27 @@ const lightDisplayNames = {
   'wardrobe_lights': 'Wardrobe Light'
 };
 
-// Light groups by category
+// Light groups by category - Updated to match LightScreenTablet structure
 const lightGroups = {
   main: [
     'kitchen_lights',
-    'dinette_lights',
+    'dinette_lights', 
     'under_cab_lights',
-    'wardrobe_lights'
+    'strip_lights',
+    'awning_lights',
+    'porch_lights',
+    'hitch_lights'
   ],
   bedroom: [
     'bed_ovhd_light',
     'left_reading_lights',
     'right_reading_lights',
-    'vibe_light',
-    'bath_light'
+    'vibe_light'
   ],
   bathroom: [
     'bath_light',
     'vanity_light',
-    'shower_lights',
-    'bed_ovhd_light'
+    'shower_lights'
   ]
 };
 
@@ -82,7 +84,7 @@ const Devices = () => {
   const [isLoading, setIsLoading] = useState(false);
   
   // Use RV State Management hooks
-  const { lights, toggleLight, setLightBrightness, turnAllLightsOn, turnAllLightsOff } = useRVLights();
+  const { lights, toggleLight, setLightBrightness: updateLightBrightness, turnAllLightsOn, turnAllLightsOff } = useRVLights();
   const { water, toggleWaterPump, toggleWaterHeater } = useRVWater();
   
   // Fan control states (these could be moved to RV state manager too)
@@ -93,16 +95,20 @@ const Devices = () => {
   const [statusMessage, setStatusMessage] = useState('');
   const [showStatus, setShowStatus] = useState(false);
 
-  // State for light toggling - now managed by RV state manager
+  // State for individual light states - now managed by RV state manager
   const [lightStates, setLightStates] = useState({});
+  const [localLightBrightness, setLocalLightBrightness] = useState({});
   
-  // State for slider values - now managed by RV state manager
-  const [sliderValues, setSliderValues] = useState({});
-  
-  // State for master light switch
+  // State for master light switch - independent from individual lights
   const [masterLightOn, setMasterLightOn] = useState(false);
 
-  // Initialize light states and slider values from RV state manager
+  // Get all available lights
+  const allLights = LightControlService.getAllLights();
+  
+  // Check if dimming is supported
+  const supportsDimming = LightControlService.supportsDimming();
+
+  // Initialize light states from RV state manager
   useEffect(() => {
     const initializeState = async () => {
       try {
@@ -122,22 +128,22 @@ const Devices = () => {
         
         // Initialize from RV state manager or set defaults
         const initialLightStates = {};
-        const initialSliderValues = {};
+        const initialLightBrightness = {};
         
         uniqueLights.forEach(lightId => {
           if (currentLightState[lightId]) {
             initialLightStates[lightId] = currentLightState[lightId].isOn || false;
-            initialSliderValues[lightId] = currentLightState[lightId].brightness || 50;
+            initialLightBrightness[lightId] = currentLightState[lightId].brightness || 50;
           } else {
             initialLightStates[lightId] = false;
-            initialSliderValues[lightId] = 50;
+            initialLightBrightness[lightId] = 50;
             // Initialize in RV state manager
             rvStateManager.updateLightState(lightId, false, 50);
           }
         });
         
         setLightStates(initialLightStates);
-        setSliderValues(initialSliderValues);
+        setLocalLightBrightness(initialLightBrightness);
         
         // Set master light state based on any lights being on
         const anyLightOn = Object.values(initialLightStates).some(state => state);
@@ -152,7 +158,7 @@ const Devices = () => {
             const savedStates = JSON.parse(savedLightStates);
             // Update RV state manager with saved states
             Object.entries(savedStates).forEach(([lightId, isOn]) => {
-              const brightness = initialSliderValues[lightId] || 50;
+              const brightness = initialLightBrightness[lightId] || 50;
               rvStateManager.updateLightState(lightId, isOn, brightness);
             });
             setLightStates(savedStates);
@@ -165,7 +171,7 @@ const Devices = () => {
               const isOn = initialLightStates[lightId] || false;
               rvStateManager.updateLightState(lightId, isOn, brightness);
             });
-            setSliderValues(savedValues);
+            setLocalLightBrightness(savedValues);
           }
         } catch (error) {
           console.error('Error loading saved light states from AsyncStorage:', error);
@@ -179,30 +185,60 @@ const Devices = () => {
     initializeState();
   }, []);
 
+  // Subscribe to RV State Manager for light states
+  useEffect(() => {
+    const unsubscribe = rvStateManager.subscribe(({ category, state }) => {
+      if (category === 'lights') {
+        const currentLights = state.lights || {};
+        const newLightStates = {};
+        const newLightBrightness = {};
+        
+        Object.entries(currentLights).forEach(([lightId, lightState]) => {
+          newLightStates[lightId] = lightState.isOn;
+          newLightBrightness[lightId] = lightState.brightness || 0;
+        });
+        
+        setLightStates(newLightStates);
+        setLocalLightBrightness(newLightBrightness);
+      }
+    });
+
+    // Initialize light states on component mount
+    const currentLights = rvStateManager.getCategoryState('lights');
+    const initialLightStates = {};
+    const initialLightBrightness = {};
+    
+    Object.entries(currentLights).forEach(([lightId, lightState]) => {
+      initialLightStates[lightId] = lightState ? lightState.isOn : false;
+      initialLightBrightness[lightId] = lightState ? lightState.brightness || 0 : 0;
+    });
+    
+    setLightStates(initialLightStates);
+    setLocalLightBrightness(initialLightBrightness);
+
+    return unsubscribe;
+  }, []);
+
   // Subscribe to external state changes from RV state manager
   useEffect(() => {
     const unsubscribe = rvStateManager.subscribeToExternalChanges((newState) => {
       if (newState.lights) {
         // Update local state when external light changes occur
         const updatedLightStates = {};
-        const updatedSliderValues = {};
+        const updatedLightBrightness = {};
         let hasChanges = false;
         
         Object.entries(newState.lights).forEach(([lightId, lightData]) => {
-          if (lightData.isOn !== lightStates[lightId] || lightData.brightness !== sliderValues[lightId]) {
+          if (lightData.isOn !== lightStates[lightId] || lightData.brightness !== localLightBrightness[lightId]) {
             updatedLightStates[lightId] = lightData.isOn;
-            updatedSliderValues[lightId] = lightData.brightness;
+            updatedLightBrightness[lightId] = lightData.brightness;
             hasChanges = true;
           }
         });
         
         if (hasChanges) {
           setLightStates(prev => ({ ...prev, ...updatedLightStates }));
-          setSliderValues(prev => ({ ...prev, ...updatedSliderValues }));
-          
-          // Update master light state
-          const anyLightOn = Object.values({ ...lightStates, ...updatedLightStates }).some(state => state);
-          setMasterLightOn(anyLightOn);
+          setLocalLightBrightness(prev => ({ ...prev, ...updatedLightBrightness }));
           
           // Show notification of external change
           const changedLights = Object.keys(updatedLightStates);
@@ -234,14 +270,14 @@ const Devices = () => {
     });
     
     return unsubscribe;
-  }, [lightStates, sliderValues]);
+  }, [lightStates, localLightBrightness]);
 
   // Sync light states to AsyncStorage when they change (backwards compatibility)
   useEffect(() => {
     const saveLightStates = async () => {
       try {
         await AsyncStorage.setItem('lightStates', JSON.stringify(lightStates));
-        await AsyncStorage.setItem('sliderValues', JSON.stringify(sliderValues));
+        await AsyncStorage.setItem('sliderValues', JSON.stringify(localLightBrightness));
       } catch (error) {
         console.error('Error saving light states:', error);
       }
@@ -251,7 +287,14 @@ const Devices = () => {
     if (Object.keys(lightStates).length > 0) {
       saveLightStates();
     }
-  }, [lightStates, sliderValues]);
+  }, [lightStates, localLightBrightness]);
+
+  // Show status message helper
+  const showStatusMessage = (message, duration = 3000) => {
+    setStatusMessage(message);
+    setShowStatus(true);
+    setTimeout(() => setShowStatus(false), duration);
+  };
 
   // Handle bathroom fan toggle with API integration
   const toggleBathroomFan = async () => {
@@ -411,133 +454,46 @@ const Devices = () => {
     }
   };
 
-  // Handler for slider value changes with RV state management
-  const handleSliderChange = (lightId, value) => {
-    setSliderValues(prev => ({
-      ...prev,
-      [lightId]: value
-    }));
-    
-    // Update RV state manager
-    const isOn = lightStates[lightId] || false;
-    rvStateManager.updateLightState(lightId, isOn, value);
-  };
-  
-  // Handler for individual EnhancedMainLight toggles with RV state management
-  const handleLightToggle = async (lightId, isOn) => {
-    try {
-      // 1) Update local state first for immediate UI feedback
-      const updatedStates = {
-        ...lightStates,
-        [lightId]: isOn
-      };
-      setLightStates(updatedStates);
-
-      // 2) Update RV state manager for multi-device sync
-      const brightness = sliderValues[lightId] || 50;
-      rvStateManager.updateLightState(lightId, isOn, brightness);
-
-      // 3) Persist the new per-light states to AsyncStorage
-      await AsyncStorage.setItem('lightStates', JSON.stringify(updatedStates));
-
-      // 4) Execute API command through RV state hook
-      await toggleLight(lightId);
-
-      console.log(`Light ${lightId} toggled to ${isOn ? 'ON' : 'OFF'}`);
-
-    } catch (error) {
-      console.error(`Failed to toggle light ${lightId}:`, error);
-      
-      // Revert on error
-      setLightStates(prev => ({ ...prev, [lightId]: !isOn }));
-      rvStateManager.updateLightState(lightId, !isOn, sliderValues[lightId] || 50);
-      
-      setStatusMessage(`Error toggling ${lightDisplayNames[lightId] || lightId}: ${error.message}`);
-      setShowStatus(true);
-      setTimeout(() => setShowStatus(false), 3000);
-    }
-  };
-
-  // Master light toggle handler with RV state management
+  // Master light toggle handler - updated to use LightControlService like LightScreenTablet
   const handleMasterLightToggle = async (isOn) => {
     try {
       setIsLoading(true);
       console.log(`Master light toggle called with isOn=${isOn}`);
       
       if (isOn) {
-        // Turn on all lights using RV state hook
-        await turnAllLightsOn();
+        // Turn on all lights using LightControlService
+        const result = await LightControlService.allLightsOn();
         
-        // IMPORTANT: Update UI state FIRST to prevent flickering
-        setMasterLightOn(true);
-        
-        // Update all light states to ON and set brightness to 50
-        const newLightStates = {};
-        const newSliderValues = {};
-        
-        Object.keys(lightStates).forEach(lightId => {
-          newLightStates[lightId] = true;
-          newSliderValues[lightId] = 50;
-          // Update RV state manager for each light
-          rvStateManager.updateLightState(lightId, true, 50);
-        });
-        
-        setLightStates(newLightStates);
-        setSliderValues(newSliderValues);
-        
-        // Save the new states to storage for synchronization
-        await AsyncStorage.setItem('lightStates', JSON.stringify(newLightStates));
-        await AsyncStorage.setItem('sliderValues', JSON.stringify(newSliderValues));
-        
-        console.log('Master light set to ON, all lights updated');
-        
-        // Show status message
-        setStatusMessage('All lights turned ON');
-        setShowStatus(true);
-        setTimeout(() => setShowStatus(false), 3000);
+        if (result.success) {
+          // Update RV state manager for all lights
+          allLights.forEach(lightId => {
+            rvStateManager.updateLightState(lightId, true, 75); // Default to 75% brightness
+          });
+          
+          setMasterLightOn(true);
+          showStatusMessage('All lights turned ON');
+        } else {
+          showStatusMessage('Failed to turn all lights ON');
+        }
       } else {
-        // Turn off all lights using RV state hook
-        await turnAllLightsOff();
+        // Turn off all lights using LightControlService
+        const result = await LightControlService.allLightsOff();
         
-        // IMPORTANT: Update UI state FIRST to prevent flickering
-        setMasterLightOn(false);
-        
-        // Update all light states to OFF and set brightness to 0
-        const newLightStates = {};
-        const newSliderValues = {};
-        
-        Object.keys(lightStates).forEach(lightId => {
-          newLightStates[lightId] = false;
-          newSliderValues[lightId] = 0;
-          // Update RV state manager for each light
-          rvStateManager.updateLightState(lightId, false, 0);
-        });
-        
-        setLightStates(newLightStates);
-        setSliderValues(newSliderValues);
-        
-        // Save the new states to storage for synchronization
-        await AsyncStorage.setItem('lightStates', JSON.stringify(newLightStates));
-        await AsyncStorage.setItem('sliderValues', JSON.stringify(newSliderValues));
-        
-        console.log('Master light set to OFF, all lights updated');
-        
-        // Show status message
-        setStatusMessage('All lights turned OFF');
-        setShowStatus(true);
-        setTimeout(() => setShowStatus(false), 3000);
+        if (result.success) {
+          // Update RV state manager for all lights
+          allLights.forEach(lightId => {
+            rvStateManager.updateLightState(lightId, false, 0);
+          });
+          
+          setMasterLightOn(false);
+          showStatusMessage('All lights turned OFF');
+        } else {
+          showStatusMessage('Failed to turn all lights OFF');
+        }
       }
     } catch (error) {
-      console.error('Failed to control master lights:', error);
-      
-      // If there's an error, revert the UI state to match reality
-      const anyLightOn = Object.values(lightStates).some(state => state);
-      setMasterLightOn(anyLightOn);
-      
-      // Show error message
-      setStatusMessage(`Error: ${error.message}`);
-      setShowStatus(true);
-      setTimeout(() => setShowStatus(false), 3000);
+      showStatusMessage(`Error: ${error.message}`);
+      console.error('Error controlling master lights:', error);
     } finally {
       setIsLoading(false);
     }
@@ -587,22 +543,21 @@ const Devices = () => {
           
           <View style={styles.divider} />
           
-          <View>
+          <ScrollView 
+            contentContainerStyle={{ paddingBottom: 80 }}
+            style={{ marginHorizontal: 20 }}
+          >
             {lightGroups.main.map((lightId) => (
-              <EnhancedMainLight
+              <SimpleHoldToDimLight
                 key={lightId}
                 name={lightDisplayNames[lightId] || lightId}
                 lightId={lightId}
-                min={0}
-                max={100}
-                value={sliderValues[lightId] || 0}
+                value={localLightBrightness[lightId] || 0}
                 isOn={lightStates[lightId] || false}
-                onToggle={(isOn) => handleLightToggle(lightId, isOn)}
-                onValueChange={(value) => handleSliderChange(lightId, value)}
-                supportsDimming={true}
+                supportsDimming={supportsDimming}
               />
             ))}
-          </View>
+          </ScrollView>
         </>
       );
     } else if (selectedTab === TABS.BEDROOM) {
@@ -690,24 +645,19 @@ const Devices = () => {
           <View style={styles.divider} />
           
           <ScrollView 
-            contentContainerStyle={{ paddingBottom: 80 }} // use your brown tone here
+            contentContainerStyle={{ paddingBottom: 80 }}
+            style={{ marginHorizontal: 20 }}
           >
-            <View>
-              {lightGroups.bedroom.map((lightId) => (
-                <EnhancedMainLight
-                  key={lightId}
-                  name={lightDisplayNames[lightId] || lightId}
-                  lightId={lightId}
-                  min={0}
-                  max={100}
-                  value={sliderValues[lightId] || 0}
-                  isOn={lightStates[lightId] || false}
-                  onToggle={(isOn) => handleLightToggle(lightId, isOn)}
-                  onValueChange={(value) => handleSliderChange(lightId, value)}
-                  supportsDimming={true}
-                />
-              ))}
-            </View>
+            {lightGroups.bedroom.map((lightId) => (
+              <SimpleHoldToDimLight
+                key={lightId}
+                name={lightDisplayNames[lightId] || lightId}
+                lightId={lightId}
+                value={localLightBrightness[lightId] || 0}
+                isOn={lightStates[lightId] || false}
+                supportsDimming={supportsDimming}
+              />
+            ))}
           </ScrollView>
         </>
       );
@@ -772,22 +722,22 @@ const Devices = () => {
           {/* Divider */}
           <View style={styles.divider} />
     
-          {/* Light Controls */}
-          {lightGroups.bathroom.map((lightId) => (
-            <EnhancedMainLight
-              key={lightId}
-              name={lightDisplayNames[lightId] || lightId}
-              lightId={lightId}
-              min={0}
-              max={100}
-              value={sliderValues[lightId] || 0}
-              isOn={lightStates[lightId] || false}
-              onToggle={(isOn) => handleLightToggle(lightId, isOn)}
-              onValueChange={(value) => handleSliderChange(lightId, value)}
-              supportsDimming={true}
-            />
-          ))}
-          <View className="h-6 pb-7"></View>
+          {/* Light Controls with SimpleHoldToDimLight */}
+          <ScrollView 
+            contentContainerStyle={{ paddingBottom: 80 }}
+            style={{ marginHorizontal: 20 }}
+          >
+            {lightGroups.bathroom.map((lightId) => (
+              <SimpleHoldToDimLight
+                key={lightId}
+                name={lightDisplayNames[lightId] || lightId}
+                lightId={lightId}
+                value={localLightBrightness[lightId] || 0}
+                isOn={lightStates[lightId] || false}
+                supportsDimming={supportsDimming}
+              />
+            ))}
+          </ScrollView>
         </View>
       );
     }
@@ -835,7 +785,7 @@ const Devices = () => {
         {/* Status message */}
         {showStatus && (
           <View style={styles.statusContainer}>
-            <Text style={styles.statusText}>{statusMessage}</Text>
+            <Text style={styles.statusMessageText}>{statusMessage}</Text>
           </View>
         )}
       </ScrollView>
@@ -1128,7 +1078,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 40,
     zIndex: 1000,
   },
-  statusText: {
+  statusMessageText: {
     color: 'white',
     fontWeight: 'bold',
     textAlign: 'center',
