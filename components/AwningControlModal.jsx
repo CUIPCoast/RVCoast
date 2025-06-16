@@ -271,12 +271,22 @@ const AwningControlModal = ({ isVisible, onClose }) => {
       } else if (command === 'retract') {
         result = await AwningService.retractAwning();
       } else if (command === 'stop') {
-        result = await AwningService.stopAwning();
+        // Import RVControlService dynamically to avoid import issues
+        const { RVControlService } = await import('../API/rvAPI');
+        
+        // Use the exact raw CAN command that works from your testing
+        console.log('🛑 Executing raw stop command: 19FEDB9F#0BFFC8010100FFFF');
+        result = await RVControlService.executeRawCommand('19FEDB9F#0BFFC8010100FFFF');
+        if (result) {
+          console.log('✅ Stop command executed successfully');
+          updateStatus('Awning stopped', 2000);
+          result = { success: true }; // Normalize the response
+        }
       }
       
       if (!result.success) {
-        console.error(`Command ${command} failed:`, result.error);
-        updateStatus(`Command failed: ${result.error}`, 5000);
+        console.error(`Command ${command} failed:`, result.error || 'Unknown error');
+        updateStatus(`Command failed: ${result.error || 'Unknown error'}`, 5000);
         // Revert state on failure
         setAwningState(prev => ({
           ...prev,
