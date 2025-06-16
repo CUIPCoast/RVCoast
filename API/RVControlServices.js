@@ -6,50 +6,188 @@ import { RVControlService } from '../API/rvAPI';
  */
 export const AwningService = {
   /**
-   * Extend the awning
+   * Extend the awning using the correct CAN commands
    * @returns {Promise} Promise that resolves when command is sent
    */
   extendAwning: async () => {
     try {
-      // Using the predefined command from server.js
-      const result = await RVControlService.executeCommand('awning_extend');
-      return { success: true, result };
+      console.log('🏠 AwningService: Extending awning (Instance 9)');
+      
+      // First stop any retract operation
+      await RVControlService.executeRawCommand('19FEDB9F#0AFF0003FF00FFFF');
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Send extend command: Instance 9, 100% power, command 1, 45 second duration
+      const result = await RVControlService.executeRawCommand('19FEDB9F#09FFC8012D00FFFF');
+      
+      console.log('✅ Awning extend command sent successfully');
+      return { success: true, result, command: 'extend', instance: 9 };
     } catch (error) {
-      console.error('Failed to extend awning:', error);
+      console.error('❌ Failed to extend awning:', error);
       return { success: false, error: error.message };
     }
   },
 
   /**
-   * Retract the awning
+   * Retract the awning using the correct CAN commands
    * @returns {Promise} Promise that resolves when command is sent
    */
   retractAwning: async () => {
     try {
-      // Using the predefined command from server.js
-      const result = await RVControlService.executeCommand('awning_retract');
-      return { success: true, result };
+      console.log('🏠 AwningService: Retracting awning (Instance 10)');
+      
+      // First stop any extend operation
+      await RVControlService.executeRawCommand('19FEDB9F#09FF0003FF00FFFF');
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Send retract command: Instance 10, 100% power, command 1, 45 second duration
+      const result = await RVControlService.executeRawCommand('19FEDB9F#0AFFC8012D00FFFF');
+      
+      console.log('✅ Awning retract command sent successfully');
+      return { success: true, result, command: 'retract', instance: 10 };
     } catch (error) {
-      console.error('Failed to retract awning:', error);
+      console.error('❌ Failed to retract awning:', error);
       return { success: false, error: error.message };
     }
   },
 
   /**
-   * Stop the awning
+   * Stop the awning by stopping both motors
    * @returns {Promise} Promise that resolves when command is sent
    */
   stopAwning: async () => {
     try {
-      // Using the predefined command from server.js
-      const result = await RVControlService.executeCommand('awning_stop');
-      return { success: true, result };
+      console.log('🏠 AwningService: Stopping awning (Both instances)');
+      
+      // Stop extend motor (Instance 9)
+      await RVControlService.executeRawCommand('19FEDB9F#09FF0003FF00FFFF');
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      // Stop retract motor (Instance 10)  
+      await RVControlService.executeRawCommand('19FEDB9F#0AFF0003FF00FFFF');
+      
+      console.log('✅ Awning stop commands sent successfully');
+      return { success: true, command: 'stop', instances: [9, 10] };
     } catch (error) {
-      console.error('Failed to stop awning:', error);
+      console.error('❌ Failed to stop awning:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
+   * Emergency stop - immediate stop of all awning motors
+   * @returns {Promise} Promise that resolves when command is sent
+   */
+  emergencyStop: async () => {
+    try {
+      console.log('🚨 AwningService: EMERGENCY STOP');
+      
+      // Send stop commands rapidly to both motors
+      const commands = [
+        '19FEDB9F#09FF0003FF00FFFF', // Stop extend
+        '19FEDB9F#0AFF0003FF00FFFF', // Stop retract
+        '19FEDB9F#09FF00040000FFFF', // Backup stop extend (command 4)
+        '19FEDB9F#0AFF00040000FFFF'  // Backup stop retract (command 4)
+      ];
+      
+      // Send all stop commands rapidly
+      for (const command of commands) {
+        try {
+          await RVControlService.executeRawCommand(command);
+        } catch (error) {
+          console.warn(`Emergency stop command failed: ${command}`, error);
+        }
+      }
+      
+      console.log('✅ Emergency stop commands sent');
+      return { success: true, command: 'emergency_stop' };
+    } catch (error) {
+      console.error('❌ Emergency stop failed:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
+   * Test awning motors individually (for diagnostic purposes)
+   */
+  testExtendMotor: async () => {
+    try {
+      console.log('🔧 Testing extend motor (Instance 9) - 5 second pulse');
+      
+      // Stop any existing operation
+      await RVControlService.executeRawCommand('19FEDB9F#09FF0003FF00FFFF');
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Send test command: Instance 9, 50% power, command 1, 5 second duration
+      await RVControlService.executeRawCommand('19FEDB9F#0964012D0500FFFF');
+      
+      console.log('✅ Extend motor test started (5 seconds)');
+      return { success: true, test: 'extend_motor', duration: 5 };
+    } catch (error) {
+      console.error('❌ Extend motor test failed:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  testRetractMotor: async () => {
+    try {
+      console.log('🔧 Testing retract motor (Instance 10) - 5 second pulse');
+      
+      // Stop any existing operation
+      await RVControlService.executeRawCommand('19FEDB9F#0AFF0003FF00FFFF');
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Send test command: Instance 10, 50% power, command 1, 5 second duration
+      await RVControlService.executeRawCommand('19FEDB9F#0A64012D0500FFFF');
+      
+      console.log('✅ Retract motor test started (5 seconds)');
+      return { success: true, test: 'retract_motor', duration: 5 };
+    } catch (error) {
+      console.error('❌ Retract motor test failed:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
+   * Get awning status by checking recent CAN traffic
+   */
+  getAwningStatus: async () => {
+    try {
+      // Try to get current status from the RV control service
+      const status = await RVControlService.getStatus();
+      
+      return {
+        success: true,
+        canInterface: status.canInterface,
+        timestamp: new Date().toISOString(),
+        instances: {
+          extend: 9,
+          retract: 10
+        },
+        commands: {
+          extend: '19FEDB9F#09FFC8012D00FFFF',
+          retract: '19FEDB9F#0AFFC8012D00FFFF',
+          stopExtend: '19FEDB9F#09FF0003FF00FFFF',
+          stopRetract: '19FEDB9F#0AFF0003FF00FFFF'
+        }
+      };
+    } catch (error) {
+      console.error('❌ Failed to get awning status:', error);
       return { success: false, error: error.message };
     }
   }
 };
+
+// Export individual functions for convenience
+export const {
+  extendAwning,
+  retractAwning,
+  stopAwning,
+  emergencyStop,
+  testExtendMotor,
+  testRetractMotor,
+  getAwningStatus
+} = AwningService;
 
 /**
  * Service module for Water controls
