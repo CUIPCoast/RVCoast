@@ -137,7 +137,7 @@ const Vents = () => {
                         width: 70,
                         height: 45,
                         right: 0,
-                        paddingTop: 10,
+                        paddingTop: 8,
                         backgroundColor: "white",
                       }}
                     />
