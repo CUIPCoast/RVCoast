@@ -257,7 +257,7 @@ const ImprovedLightScreenTablet = () => {
             borderRadius: 10,
             justifyContent: "center",
             padding: 20,
-            bottom: 220,
+            bottom: 320,
           }}
         >
           <View
@@ -362,16 +362,16 @@ const ImprovedLightScreenTablet = () => {
           <Col
             style={{
               width: "63%",
-              height: 310,
+              height: 400,
               backgroundColor: "#1B1B1B",
               borderRadius: 10,
               justifyContent: "flex-start",
               padding: 20,
-              marginLeft: -260,
+              marginLeft: -290,
               marginRight: 30,
-              bottom: 140,
+              bottom: 200,
               shadowColor: "#FFF",
-              shadowOffset: { width: 0, height: 6 },
+              
               shadowOpacity: 1,
               shadowRadius: 4,
               elevation: 6,
@@ -418,15 +418,15 @@ const ImprovedLightScreenTablet = () => {
           <Col
             style={{
               width: "70%",
-              height: 310,
+              height: 400,
               backgroundColor: "#1B1B1B",
               borderRadius: 10,
               justifyContent: "flex-start",
               padding: 20,
               marginRight: 30,
-              bottom: 140,
+              bottom: 200,
               shadowColor: "#FFF",
-              shadowOffset: { width: 0, height: 6 },
+              
               shadowOpacity: 1,
               shadowRadius: 4,
               elevation: 6,
@@ -473,14 +473,14 @@ const ImprovedLightScreenTablet = () => {
           <Col
             style={{
               width: "70%",
-              height: 310,
+              height: 400,
               backgroundColor: "#1B1B1B",
               borderRadius: 10,
               justifyContent: "flex-start",
               padding: 20,
-              bottom: 140,
+              bottom: 200,
               shadowColor: "#FFF",
-              shadowOffset: { width: 0, height: 6 },
+              
               shadowOpacity: 1,
               shadowRadius: 4,
               elevation: 6,

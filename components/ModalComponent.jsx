@@ -19,7 +19,7 @@ const ModalComponent = ({ nameComponent }) => {
       case 'Settings': return <Ionicons name="settings-outline" size={32} color="#FFF" />;
       case 'Home':     return <Ionicons name="home-outline"      size={32} color="#FFF" />;
       case 'Devices':  return <Ionicons name="phone-portrait-outline" size={32} color="#FFF" />;
-      case 'Wifi':     return <Ionicons name="wifi-outline"      size={152} color="#FFF" />;
+      case 'Wifi':     return <Ionicons name="wifi-outline"      size={192} color="#FFF" />;
       default:         return <Text>?</Text>;
     }
   };

@@ -97,7 +97,7 @@ const MainScreen = () => {
                             width: 70,
                             height: 45,
                             right: 0,
-                            paddingTop: 10,
+                            paddingBottom: -10,
                             backgroundColor: "white"
                         }}
                     />
@@ -127,12 +127,12 @@ const MainScreen = () => {
                     <Row className="bg-brown rounded-xl m-3 mb-10 top-15" 
                     style = {{
                         shadowColor: "#FFFFFF",
-                        shadowOffset: { width: 100, height: 120, },
+                        
                         shadowOpacity: 0.5,
-                        shadowRadius: 6,
+                        shadowRadius: 2,
                         elevation: 6,
                     }}
-                    size={75}>
+                    size={85}>
                         <View className="mb-6">
         <Text className="text-white text-lg font-semibold mb-2 top-2 left-3">Live Location</Text>
         <Map />
@@ -150,9 +150,9 @@ const MainScreen = () => {
                         marginBottom: 20,
                         position: "relative",
                         shadowColor: "#FFFFFF",
-                        shadowOffset: { width: 100, height: 120, },
+                        
                         shadowOpacity: 0.5,
-                        shadowRadius: 6,
+                        shadowRadius: 2,
                         elevation: 6,
                     }}
                 >
@@ -253,13 +253,13 @@ const MainScreen = () => {
                             justifyContent: "center",
                             padding: 10,
                             overflow: "visible",
-                            width: 220,
-                            height: 180,
+                            width: 260,
+                            height: 280,
                             position: "relative",
                             shadowColor: "#FFF",
-                            shadowOffset: { width: 0, height: 6 },
+                            
                             shadowOpacity: 1,
-                            shadowRadius: 4,
+                            shadowRadius: 2,
                             elevation: 6,
                         }}
                     >
@@ -291,14 +291,14 @@ const MainScreen = () => {
                             justifyContent: "center",
                             padding: 10,
                             overflow: "visible",
-                            width: 220,
-                            height: 180,
+                             width: 260,
+                            height: 280,
                             position: "relative",
                             shadowColor: "#FFF",
-                            shadowOffset: { width: 0, height: 6 },
+                            
                             shadowOpacity: 1,
-                            shadowRadius: 4,
-                            elevation: 6,
+                            shadowRadius: 2,
+                            elevation: 3,
                         }}
                     >
                         <Text
@@ -316,8 +316,8 @@ const MainScreen = () => {
                             <Image
                                 source={require("../assets/abpost61724photoroom-3.png")}
                                 style={{
-                                    width: 120,
-                                    height: 120,
+                                    width: 180,
+                                    height: 180,
                                     resizeMode: "contain",
                                 }}
                             />
@@ -330,11 +330,11 @@ const MainScreen = () => {
 
                 </Col>
 
-                <Col className="bg-brown p-2 rounded-xl m-3 mb-10" size={15} style={{
+                <Col className="bg-brown p-2 rounded-xl m-3 mb-13" size={16} style={{
                     shadowColor: "#FFF",
-                    shadowOffset: { width: 0, height: 12 },
+                    
                     shadowOpacity: 1,
-                    shadowRadius: 6,
+                    
                     elevation: 6,
                 }} >
                     <Text className="text-white">Air Conditioning</Text>
@@ -357,7 +357,7 @@ const styles = {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.3,
-        shadowRadius: 4,
+        shadowRadius: 2,
         elevation: 5,
         marginVertical: 8,
       },

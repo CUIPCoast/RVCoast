@@ -62,8 +62,9 @@ const Map = () => {
       <View className="rounded-lg overflow-hidden shadow-lg">
       <MapView
   style={{
-    width: isTablet ? 180 : 320,
-    height: isTablet ? 210 : 180,
+    
+    width: isTablet ? 210 : 320,
+    height: isTablet ? 340 : 180,
   }}
   customMapStyle={darkMapStyle}
   initialRegion={{
