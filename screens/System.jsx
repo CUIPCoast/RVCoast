@@ -238,8 +238,8 @@ const System = () => {
           
           {/* Red to Blue (Left to Center in top row) */}
           <ConnectionDot top={87} left={270}></ConnectionDot>
-          <ConnectionDot top={88} left={402}></ConnectionDot>
-          <HorizontalLine top={86} left={245} width={160}></HorizontalLine>
+          <ConnectionDot top={88} left={502}></ConnectionDot>
+          <HorizontalLine top={86} left={245} width={250}></HorizontalLine>
           
           {/* Blue to Green (Center to Right in top row) */}
           <ConnectionDot top={87} left={570}></ConnectionDot>
@@ -590,8 +590,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
     justifyContent: "center",
     alignItems: "center",
-    width: 250,
-    height: 180,
+    width: 310,
+    height: 240,
     backgroundColor: "#D32F2F",
     position: "relative",
     paddingTop: 40,
@@ -607,8 +607,8 @@ const styles = StyleSheet.create({
   blueCard: {
     borderRadius: 12,
     marginHorizontal: 8,
-    width: 160,    // was 180
-    height: 160,   // was 140
+    width: 180,    // was 180
+    height: 200,   // was 140
     backgroundColor: "#1976D2",
     shadowColor: "#6CB4EE",
     shadowOffset: { width: 0, height: 0 },

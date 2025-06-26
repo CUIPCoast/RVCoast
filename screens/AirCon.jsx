@@ -302,17 +302,17 @@ const AirCon = ({ onClose }) => {
             linearGradient={[ { offset: '0%', color:'#ffaca6' }, { offset: '100%', color: '#FF8200' }]}
             onChange={handleTempChange}
             subTitle={'Degrees'}
-            subTitleStyle={{ color: isDarkMode ? 'white' : 'black', paddingBottom: 25 }}
+            subTitleStyle={{ color: isDarkMode ? 'white' : 'black', paddingBottom: 25, fontSize: 20 }}
             unitStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5 }}
-            valueStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5}}
+            valueStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5,  fontSize: 42, }}
             style={{
               backgroundColor: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
             }}
             buttonContainerStyle={{
               color:"FFFFFF",
             }}
-            leftIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginRight: 10, top:20, height: 40, width: 50, paddingLeft: 4 }}
-            rightIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginLeft: 10, top:20, height: 40, width: 50, paddingLeft: 5 }}
+            leftIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginRight: 10, top:40, height: 40, width: 50, paddingLeft: 4 }}
+            rightIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginLeft: 10, top:40, height: 40, width: 50, paddingLeft: 5 }}
             isHideTailText={true}
             unit={'°F'}
           />
@@ -437,7 +437,7 @@ const tabletStyles = StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',
-    marginTop: 50,
+    marginTop: 120,
     backgroundColor: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
   },
   closeButton: {
@@ -465,7 +465,7 @@ const tabletStyles = StyleSheet.create({
   },
   buttonsContainer: {
     flexDirection: 'row',
-    marginTop: 30,
+    marginTop: 70,
   },
   button: {
     paddingHorizontal: 20,

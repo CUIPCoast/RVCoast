@@ -219,9 +219,10 @@ const ImprovedLightScreenTablet = () => {
               source={require("../assets/images/icon.png")}
               style={{
                 width: 70,
-                height: 45,
+                height: 47,
                 right: 0,
-                paddingTop: 10,
+                
+                
                 backgroundColor: "white",
               }}
             />
@@ -373,8 +374,8 @@ const ImprovedLightScreenTablet = () => {
               shadowColor: "#FFF",
               
               shadowOpacity: 1,
-              shadowRadius: 4,
-              elevation: 6,
+              shadowRadius: 2,
+              elevation: 3,
             }}
           >
             <Text
@@ -428,8 +429,8 @@ const ImprovedLightScreenTablet = () => {
               shadowColor: "#FFF",
               
               shadowOpacity: 1,
-              shadowRadius: 4,
-              elevation: 6,
+              shadowRadius: 2,
+              elevation: 3,
             }}
           >
             <Text

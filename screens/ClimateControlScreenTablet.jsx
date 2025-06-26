@@ -830,7 +830,7 @@ const ClimateControlScreenTablet = () => {
                     width: 70,
                     height: 45,
                     right: 0,
-                    paddingTop: 10,
+                    
                     backgroundColor: "white"
                   }}
                 />
@@ -921,29 +921,60 @@ const ClimateControlScreenTablet = () => {
               />
               <View style={styles.container}>
                 <RadialSlider
-                            value={temp}
-                            min={60}
-                            max={85}
-                            thumbColor={"#FFFFFF"}
-                            thumbBorderColor={"#848482"}
-                            sliderTrackColor={"#E5E5E5"}
-                            linearGradient={[ { offset: '0%', color:'#ffaca6' }, { offset: '100%', color: '#FF8200' }]}
-                            onChange={handleTempChange}
-                            subTitle={'Degrees'}
-                            subTitleStyle={{ color: isDarkMode ? 'white' : 'black', paddingBottom: 25 }}
-                            unitStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5 }}
-                            valueStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5}}
-                            style={{
-                              backgroundColor: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
-                            }}
-                            buttonContainerStyle={{
-                              color:"FFFFFF",
-                            }}
-                            leftIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginRight: 10, top:20, height: 40, width: 50, paddingLeft: 4 }}
-                            rightIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginLeft: 10, top:20, height: 40, width: 50, paddingLeft: 5 }}
-                            isHideTailText={true}
-                            unit={'°F'}
-                          />
+  value={temp}
+  min={60}
+  max={85}
+  thumbColor={"#FFFFFF"}
+  thumbBorderColor={"#848482"}
+  sliderTrackColor={"#E5E5E5"}
+  linearGradient={[
+    { offset: '0%', color: '#ffaca6' },
+    { offset: '100%', color: '#FF8200' },
+  ]}
+  onChange={handleTempChange}
+  subTitle={'Degrees'}
+  subTitleStyle={{
+    color: isDarkMode ? 'white' : 'black',
+    paddingBottom: 15,
+    fontSize: 20, // Smaller subtitle
+  }}
+  unitStyle={{
+    color: isDarkMode ? 'white' : 'black',
+    paddingTop: 5,
+  }}
+  valueStyle={{
+    color: isDarkMode ? 'white' : 'black',
+    paddingTop: 5,
+    fontSize: 48, // Smaller value number
+  }}
+  style={{
+    backgroundColor: '#1B1B1B', // light blue background
+  }}
+  buttonContainerStyle={{
+    color: "FFFFFF",
+  }}
+  leftIconStyle={{
+    backgroundColor: 'white',
+    borderRadius: 10,
+    marginRight: 10,
+    top: 40,
+    height: 40,
+    width: 50,
+    paddingLeft: 4,
+  }}
+  rightIconStyle={{
+    backgroundColor: 'white',
+    borderRadius: 10,
+    marginLeft: 10,
+    top: 40,
+    height: 40,
+    width: 50,
+    paddingLeft: 5,
+  }}
+  isHideTailText={true}
+  unit={'°F'}
+/>
+
               </View>
             </Col>
             <View
@@ -1024,7 +1055,7 @@ const ClimateControlScreenTablet = () => {
           borderRadius: 5,
           paddingVertical: 10,
           paddingHorizontal: 15,
-          marginVertical: 8,
+          marginVertical: 15,
           width: 220,
         }}
       >
@@ -1102,61 +1133,41 @@ const ClimateControlScreenTablet = () => {
 
 
                   </Col>
-                  {/* Night/Dehumid Buttons */}
-                  <View
-                  style={{
-                    flex: 1,
-                    justifyContent: "space-evenly",
-                    alignItems: "center",
-                    right: -10,
-                    top: 100,
-                  }}
-                >
-                  {/* Day/Night Toggle */}
-<TouchableOpacity
-  onPress={handleNightPress}
-  disabled={isLoading}
-  style={[
-    styles.toggleBase,
-    isNightToggled ? styles.toggleActiveDay : styles.toggleInactive
-  ]}
-  activeOpacity={0.7}
->
-  <Image
-    source={isNightToggled ? moonImage : sunImage}
-    style={styles.toggleIcon}
-  />
-  <Text style={[
-    styles.toggleText,
-    isNightToggled && styles.toggleTextActive
-  ]}>
-    {isNightToggled ? 'Night Mode' : 'Day Mode'}
-  </Text>
-</TouchableOpacity>
+                  <View style={styles.fixedToggleContainer}>
+  {/* Day/Night Toggle */}
+  <TouchableOpacity
+    onPress={handleNightPress}
+    disabled={isLoading}
+    style={[
+      styles.toggleBase,
+      isNightToggled && styles.toggleActiveDay
+    ]}
+    activeOpacity={0.8}
+  >
+    <Image source={isNightToggled ? moonImage : sunImage} style={styles.toggleIcon} />
+    <Text style={styles.toggleText}>
+      {isNightToggled ? 'Night Mode' : 'Day Mode'}
+    </Text>
+  </TouchableOpacity>
 
-{/* Dehumidify Toggle */}
-<TouchableOpacity
-  onPress={handleDehumidPress}
-  disabled={isLoading}
-  style={[
-    styles.toggleBase,
-    isDehumidToggled ? styles.toggleActiveDehumid : styles.toggleInactive
-  ]}
-  activeOpacity={0.7}
->
-  <Image
-    source={require("../assets/drop.png")}
-    style={styles.toggleIcon}
-  />
-  <Text style={[
-    styles.toggleText,
-    isDehumidToggled && styles.toggleTextActive
-  ]}>
-    {isDehumidToggled ? 'Dehumidify On' : 'Dehumidify Off'}
-  </Text>
-</TouchableOpacity>
+  {/* Dehumidify Toggle */}
+  <TouchableOpacity
+    onPress={handleDehumidPress}
+    disabled={isLoading}
+    style={[
+      styles.toggleBase,
+      isDehumidToggled && styles.toggleActiveDehumid
+    ]}
+    activeOpacity={0.8}
+  >
+    <Image source={require("../assets/drop.png")} style={styles.toggleIcon} />
+    <Text style={styles.toggleText}>
+      Dehumidify
+    </Text>
+  </TouchableOpacity>
+</View>
 
-                </View>
+
                 </View>
               </View>
             </View>
@@ -1273,6 +1284,15 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
   },
+
+  fixedToggleContainer: {
+  position: 'absolute',
+  top: 20, // adjust Y-position
+  left: 400, // adjust X-position
+  zIndex: 1000,
+  alignItems: 'center',
+},
+
   // Added status container style from AirCon
   statusContainer: {
     position: "absolute",
@@ -1319,7 +1339,8 @@ const styles = StyleSheet.create({
   },
   fanSpeedContainer: {
     width: 80,
-    height: 150, // Height limit for the container
+    height: 195, // Height limit for the container
+    marginTop:5,
     backgroundColor: 'rgba(0,0,0,0.2)',
     borderRadius: 5,
     overflow: 'hidden',
@@ -1327,6 +1348,7 @@ const styles = StyleSheet.create({
   fanSpeedScrollContent: {
     alignItems: 'center',
     paddingVertical: 2,
+    
   },
   fanSpeedButton: {
     padding: 10,
@@ -1343,15 +1365,22 @@ const styles = StyleSheet.create({
   },
 
   toggleBase: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 150,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 25,
-    marginVertical: 8,
-  },
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'flex-start',
+  width: 180,
+  paddingVertical: 12,
+  paddingHorizontal: 16,
+  borderRadius: 30,
+  marginVertical: 10,
+  backgroundColor: '#2C2C2E',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.3,
+  shadowRadius: 4,
+  elevation: 4,
+},
+
   toggleActiveDay: {
     backgroundColor: '#FFBA00',   // gold for Day/Night
   },
@@ -1362,15 +1391,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#333',      // dark gray when off
   },
   toggleIcon: {
-    width: 24,
-    height: 24,
-    marginRight: 8,
-    tintColor: 'white',
-  },
+  width: 26,
+  height: 26,
+  marginRight: 12,
+  tintColor: 'white',
+},
+
   toggleText: {
-    color: 'white',
-    fontSize: 16,
-  },
+  color: 'white',
+  fontSize: 17,
+  fontWeight: '600',
+},
+
   toggleTextActive: {
     fontWeight: '600',
   },
