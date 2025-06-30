@@ -98,7 +98,7 @@ const System = () => {
   // Get battery state of charge as percentage
   const getBatterySOC = () => {
     if (!victronData || !victronData.battery) return 0;
-    return Math.round(victronData.battery.soc * 100);
+    return Math.round(victronData.battery.soc);
   };
 
   // Get battery power with proper sign
@@ -237,39 +237,57 @@ const System = () => {
           {/* ————————————— CONNECTION LINES ————————————— */}
           
           {/* Red to Blue (Left to Center in top row) */}
-          <ConnectionDot top={87} left={270}></ConnectionDot>
-          <ConnectionDot top={88} left={502}></ConnectionDot>
+          <ConnectionDot top={87} left={330}></ConnectionDot>
+          <ConnectionDot top={88} left={490}></ConnectionDot>
           <HorizontalLine top={86} left={245} width={250}></HorizontalLine>
           
           {/* Blue to Green (Center to Right in top row) */}
-          <ConnectionDot top={87} left={570}></ConnectionDot>
-          <ConnectionDot top={165} left={486}></ConnectionDot>
-          <ConnectionDot top={88} left={702}></ConnectionDot>
-          <HorizontalLine top={86} left={560} width={200}></HorizontalLine>
+          <ConnectionDot top={88} left={670}></ConnectionDot>
+          <ConnectionDot top={88} left={832}></ConnectionDot>
+          <HorizontalLine top={86} left={560} width={450}></HorizontalLine>
+
+          {/* Bottom of Bulk Victron Image */}
+          <ConnectionDot top={210} left={576}></ConnectionDot>
 
           {/* Vertical line from Blue box down */}
-          <VerticalLine top={140} left={485} height={130}></VerticalLine>
-          <ConnectionDot top={272} left={255}></ConnectionDot>
+          <VerticalLine top={215} left={575} height={220}></VerticalLine>
+
+          {/* Dot in Middle */}
+          <ConnectionDot top={432} left={576}></ConnectionDot>
+          <HorizontalLine top={431} left={389} width={180}></HorizontalLine>
+
+          {/* Battery Lines */}
           
-          <ConnectionDot top={272} left={312}></ConnectionDot>
-          <VerticalLine top={269} left={311} height={78}></VerticalLine>
-          <HorizontalLine top={345} left={312} width={65}></HorizontalLine>
+          <ConnectionDot top={432} left={384}></ConnectionDot>
+          
+          <ConnectionDot top={432} left={310}></ConnectionDot>
+          
+          <HorizontalLine top={431} left={314} width={65}></HorizontalLine>
 
-          <ConnectionDot top={346} left={312}></ConnectionDot>
+          {/* DC Lines */}
 
-          <HorizontalLine top={271} left={260} width={55}></HorizontalLine>
-          <ConnectionDot top={346} left={365}></ConnectionDot>
+          <VerticalLine top={438} left={383} height={120}></VerticalLine>
 
-          <HorizontalLine top={271} left={315} width={170}></HorizontalLine>
-          <ConnectionDot top={273} left={486}></ConnectionDot>
+          <ConnectionDot top={557} left={384}></ConnectionDot>
 
-          <HorizontalLine top={271} left={490} width={155}></HorizontalLine>
-          <ConnectionDot top={273} left={646}></ConnectionDot>
+          <HorizontalLine top={556} left={384} width={75}></HorizontalLine>
+          
+          <ConnectionDot top={557} left={464}></ConnectionDot>
 
-          <VerticalLine top={269} left={645} height={78}></VerticalLine>
-          <ConnectionDot top={346} left={647}></ConnectionDot>
+          {/* PV Charger Lines */}
 
-          <HorizontalLine top={345} left={650} width={85}></HorizontalLine>
+          <HorizontalLine top={431} left={578} width={165}></HorizontalLine>
+
+          <ConnectionDot top={433} left={744}></ConnectionDot>
+
+          <VerticalLine top={438} left={743} height={70}></VerticalLine>
+
+          <ConnectionDot top={513} left={744}></ConnectionDot>
+
+          <HorizontalLine top={512} left={738} width={75}></HorizontalLine>
+
+          <ConnectionDot top={513} left={815}></ConnectionDot>
+
         </View>
       </SafeAreaView>
     );
@@ -624,8 +642,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
     justifyContent: "center",
     alignItems: "center",
-    width: 250,
-    height: 180,
+    width: 310,
+    height: 240,
     backgroundColor: "#388E3C",
     position: "relative",
     paddingTop: 40,
@@ -639,15 +657,16 @@ const styles = StyleSheet.create({
   },
   
   darkerGreenCard: {
-    marginTop: 95,
+    marginTop: 155,
     borderRadius: 12,
     padding: 12,
     marginHorizontal: 8,
     justifyContent: "center",
     alignItems: "center",
-    right: 35,
+    right: 27,
+    top:60,
     width: 220,
-    height: 110,
+    height: 130,
     backgroundColor: "#1B5E20",
   
     // Glow

@@ -42,15 +42,17 @@ export default PVChargerCard;
 /* ————— local styles ————— */
 const styles = StyleSheet.create({
   frame: {
-    width: 180,
+    width: 190,
     height: 140,
+    right: 80,
+    top: 100,
     marginHorizontal: 8,
     position: 'relative',
   },
   photo: {
     position: 'absolute',
-    width: '110%', // a touch wider so edges never peek through
-    height: '110%',
+    width: '130%', // a touch wider so edges never peek through
+    height: '140%',
     resizeMode: 'contain',
   },
   orangeCard: {
@@ -59,8 +61,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
     justifyContent: "center",
     alignItems: "center",
-    width: 180,
-    height: 140,
+    width: 240,
+    height: 180,
     backgroundColor: "#F57C00",
   
     // Glow

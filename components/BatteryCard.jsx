@@ -12,7 +12,7 @@ import {
   StyleSheet,
 } from "react-native";
 
-const BatteryCard = ({ width = 250, height = 150, children }) => {
+const BatteryCard = ({ width = 280, height = 180, children, subtitleStyle = {}, percentageStyle = {} }) => {
   // State to track parsed values
   const [batteryLevel, setBatteryLevel] = useState(0);
   const [batteryPower, setBatteryPower] = useState("0W");
@@ -44,16 +44,12 @@ const BatteryCard = ({ width = 250, height = 150, children }) => {
           if (match && match[1]) {
             foundLevel = parseFloat(match[1]);
             stillLoading = false;
-            // Log for debugging
-            console.log(`Found battery level: ${foundLevel}%`);
           }
         } 
         
         // Look for power values
         if (childText.includes('W')) {
           foundPower = childText;
-          // Log for debugging
-          console.log(`Found battery power: ${foundPower}`);
         }
       }
     };
@@ -66,6 +62,91 @@ const BatteryCard = ({ width = 250, height = 150, children }) => {
     setBatteryPower(foundPower);
     setIsLoading(stillLoading);
   }, [children]);
+  
+  // Function to enhance children with battery-specific styling
+  const enhanceChildren = (children) => {
+    return React.Children.map(children, (child, index) => {
+      if (!child || typeof child !== 'object') return child;
+      
+      // Handle React fragments
+      if (child.type === React.Fragment) {
+        return React.cloneElement(child, {
+          children: React.Children.map(child.props.children, (fragmentChild, fragmentIndex) => {
+            if (!fragmentChild || typeof fragmentChild !== 'object') return fragmentChild;
+            
+            // Check if this is the first child in the fragment (index 0) - the percentage
+            if (fragmentChild.type === Text && fragmentIndex === 0) {
+              return React.cloneElement(fragmentChild, {
+                style: [fragmentChild.props.style, styles.batteryPercentage, percentageStyle]
+              });
+            }
+            
+            // Check if this is the second child in the fragment (index 1) - the subtitle
+            if (fragmentChild.type === Text && fragmentIndex === 1) {
+              return React.cloneElement(fragmentChild, {
+                style: [fragmentChild.props.style, styles.batterySubtitle, subtitleStyle]
+              });
+            }
+            
+            // Also check for percentage text (contains '%')
+            if (fragmentChild.type === Text && 
+                fragmentChild.props.children && 
+                String(fragmentChild.props.children).includes('%')) {
+              return React.cloneElement(fragmentChild, {
+                style: [fragmentChild.props.style, styles.batteryPercentage, percentageStyle]
+              });
+            }
+            
+            // Also check if it contains 'W' - power text
+            if (fragmentChild.type === Text && 
+                fragmentChild.props.children && 
+                String(fragmentChild.props.children).includes('W')) {
+              return React.cloneElement(fragmentChild, {
+                style: [fragmentChild.props.style, styles.batterySubtitle, subtitleStyle]
+              });
+            }
+            
+            return fragmentChild;
+          })
+        });
+      }
+      
+      // If it's a Text component, check if it's the first child (percentage)
+      if (child.type === Text && index === 0) {
+        return React.cloneElement(child, {
+          style: [child.props.style, styles.batteryPercentage, percentageStyle]
+        });
+      }
+      
+      // If it's a Text component, check if it's likely a subtitle (second child, contains 'W', etc.)
+      if (child.type === Text && index === 1) {
+        // This is likely the subtitle/power text
+        return React.cloneElement(child, {
+          style: [child.props.style, styles.batterySubtitle, subtitleStyle]
+        });
+      }
+      
+      // If it contains '%' and is a Text component, treat as percentage
+      if (child.type === Text && 
+          child.props.children && 
+          String(child.props.children).includes('%')) {
+        return React.cloneElement(child, {
+          style: [child.props.style, styles.batteryPercentage, percentageStyle]
+        });
+      }
+      
+      // If it contains 'W' and is a Text component, treat as subtitle
+      if (child.type === Text && 
+          child.props.children && 
+          String(child.props.children).includes('W')) {
+        return React.cloneElement(child, {
+          style: [child.props.style, styles.batterySubtitle, subtitleStyle]
+        });
+      }
+      
+      return child;
+    });
+  };
   
   // Calculate dynamic values
   const padding = 8;
@@ -90,9 +171,6 @@ const BatteryCard = ({ width = 250, height = 150, children }) => {
     fillColor = '#F57C00'; // Orange for medium battery (matching your orange card)
     gradientColors = ['#FFB74D', '#E65100'];
   }
-
-  // For debugging - log the fill level
-  console.log(`Rendering battery at ${batteryLevel}% - levelWidth: ${levelWidth}/${maxFillWidth}`);
 
   return (
     <View style={styles.container}>
@@ -162,20 +240,6 @@ const BatteryCard = ({ width = 250, height = 150, children }) => {
           />
         )}
         
-        {/* Battery percentage display */}
-        {!isLoading && (
-          <SvgText
-            x={width / 2}
-            y={height / 2 + 5}
-            fontSize="24"
-            fontWeight="bold"
-            fill="#ffffff"
-            textAnchor="middle"
-          >
-            {`${batteryLevel}%`}
-          </SvgText>
-        )}
-        
         {/* Battery label */}
         <SvgText
           x={width / 2}
@@ -222,8 +286,9 @@ const BatteryCard = ({ width = 250, height = 150, children }) => {
         />
       </Svg>
       
+      {/* Content container - this will display the children passed from parent */}
       <View style={styles.contentContainer}>
-        {children}
+        {enhanceChildren(children)}
       </View>
     </View>
   );
@@ -234,6 +299,8 @@ const styles = StyleSheet.create({
     position: 'relative',
     width: 250,
     height: 150,
+    top: 70,
+    left: 25,
     marginHorizontal: 8,
     shadowColor: "#000",
     shadowOpacity: 0.3,
@@ -246,6 +313,32 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingTop: 15,
+    zIndex: 1, // Ensure content appears above the SVG
+  },
+  // New battery-specific subtitle styling
+  batterySubtitle: {
+    color: "#CCCCCC",         // Lighter gray color
+    fontSize: 14,             // Slightly larger font
+    fontWeight: "500",        // Medium weight
+    marginTop: 6,             // More space from main text
+    left:10,
+    top:18,
+    textAlign: "center",      // Center aligned
+    letterSpacing: 0.5,       // Slight letter spacing
+    opacity: 0.9,             // Slight transparency
+  },
+  // New battery-specific percentage styling
+  batteryPercentage: {
+    color: "#FFFFFF",         // Pure white for contrast
+    fontSize: 32,             // Larger, more prominent
+    fontWeight: "700",        // Bold weight
+    textAlign: "center",      // Center aligned
+    left:20,
+    top:18,
+    letterSpacing: 1,         // Better letter spacing
+    textShadowColor: "rgba(0, 0, 0, 0.3)", // Subtle text shadow
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   }
 });
 
