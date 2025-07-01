@@ -948,7 +948,7 @@ const ClimateControlScreenTablet = () => {
     fontSize: 48, // Smaller value number
   }}
   style={{
-    backgroundColor: '#1B1B1B', // light blue background
+    backgroundColor: '#1B1B1B', 
   }}
   buttonContainerStyle={{
     color: "FFFFFF",
