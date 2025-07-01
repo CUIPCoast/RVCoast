@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Dimensions } from "react-native";
 
 const useScreenSize = () => {
-  const [isTablet, setIsTablet] = useState(Dimensions.get("window").height <= 850);
+  const [isTablet, setIsTablet] = useState(Dimensions.get("window").height <= 825);
 
   useEffect(() => {
     const onChange = ({ window }) => {

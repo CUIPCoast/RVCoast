@@ -134,7 +134,7 @@ const MainScreen = () => {
                     }}
                     size={85}>
                         <View className="mb-6">
-        <Text className="text-white text-lg font-semibold mb-2 top-2 left-3">Live Location</Text>
+        <Text className="text-white text-2g font-semibold mb-2 top-2 left-3">Live Location</Text>
         <Map />
       </View>
                     </Row>
@@ -142,48 +142,90 @@ const MainScreen = () => {
 
                 <Col size={30} className="">
                 <Row
-                    className="bg-brown rounded-xl my-3 mb-10"
-                    style={{
-                        flexDirection: "column",
-                        alignItems: "flex-start",
-                        padding: 15,
-                        marginBottom: 20,
-                        position: "relative",
-                        shadowColor: "#FFFFFF",
-                        
-                        shadowOpacity: 0.5,
-                        shadowRadius: 2,
-                        elevation: 6,
-                    }}
-                >
+  className="bg-brown rounded-xl my-3 mb-10"
+  style={{
+    flexDirection: "column",
+    padding: 15,
+    shadowColor: "#FFFFFF",
+    shadowOpacity: 0.5,
+    shadowRadius: 2,
+    elevation: 6,
+    position: "relative",
+  }}
+>
+  {/* Header */}
+  <Text 
+    className="text-white text-2g font-semibold"
+    style={{
+      position: "absolute",
+      top: 10,
+      left: 10,
+      zIndex: 1,
+    }}
+  >
+    Water System
+  </Text>
 
-                <View className="flex-row justify-between items-start w-full mt-[-5] pb-2">
-                <View>
-                    <Text className="text-white mb-1">Heaters</Text>
-                    
-                    <View className="mt-5 space-y-2 mb-5">
-                    
-                  {/* Water Heater Button */}
+  {/* Content container */}
+  <View style={{
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingTop: 35,
+    flex: 1,
+  }}>
+    {/* Left column: modernized control buttons */}
+    <View style={{ alignItems: "center", marginRight: 75 }}>
+      {/* Water Heater Button */}
       <TouchableOpacity
         onPress={handleWaterHeaterToggle}
         disabled={isLoading}
         activeOpacity={0.8}
+        style={[
+          styles.modernButton,
+          { marginBottom: 16 },
+          isLoading && styles.buttonDisabled
+        ]}
       >
         <LinearGradient
-          colors={
-            isWaterHeaterOn
-              ? ['#00C6FB', '#005BEA']
-              : ['#1A1A1D', '#1A1A1D']
+          colors={isWaterHeaterOn 
+            ? ["#FF6B6B", "#FF8E53", "#FF6B35"] 
+            : ["#2C2C34", "#3A3A42", "#2C2C34"]
           }
-          style={styles.waterbutton}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.modernGradientButton}
         >
-          <Ionicons
-            name={isWaterHeaterOn ? 'water' : 'water-outline'}
-            size={32}
-            color="#FFF"
-            style={styles.icon}
-          />
-          <Text style={styles.label}>Water Heater</Text>
+          <View style={styles.buttonContent}>
+            <View style={[
+              styles.iconContainer,
+              { backgroundColor: isWaterHeaterOn ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)' }
+            ]}>
+              <Ionicons
+                name={isWaterHeaterOn ? "flame" : "flame-outline"}
+                size={24}
+                color={isWaterHeaterOn ? "#FFF" : "#B0B0B0"}
+              />
+            </View>
+            <View style={styles.textContainer}>
+              <Text style={[
+                styles.buttonTitle,
+                { color: isWaterHeaterOn ? "#FFF" : "#E0E0E0" }
+              ]}>
+                Water Heater
+              </Text>
+              <Text style={[
+                styles.buttonSubtitle,
+                { color: isWaterHeaterOn ? "rgba(255,255,255,0.8)" : "#888" }
+              ]}>
+                {isWaterHeaterOn ? "Heating" : "Off"}
+              </Text>
+            </View>
+            <View style={[
+              styles.statusIndicator,
+              { backgroundColor: isWaterHeaterOn ? "#4CAF50" : "#666" }
+            ]} />
+          </View>
         </LinearGradient>
       </TouchableOpacity>
 
@@ -192,50 +234,77 @@ const MainScreen = () => {
         onPress={handleWaterPumpToggle}
         disabled={isLoading}
         activeOpacity={0.8}
+        style={[
+          styles.modernButton,
+          isLoading && styles.buttonDisabled
+        ]}
       >
         <LinearGradient
-          colors={
-            isWaterPumpOn
-              ? ['#00C6FB', '#005BEA']
-              : ['#1A1A1D', '#1A1A1D']
+          colors={isWaterPumpOn 
+            ? ["#4FC3F7", "#29B6F6", "#0288D1"] 
+            : ["#2C2C34", "#3A3A42", "#2C2C34"]
           }
-          style={styles.waterbutton}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.modernGradientButton}
         >
-          <Ionicons
-            // you can swap this for a “pump” icon if you find one
-            name={isWaterPumpOn ? 'pie-chart' : 'pie-chart-outline'}
-            size={32}
-            color="#FFF"
-            style={styles.icon}
-          />
-          <Text style={styles.label}>Water Pump</Text>
+          <View style={styles.buttonContent}>
+            <View style={[
+              styles.iconContainer,
+              { backgroundColor: isWaterPumpOn ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)' }
+            ]}>
+              <Ionicons
+                name={isWaterPumpOn ? "water" : "water-outline"}
+                size={24}
+                color={isWaterPumpOn ? "#FFF" : "#B0B0B0"}
+              />
+            </View>
+            <View style={styles.textContainer}>
+              <Text style={[
+                styles.buttonTitle,
+                { color: isWaterPumpOn ? "#FFF" : "#E0E0E0" }
+              ]}>
+                Water Pump
+              </Text>
+              <Text style={[
+                styles.buttonSubtitle,
+                { color: isWaterPumpOn ? "rgba(255,255,255,0.8)" : "#888" }
+              ]}>
+                {isWaterPumpOn ? "Running" : "Off"}
+              </Text>
+            </View>
+            <View style={[
+              styles.statusIndicator,
+              { backgroundColor: isWaterPumpOn ? "#4CAF50" : "#666" }
+            ]} />
+          </View>
         </LinearGradient>
       </TouchableOpacity>
-                    </View>
-                </View>
+    </View>
 
-                {/* TankHeaterControls stay in the same place */}
-                <View className="flex-row justify-between w-60 px-4">
-                <TankHeaterControl
-                    name="Fresh Water"
-                    initialPercentage={80}
-                    isOn={isOn}
-                    setIsOn={setIsOn}
-                    trackColor={{ minimum: "lightblue", maximum: "white" }}
-                />
-                
-                <TankHeaterControl
-                    name="Gray Water"
-                    initialPercentage={40}
-                    isOn={isOnGray}
-                    setIsOn={setIsOnGray}
-                    trackColor={{ minimum: "gray", maximum: "white" }}
-                />
-                </View>
-                </View>
+    {/* Right column: tank sliders */}
+    <View className="flex-row">
+      <TankHeaterControl
+        name="Fresh"
+        icon="water"
+        initialPercentage={80}
+        isOn={isOn}
+        setIsOn={setIsOn}
+        trackColor={{ minimum: "#00C6FB", maximum: "#555" }}
+      />
+      <View style={{ width: 40 }} />
+      <TankHeaterControl
+        name="Gray"
+        icon="water-outline"
+        initialPercentage={40}
+        isOn={isOnGray}
+        setIsOn={setIsOnGray}
+        trackColor={{ minimum: "#AAA", maximum: "#555" }}
+      />
+    </View>
+  </View>
+</Row>
 
-
-                </Row>
 
                             
                 <Row className="rounded-x2 mt20" style={{ 
@@ -264,7 +333,7 @@ const MainScreen = () => {
                         }}
                     >
                         <Text
-                            className="text-white"
+                            className="text-white text-2g font-semibold"
                             style={{
                                 position: "absolute",
                                 top: 10,
@@ -302,7 +371,7 @@ const MainScreen = () => {
                         }}
                     >
                         <Text
-                            className="text-white"
+                            className="text-white text-2g font-semibold"
                             style={{
                                 position: "absolute",
                                 top: 10,
@@ -337,7 +406,7 @@ const MainScreen = () => {
                     
                     elevation: 6,
                 }} >
-                    <Text className="text-white">Air Conditioning</Text>
+                    <Text className="text-white text-2g font-semibold ">Air Conditioning</Text>
                     <AirCon />
                 </Col>
             </Row>
@@ -347,12 +416,70 @@ const MainScreen = () => {
 };
 
 const styles = {
+    // Modern button styles
+    modernButton: {
+        borderRadius: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 8,
+        marginVertical: 4,
+    },
+    modernGradientButton: {
+        borderRadius: 16,
+        padding: 2,
+    },
+    buttonContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.1)',
+        borderRadius: 14,
+        paddingVertical: 16,
+        paddingHorizontal: 16,
+        minWidth: 180,
+        position: 'relative',
+    },
+    iconContainer: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    textContainer: {
+        flex: 1,
+        justifyContent: 'center',
+    },
+    buttonTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        letterSpacing: 0.5,
+    },
+    buttonSubtitle: {
+        fontSize: 12,
+        fontWeight: '500',
+        marginTop: 2,
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+    },
+    statusIndicator: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        position: 'absolute',
+        top: 12,
+        right: 12,
+    },
+    
+    // Legacy styles (keeping for compatibility)
     waterbutton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 12,
-        paddingHorizontal: 16,
+        paddingVertical: 16,
+        paddingHorizontal: 20,
         borderRadius: 12,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
@@ -360,15 +487,16 @@ const styles = {
         shadowRadius: 2,
         elevation: 5,
         marginVertical: 8,
-      },
-      icon: {
+        minWidth: 160,
+    },
+    icon: {
         marginRight: 12,
-      },
-      label: {
+    },
+    label: {
         color: '#FFF',
-        fontSize: 16,
+        fontSize: 17,
         fontWeight: '600',
-      },
+    },
     errorContainer: {
         backgroundColor: "rgba(255, 0, 0, 0.1)",
         padding: 10,
@@ -395,7 +523,17 @@ const styles = {
     loadingText: {
         color: "white",
         fontSize: 16,
-    }
+    },
+    miniCircle: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        marginLeft: 6,
+        backgroundColor: "#00C6FB",
+    },
+    buttonDisabled: {
+        opacity: 0.6,
+    },
 };
 
 export default MainScreen;
