@@ -6,7 +6,9 @@ import moment from 'moment';
 import Settings from './Settings';
 import ModalComponent from '../components/ModalComponent';
 import Map from "../components/Map";
-import TankHeaterControl from "../components/TankHeaterControl";
+import TankHeaterControl from "../components/TankHeaterControl"; // Enhanced version
+import TemperatureDisplay from "../components/TemperatureDisplay"; // New component
+import useTemperature from "../hooks/useTemperature"; // New hook
 
 import AwningControlModal from "../components/AwningControlModal";
 import AirCon from "./AirCon.jsx";
@@ -30,6 +32,14 @@ const MainScreen = () => {
     const [isWaterPumpOn, setWaterPumpOn] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState(null);
+
+    // Add temperature monitoring
+    const { 
+        temperature, 
+        isConnected: tempConnected, 
+        error: tempError,
+        refresh: refreshTemp 
+    } = useTemperature({ autoStart: true });
   
     // Clear error message after 5 seconds
     useEffect(() => {
@@ -59,14 +69,17 @@ const MainScreen = () => {
         }
     };
     
-    // Handle water heater toggle
+    // Handle water heater toggle - enhanced with state sync
     const handleWaterHeaterToggle = async () => {
         setIsLoading(true);
         try {
             const result = await WaterService.toggleWaterHeater();
             if (result.success) {
-                setWaterHeaterOn(!isWaterHeaterOn);
+                const newState = !isWaterHeaterOn;
+                setWaterHeaterOn(newState);
+                setIsOn(newState); // Sync with fresh water tank heater state
                 setErrorMessage(null);
+                console.log(`MainScreen: Water heater toggled to ${newState ? 'ON' : 'OFF'}`);
             } else {
                 setErrorMessage(`Failed to toggle water heater: ${result.error}`);
             }
@@ -75,6 +88,12 @@ const MainScreen = () => {
         } finally {
             setIsLoading(false);
         }
+    };
+
+    // Handle temperature display press
+    const handleTemperaturePress = (tempData) => {
+        console.log('MainScreen: Current temperature:', tempData);
+        // You could open a climate control modal here
     };
     
     return (
@@ -86,21 +105,18 @@ const MainScreen = () => {
                         <Text className="text-lg text-white">{currentDate}</Text>
                     </Col>
                 </Row>
-                <Row
-                    className="bg-black"
-                    size={1}
-                >
+                <Row className="bg-black" size={1}>
                     <View className="pt-3 pl-3">
-                    <Image
-                        source={require("../assets/images/icon.png")}
-                        style={{
-                            width: 70,
-                            height: 45,
-                            right: 0,
-                            paddingTop: 10,
-                            backgroundColor: "white"
-                        }}
-                    />
+                        <Image
+                            source={require("../assets/images/icon.png")}
+                            style={{
+                                width: 70,
+                                height: 45,
+                                right: 0,
+                                paddingTop: 10,
+                                backgroundColor: "white"
+                            }}
+                        />
                     </View>
                 </Row>
             </Row>
@@ -109,6 +125,15 @@ const MainScreen = () => {
             {errorMessage && (
                 <View style={styles.errorContainer}>
                     <Text style={styles.errorText}>{errorMessage}</Text>
+                </View>
+            )}
+
+            {/* Temperature error display */}
+            {tempError && (
+                <View style={[styles.errorContainer, { backgroundColor: "rgba(255, 165, 0, 0.1)", borderColor: "orange" }]}>
+                    <Text style={[styles.errorText, { color: "orange" }]}>
+                        Temperature monitoring: {tempError}
+                    </Text>
                 </View>
             )}
 
@@ -122,7 +147,14 @@ const MainScreen = () => {
             <Row size={80}>
                 <Col size={15} className="">
                     <Row className=" rounded-xl mr-3 ml-3 mt-1 top-5" size={28}>
-                       
+                        {/* Temperature Display - NEW */}
+                        <View style={styles.temperatureContainer}>
+                            <TemperatureDisplay 
+                                onTemperaturePress={handleTemperaturePress}
+                                showSetpoints={false}
+                                style={styles.temperatureDisplay}
+                            />
+                        </View>
                     </Row>
                     <Row className="bg-brown rounded-xl m-3 mb-10 top-15" 
                     style = {{
@@ -132,11 +164,11 @@ const MainScreen = () => {
                         shadowRadius: 6,
                         elevation: 6,
                     }}
-                    size={75}>
-                        <View className="mb-6">
-        <Text className="text-white text-lg font-semibold mb-2 top-2 left-3">Live Location</Text>
-        <Map />
-      </View>
+                    size={30}>
+                        <View className="bg-brown rounded-xl m-3 mb-10 top-15">
+                            
+                            <Map />
+                        </View>
                     </Row>
                 </Col>
 
@@ -163,7 +195,7 @@ const MainScreen = () => {
                     
                     <View className="mt-5 space-y-2 mb-5">
                     
-                  {/* Water Heater Button */}
+                  {/* Water Heater Button - Enhanced with connection status */}
       <TouchableOpacity
         onPress={handleWaterHeaterToggle}
         disabled={isLoading}
@@ -177,17 +209,27 @@ const MainScreen = () => {
           }
           style={styles.waterbutton}
         >
-          <Ionicons
-            name={isWaterHeaterOn ? 'water' : 'water-outline'}
-            size={32}
-            color="#FFF"
-            style={styles.icon}
-          />
-          <Text style={styles.label}>Water Heater</Text>
+          <View style={styles.buttonContent}>
+            <Ionicons
+              name={isWaterHeaterOn ? 'water' : 'water-outline'}
+              size={32}
+              color="#FFF"
+              style={styles.icon}
+            />
+            <View style={styles.labelContainer}>
+              <Text style={styles.label}>Water Heater</Text>
+              {/* Status indicator */}
+              <Text style={[styles.statusText, { 
+                color: isWaterHeaterOn ? '#00FF87' : '#888' 
+              }]}>
+                {isWaterHeaterOn ? 'ON' : 'OFF'}
+              </Text>
+            </View>
+          </View>
         </LinearGradient>
       </TouchableOpacity>
 
-      {/* Water Pump Button */}
+      {/* Water Pump Button - Enhanced with status */}
       <TouchableOpacity
         onPress={handleWaterPumpToggle}
         disabled={isLoading}
@@ -201,24 +243,32 @@ const MainScreen = () => {
           }
           style={styles.waterbutton}
         >
-          <Ionicons
-            // you can swap this for a “pump” icon if you find one
-            name={isWaterPumpOn ? 'pie-chart' : 'pie-chart-outline'}
-            size={32}
-            color="#FFF"
-            style={styles.icon}
-          />
-          <Text style={styles.label}>Water Pump</Text>
+          <View style={styles.buttonContent}>
+            <Ionicons
+              name={isWaterPumpOn ? 'pie-chart' : 'pie-chart-outline'}
+              size={32}
+              color="#FFF"
+              style={styles.icon}
+            />
+            <View style={styles.labelContainer}>
+              <Text style={styles.label}>Water Pump</Text>
+              <Text style={[styles.statusText, { 
+                color: isWaterPumpOn ? '#00FF87' : '#888' 
+              }]}>
+                {isWaterPumpOn ? 'ON' : 'OFF'}
+              </Text>
+            </View>
+          </View>
         </LinearGradient>
       </TouchableOpacity>
                     </View>
                 </View>
 
-                {/* TankHeaterControls stay in the same place */}
+                {/* Enhanced TankHeaterControls with real-time CAN data */}
                 <View className="flex-row justify-between w-60 px-4">
                 <TankHeaterControl
                     name="Fresh Water"
-                    initialPercentage={80}
+                    tankType="fresh" // NEW: Specify tank type for CAN monitoring
                     isOn={isOn}
                     setIsOn={setIsOn}
                     trackColor={{ minimum: "lightblue", maximum: "white" }}
@@ -226,7 +276,7 @@ const MainScreen = () => {
                 
                 <TankHeaterControl
                     name="Gray Water"
-                    initialPercentage={40}
+                    tankType="gray" // NEW: Specify tank type for CAN monitoring
                     isOn={isOnGray}
                     setIsOn={setIsOnGray}
                     trackColor={{ minimum: "gray", maximum: "white" }}
@@ -234,9 +284,31 @@ const MainScreen = () => {
                 </View>
                 </View>
 
+                {/* System Status Indicator - NEW */}
+                <View style={styles.systemStatus}>
+                  <View style={styles.statusRow}>
+                    <Text style={styles.statusLabel}>CAN Bus:</Text>
+                    <Text style={[styles.statusValue, { 
+                      color: tempConnected ? '#10B981' : '#EF4444' 
+                    }]}>
+                      {tempConnected ? '● Connected' : '○ Disconnected'}
+                    </Text>
+                  </View>
+                  <View style={styles.statusRow}>
+                    <Text style={styles.statusLabel}>Temperature:</Text>
+                    <Text style={styles.statusValue}>
+                      {temperature.value ? `${temperature.value.toFixed(1)}${temperature.unit}` : '--°F'}
+                    </Text>
+                  </View>
+                  <View style={styles.statusRow}>
+                    <Text style={styles.statusLabel}>Last Update:</Text>
+                    <Text style={styles.statusValue}>
+                      {new Date().toLocaleTimeString()}
+                    </Text>
+                  </View>
+                </View>
 
                 </Row>
-
                             
                 <Row className="rounded-x2 mt20" style={{ 
                   justifyContent: "center", 
@@ -327,7 +399,6 @@ const MainScreen = () => {
                 </Col>
                 </Row>
 
-
                 </Col>
 
                 <Col className="bg-brown p-2 rounded-xl m-3 mb-10" size={15} style={{
@@ -347,10 +418,11 @@ const MainScreen = () => {
 };
 
 const styles = {
+    // Enhanced water button styles
     waterbutton: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
         paddingVertical: 12,
         paddingHorizontal: 16,
         borderRadius: 12,
@@ -360,15 +432,75 @@ const styles = {
         shadowRadius: 4,
         elevation: 5,
         marginVertical: 8,
-      },
-      icon: {
+        minWidth: 180,
+    },
+    buttonContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    icon: {
         marginRight: 12,
-      },
-      label: {
+    },
+    labelContainer: {
+        flex: 1,
+    },
+    label: {
         color: '#FFF',
         fontSize: 16,
         fontWeight: '600',
-      },
+    },
+    statusText: {
+        fontSize: 12,
+        fontWeight: '500',
+        marginTop: 2,
+    },
+    
+    // New temperature display styles
+    temperatureContainer: {
+        flex: 1,
+        padding: 8,
+    },
+    temperatureDisplay: {
+        backgroundColor: 'rgb(40, 41, 43)', // Brown with transparency
+        height:160,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#FFFFFF20',
+        shadowColor: "#FFFFFF",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 4,
+    },
+    
+    // New system status styles
+    systemStatus: {
+        marginTop: 12,
+        padding: 8,
+        backgroundColor: 'rgba(0, 0, 0, 0.3)',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#FFFFFF20',
+    },
+    statusRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginVertical: 2,
+    },
+    statusLabel: {
+        color: '#CCCCCC',
+        fontSize: 12,
+        fontWeight: '500',
+    },
+    statusValue: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    
+    // Existing styles
     errorContainer: {
         backgroundColor: "rgba(255, 0, 0, 0.1)",
         padding: 10,
