@@ -7,6 +7,7 @@ import {
   Image,
   StyleSheet,
   TouchableOpacity,
+  Dimensions,
 } from "react-native";
 
 import Map from "../components/Map";
@@ -14,28 +15,29 @@ import useScreenSize from "../helper/useScreenSize.jsx";
 import VictronEnergyPanel from "../components/VictronEnergyPanel";
 import EnergyFlowDiagram from "../components/EnergyFlowDiagram";
 import { VictronEnergyService } from "../API/VictronEnergyService";
-
-
 import BatteryCard from "../components/BatteryCard.jsx";
 import { HorizontalLine, VerticalLine, ConnectionDot } from '../components/Lines.js';
 import PVChargerCard from "../components/PVChargerCard.jsx";
 import GlowingCard from '../components/GlowingCards.jsx';
 
+const { width: screenWidth } = Dimensions.get('window');
 
 const System = () => {
-
   const isTablet = useScreenSize();
   const [victronData, setVictronData] = useState(null);
   const [energyError, setEnergyError] = useState(null);
   const [showDetailedView, setShowDetailedView] = useState(false);
   const [batteryLevel, setBatteryLevel] = useState(12.5);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Fetch Victron data when component mounts
   useEffect(() => {
     const fetchVictronData = async () => {
       try {
+        setRefreshing(true);
         const data = await VictronEnergyService.getAllData();
         setVictronData(data);
+        setEnergyError(null);
         
         // Update battery level if available
         if (data && data.battery && data.battery.voltage) {
@@ -44,6 +46,8 @@ const System = () => {
       } catch (error) {
         console.error("Failed to load Victron data:", error);
         setEnergyError("Could not connect to the Victron system");
+      } finally {
+        setRefreshing(false);
       }
     };
 
@@ -85,12 +89,53 @@ const System = () => {
     const l2 = victronData.grid.l2Power;
     
     if (l1 !== 0 || l2 !== 0) {
-      displayText += `\nL1: ${l1}W`;
-      displayText += ` \nL2: ${l2}W`;
-      
+      displayText += `\nL1: ${l1}W L2: ${l2}W`;
     }
     
     return displayText;
+  };
+
+  // Get battery state of charge as percentage
+  const getBatterySOC = () => {
+    if (!victronData || !victronData.battery) return 0;
+    return Math.round(victronData.battery.soc * 100);
+  };
+
+  // Get battery power with proper sign
+  const getBatteryPower = () => {
+    if (!victronData || !victronData.battery) return 0;
+    return victronData.battery.power;
+  };
+
+  // Get battery voltage
+  const getBatteryVoltage = () => {
+    if (!victronData || !victronData.battery) return 0;
+    return victronData.battery.voltage?.toFixed(1) || '0.0';
+  };
+
+  // Get battery current
+  const getBatteryCurrent = () => {
+    if (!victronData || !victronData.battery) return 0;
+    return victronData.battery.current?.toFixed(1) || '0.0';
+  };
+
+  // Get system status indicator
+  const getSystemStatus = () => {
+    if (!victronData) return { status: 'Unknown', color: '#666' };
+    
+    if (victronData.apiStatus === 'simulation') {
+      return { status: 'Simulation', color: '#FF9800' };
+    }
+    
+    if (victronData.grid && victronData.grid.isConnected) {
+      return { status: 'Shore Power', color: '#4CAF50' };
+    }
+    
+    if (victronData.pvCharger && victronData.pvCharger.power > 0) {
+      return { status: 'Solar Charging', color: '#FFD700' };
+    }
+    
+    return { status: 'Battery Power', color: '#2196F3' };
   };
 
   // Tablet view with integrated Victron data
@@ -153,10 +198,10 @@ const System = () => {
               {victronData ? (
                 <>
                   <Text style={styles.cardValue}>
-                    {`${(victronData.battery.soc * 100).toFixed(0)}%`}
+                    {`${getBatterySOC()}%`}
                   </Text>
                   <Text style={styles.cardSubtitle}>
-                    {`${victronData.battery.power}W`}
+                    {`${getBatteryPower()}W`}
                   </Text>
                 </>
               ) : (
@@ -170,8 +215,8 @@ const System = () => {
                   <Text style={styles.greenCardHeaderText}>DC Power</Text>
                 </View>
                 <Text style={[styles.cardValue, { top: 20 }]}>
-  {victronData ? `${victronData.dcSystem.power}W` : "--"}
-</Text>
+                  {victronData ? `${victronData.dcSystem.power}W` : "--"}
+                </Text>
               </View>
             </GlowingCard>
             
@@ -230,86 +275,221 @@ const System = () => {
     );
   }
   
-  // Mobile view
+  // Enhanced Mobile view with Victron data integration
   return (
-    <ScrollView 
-      overScrollMode="never"
-      contentContainerStyle={{ paddingHorizontal: 20, paddingVertical: 20 }} 
-      decelerationRate={0.8}
-      className="bg-brown"
-    >
-      <Text className="text-white text-3xl font-semibold mb-4">RV Health</Text>
-      
-      {/* Victron Energy Panel */}
-      {/* Show either detailed or simple energy panel based on user preference */}
-      {showDetailedView ? (
-        <>
-          <VictronEnergyPanel 
-            onError={handleEnergyError} 
-            refreshInterval={10000} 
+    <SafeAreaView style={styles.mobileContainer}>
+      <ScrollView 
+        overScrollMode="never"
+        contentContainerStyle={styles.mobileContent}
+        showsVerticalScrollIndicator={false}
+        decelerationRate={0.8}
+      >
+        {/* ————————————— MOBILE HEADER ————————————— */}
+        <View style={styles.mobileHeader}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.mobileHeaderTitle}>RV Energy System</Text>
+            <View style={styles.statusRow}>
+              <View style={[styles.statusDot, { backgroundColor: getSystemStatus().color }]} />
+              <Text style={styles.statusText}>{getSystemStatus().status}</Text>
+              {refreshing && <Text style={styles.refreshText}>Updating...</Text>}
+            </View>
+          </View>
+          <Image
+            source={require("../assets/images/icon.png")}
+            style={styles.mobileLogo}
           />
-          <EnergyFlowDiagram energyData={victronData} />
-        </>
-      ) : (
-        <View style={styles.simplePanelContainer}>
-          <View style={styles.headerRow}>
-            <Text style={styles.title}>Energy Status</Text>
-            <TouchableOpacity onPress={toggleEnergyView}>
-              <Text style={styles.viewDetailText}>View Details</Text>
+        </View>
+
+        {/* ————————————— MAIN ENERGY CARDS ————————————— */}
+        <View style={styles.energyCardsContainer}>
+          {/* Battery Card - Full Width */}
+          <GlowingCard glowColor="#2196F3" style={styles.batteryCardWrapper}>
+            <View style={styles.mobileBatteryCard}>
+              <View style={styles.batteryHeader}>
+                <Text style={styles.batteryHeaderText}>Battery System</Text>
+                <Text style={styles.batteryTime}>
+                  {victronData?.battery?.timeToGo || '--:--'}
+                </Text>
+              </View>
+              <View style={styles.batteryMainContent}>
+                <View style={styles.batteryLeft}>
+                  <Text style={styles.batterySOC}>{getBatterySOC()}%</Text>
+                  <Text style={styles.batterySOCLabel}>State of Charge</Text>
+                </View>
+                <View style={styles.batteryRight}>
+                  <View style={styles.batteryStats}>
+                    <Text style={styles.batteryStatValue}>{getBatteryVoltage()}V</Text>
+                    <Text style={styles.batteryStatLabel}>Voltage</Text>
+                  </View>
+                  <View style={styles.batteryStats}>
+                    <Text style={styles.batteryStatValue}>{getBatteryCurrent()}A</Text>
+                    <Text style={styles.batteryStatLabel}>Current</Text>
+                  </View>
+                  <View style={styles.batteryStats}>
+                    <Text style={[styles.batteryStatValue, { 
+                      color: getBatteryPower() > 0 ? '#4CAF50' : '#FF5722' 
+                    }]}>
+                      {getBatteryPower()}W
+                    </Text>
+                    <Text style={styles.batteryStatLabel}>
+                      {getBatteryPower() > 0 ? 'Charging' : 'Discharging'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          </GlowingCard>
+
+          {/* Top Row - Solar and Grid */}
+          <View style={styles.topRowCards}>
+            <GlowingCard glowColor="#FFBF00" style={styles.halfCardWrapper}>
+              <View style={styles.solarCard}>
+                <View style={styles.cardHeaderMobile}>
+                  <Text style={styles.cardHeaderTextMobile}>Solar</Text>
+                </View>
+                <Text style={styles.cardValueMobile}>
+                  {victronData ? `${victronData.pvCharger.power}W` : '--'}
+                </Text>
+                <Text style={styles.cardSubtitleMobile}>
+                  {victronData ? `${victronData.pvCharger.dailyYield}kWh today` : '--'}
+                </Text>
+              </View>
+            </GlowingCard>
+
+            <GlowingCard glowColor="#D32F2F" style={styles.halfCardWrapper}>
+              <View style={styles.gridCard}>
+                <View style={styles.cardHeaderMobile}>
+                  <Text style={styles.cardHeaderTextMobile}>Shore Power</Text>
+                </View>
+                <Text style={styles.cardValueMobile}>
+                  {victronData && victronData.grid && victronData.grid.isConnected ? 
+                    `${victronData.grid.power}W` : 'Disconnected'}
+                </Text>
+                {victronData && victronData.grid && victronData.grid.isConnected && (
+                  <Text style={styles.cardSubtitleMobile}>
+                    {victronData.grid.voltage}V • {victronData.grid.frequency}Hz
+                  </Text>
+                )}
+              </View>
+            </GlowingCard>
+          </View>
+
+          {/* Bottom Row - AC Loads and DC System */}
+          <View style={styles.bottomRowCards}>
+            <GlowingCard glowColor="#4CAF50" style={styles.halfCardWrapper}>
+              <View style={styles.acLoadsCard}>
+                <View style={styles.cardHeaderMobile}>
+                  <Text style={styles.cardHeaderTextMobile}>AC Loads</Text>
+                </View>
+                <Text style={styles.cardValueMobile}>
+                  {victronData ? `${victronData.acLoads.power}W` : '--'}
+                </Text>
+                <Text style={styles.cardSubtitleMobile}>
+                  Appliances & Outlets
+                </Text>
+              </View>
+            </GlowingCard>
+
+            <GlowingCard glowColor="#9C27B0" style={styles.halfCardWrapper}>
+              <View style={styles.dcSystemCard}>
+                <View style={styles.cardHeaderMobile}>
+                  <Text style={styles.cardHeaderTextMobile}>DC System</Text>
+                </View>
+                <Text style={styles.cardValueMobile}>
+                  {victronData ? `${victronData.dcSystem.power}W` : '--'}
+                </Text>
+                <Text style={styles.cardSubtitleMobile}>
+                  Lights & 12V Devices
+                </Text>
+              </View>
+            </GlowingCard>
+          </View>
+        </View>
+
+        {/* ————————————— SYSTEM OVERVIEW ————————————— */}
+        <GlowingCard glowColor="#607D8B" style={styles.overviewCardWrapper}>
+          <View style={styles.systemOverviewCard}>
+            <Text style={styles.overviewTitle}>System Overview</Text>
+            <View style={styles.overviewContent}>
+              <View style={styles.overviewRow}>
+                <Text style={styles.overviewLabel}>AC Input:</Text>
+                <Text style={styles.overviewValue}>
+                  {victronData?.systemOverview?.acInput || 'Unknown'}
+                </Text>
+              </View>
+              <View style={styles.overviewRow}>
+                <Text style={styles.overviewLabel}>System State:</Text>
+                <Text style={styles.overviewValue}>
+                  {victronData?.systemOverview?.state || 'Unknown'}
+                </Text>
+              </View>
+              <View style={styles.overviewRow}>
+                <Text style={styles.overviewLabel}>AC Mode:</Text>
+                <Text style={styles.overviewValue}>
+                  {victronData?.systemOverview?.mode || 'Unknown'}
+                </Text>
+              </View>
+              <View style={styles.overviewRow}>
+                <Text style={styles.overviewLabel}>Data Source:</Text>
+                <Text style={[styles.overviewValue, { 
+                  color: victronData?.apiStatus === 'connected' ? '#4CAF50' : '#FF9800' 
+                }]}>
+                  {victronData?.apiStatus === 'connected' ? 'Live Data' : 
+                   victronData?.apiStatus === 'simulation' ? 'Simulation' : 'Cached'}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </GlowingCard>
+
+        {/* ————————————— DETAILED VIEW TOGGLE ————————————— */}
+        <TouchableOpacity 
+          style={styles.detailToggleButton} 
+          onPress={toggleEnergyView}
+        >
+          <Text style={styles.detailToggleText}>
+            {showDetailedView ? 'Hide Details' : 'View Detailed Analysis'}
+          </Text>
+        </TouchableOpacity>
+
+        {/* ————————————— DETAILED VIEW ————————————— */}
+        {showDetailedView && (
+          <>
+            <VictronEnergyPanel 
+              onError={handleEnergyError} 
+              refreshInterval={10000} 
+            />
+            <EnergyFlowDiagram energyData={victronData} />
+          </>
+        )}
+
+        {/* ————————————— MAP SECTION ————————————— */}
+        <View style={styles.mapSection}>
+          <Text style={styles.mapTitle}>Live Location</Text>
+          <View style={styles.mapContainer}>
+            <Map />
+          </View>
+        </View>
+
+        {/* ————————————— ERROR STATE ————————————— */}
+        {energyError && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{energyError}</Text>
+            <TouchableOpacity 
+              style={styles.retryButton}
+              onPress={() => window.location.reload()}
+            >
+              <Text style={styles.retryText}>Retry Connection</Text>
             </TouchableOpacity>
           </View>
-          
-          {victronData ? (
-            <View style={styles.simpleEnergyData}>
-              <View style={styles.energyItem}>
-                <Text style={styles.energyValue}>
-                  {(victronData.battery.soc * 100)}%
-                </Text>
-                <Text style={styles.energyLabel}>Battery</Text>
-                <Text style={styles.energyDetail}>
-                  {victronData.battery.spc}V • {` ${victronData.battery.current} A`}
-                </Text>
-              </View>
-              
-              <View style={styles.energyItem}>
-                <Text style={styles.energyValue}>{victronData.acLoads.power}W</Text>
-                <Text style={styles.energyLabel}>Power Usage</Text>
-              </View>
-              
-              <View style={styles.energyItem}>
-                <Text style={styles.energyValue}>{victronData.pvCharger.power}W</Text>
-                <Text style={styles.energyLabel}>Solar Input</Text>
-              </View>
-              
-              {/* Added Grid Power to mobile view */}
-              <View style={styles.energyItem}>
-                <Text style={styles.energyValue}>
-                  {victronData.grid && victronData.grid.isConnected ? 
-                    `${victronData.grid.power}W` : 
-                    "Off"}
-                </Text>
-                <Text style={styles.energyLabel}>Shore Power</Text>
-              </View>
-            </View>
-          ) : (
-            <View style={styles.loadingContainer}>
-              <Text style={styles.loadingText}>
-                {energyError ? energyError : "Loading energy data..."}
-              </Text>
-            </View>
-          )}
-        </View>
-      )}
-      
-      <View className="mb-6">
-        <Text className="text-white text-lg font-semibold mb-2">Live Location</Text>
-        <Map />
-      </View>
-    </ScrollView>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  // Tablet styles (unchanged)
   tabletContainer: {
     flex: 1,
     backgroundColor: "#000",
@@ -398,7 +578,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   darkerGreenCardHeaderText: {
-    color: '#F',
+    color: '#FFF',
     fontSize: 18,
     fontWeight: '700',
   },
@@ -501,6 +681,295 @@ const styles = StyleSheet.create({
     marginTop: 8,
     tintColor: '#fff',
   },
+
+  // Enhanced Mobile Styles
+  mobileContainer: {
+    flex: 1,
+    backgroundColor: "#211D1D", // Match your brown theme
+  },
+  mobileContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+    paddingBottom: 40,
+  },
+  mobileHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+    paddingHorizontal: 4,
+  },
+  headerLeft: {
+    flex: 1,
+  },
+  mobileHeaderTitle: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  statusText: {
+    color: '#CCCCCC',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  refreshText: {
+    color: '#FFB267',
+    fontSize: 12,
+    marginLeft: 8,
+    fontStyle: 'italic',
+  },
+  mobileLogo: {
+    width: 50,
+    height: 32,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 6,
+  },
+
+  // Energy Cards Container
+  energyCardsContainer: {
+    marginBottom: 20,
+  },
+
+  // Battery Card (Full Width)
+  batteryCardWrapper: {
+    marginBottom: 16,
+  },
+  mobileBatteryCard: {
+    backgroundColor: '#1976D2',
+    borderRadius: 16,
+    padding: 20,
+    minHeight: 140,
+  },
+  batteryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  batteryHeaderText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  batteryTime: {
+    color: '#BBDEFB',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  batteryMainContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  batteryLeft: {
+    flex: 1,
+  },
+  batterySOC: {
+    color: '#FFFFFF',
+    fontSize: 36,
+    fontWeight: '700',
+    lineHeight: 40,
+  },
+  batterySOCLabel: {
+    color: '#BBDEFB',
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 4,
+  },
+  batteryRight: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    flex: 1,
+  },
+  batteryStats: {
+    alignItems: 'center',
+  },
+  batteryStatValue: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  batteryStatLabel: {
+    color: '#BBDEFB',
+    fontSize: 10,
+    fontWeight: '400',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+
+  // Top Row Cards (Solar & Grid)
+  topRowCards: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  halfCardWrapper: {
+    flex: 1,
+    marginHorizontal: 6,
+  },
+  solarCard: {
+    backgroundColor: '#FF8F00',
+    borderRadius: 12,
+    padding: 16,
+    minHeight: 100,
+    justifyContent: 'center',
+  },
+  gridCard: {
+    backgroundColor: '#D32F2F',
+    borderRadius: 12,
+    padding: 16,
+    minHeight: 100,
+    justifyContent: 'center',
+  },
+
+  // Bottom Row Cards (AC Loads & DC System)
+  bottomRowCards: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  acLoadsCard: {
+    backgroundColor: '#388E3C',
+    borderRadius: 12,
+    padding: 16,
+    minHeight: 100,
+    justifyContent: 'center',
+  },
+  dcSystemCard: {
+    backgroundColor: '#7B1FA2',
+    borderRadius: 12,
+    padding: 16,
+    minHeight: 100,
+    justifyContent: 'center',
+  },
+
+  // Mobile Card Common Styles
+  cardHeaderMobile: {
+    marginBottom: 8,
+  },
+  cardHeaderTextMobile: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    opacity: 0.9,
+  },
+  cardValueMobile: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  cardSubtitleMobile: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '400',
+    opacity: 0.8,
+  },
+
+  // System Overview Card
+  overviewCardWrapper: {
+    marginBottom: 20,
+  },
+  systemOverviewCard: {
+    backgroundColor: '#455A64',
+    borderRadius: 12,
+    padding: 20,
+  },
+  overviewTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  overviewContent: {
+    gap: 12,
+  },
+  overviewRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  overviewLabel: {
+    color: '#B0BEC5',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  overviewValue: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  // Detail Toggle Button
+  detailToggleButton: {
+    backgroundColor: '#FFB267',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  detailToggleText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+
+  // Map Section
+  mapSection: {
+    marginBottom: 20,
+  },
+  mapTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  mapContainer: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    height: 200,
+  },
+
+  // Error State
+  errorContainer: {
+    backgroundColor: '#F44336',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  errorText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  retryButton: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  retryText: {
+    color: '#F44336',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  // Legacy styles for backward compatibility
   simplePanelContainer: {
     backgroundColor: '#211D1D',
     borderRadius: 15,
@@ -566,7 +1035,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: 'white',
     marginBottom: 12,
-  },
+  }
 });
 
 export default System;

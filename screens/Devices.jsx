@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { StyleSheet, View, Text, Pressable, TouchableOpacity, Image, ScrollView, Modal, Button, ActivityIndicator } from "react-native";
-import EnhancedMainLight from "../components/EnhancedMainLight.jsx";
+import SimpleHoldToDimLight from "../components/SimpleHoldToDimLight.jsx";
 
 import useScreenSize from "../helper/useScreenSize.jsx";
 import AwningControlModal from "../components/AwningControlModal";
@@ -11,6 +11,11 @@ import { Feather as Icon } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import Ionicons from '@expo/vector-icons/Ionicons';
+
+// Import RV State Management hooks
+import { useRVLights, useRVWater } from "../API/RVStateManager/RVStateHooks";
+import rvStateManager from "../API/RVStateManager/RVStateManager";
+import { LightControlService } from "../Service/LightControlService.js";
 
 import {
   Padding,
@@ -45,30 +50,29 @@ const lightDisplayNames = {
   'wardrobe_lights': 'Wardrobe Light'
 };
 
-// Light groups by category
+// Light groups by category - Updated to match LightScreenTablet structure
 const lightGroups = {
   main: [
     'kitchen_lights',
-    'dinette_lights',
+    'dinette_lights', 
     'under_cab_lights',
-    'wardrobe_lights'
+    'strip_lights',
+    'awning_lights',
+    'porch_lights',
+    'hitch_lights'
   ],
   bedroom: [
     'bed_ovhd_light',
     'left_reading_lights',
     'right_reading_lights',
-    'vibe_light',
-    'bath_light'
+    'vibe_light'
   ],
   bathroom: [
     'bath_light',
     'vanity_light',
-    'shower_lights',
-    'bed_ovhd_light'
+    'shower_lights'
   ]
 };
-
-
 
 const Devices = () => {
   const [isOn, setIsOn] = useState(false);
@@ -79,80 +83,201 @@ const Devices = () => {
   const [isScheduleModalVisible, setScheduleModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
-  // Fan and water control states
+  // Use RV State Management hooks
+  const { lights, toggleLight, setLightBrightness: updateLightBrightness, turnAllLightsOn, turnAllLightsOff } = useRVLights();
+  const { water, toggleWaterPump, toggleWaterHeater } = useRVWater();
+  
+  // Fan control states (these could be moved to RV state manager too)
   const [isBathroomFanOn, setBathroomFanOn] = useState(false);
   const [isBayVentFanOn, setBayVentFanOn] = useState(false);
-  const [isWaterHeaterOn, setWaterHeaterOn] = useState(false);
-  const [isWaterPumpOn, setWaterPumpOn] = useState(false);
   
   // State for API operation status
   const [statusMessage, setStatusMessage] = useState('');
   const [showStatus, setShowStatus] = useState(false);
 
-  // State for light toggling
+  // State for individual light states - now managed by RV state manager
   const [lightStates, setLightStates] = useState({});
+  const [localLightBrightness, setLocalLightBrightness] = useState({});
   
-  // State for slider values
-  const [sliderValues, setSliderValues] = useState({});
-  
-  // State for master light switch
+  // State for master light switch - independent from individual lights
   const [masterLightOn, setMasterLightOn] = useState(false);
 
-  // Initialize light states and slider values
+  // Get all available lights
+  const allLights = LightControlService.getAllLights();
+  
+  // Check if dimming is supported
+  const supportsDimming = LightControlService.supportsDimming();
+
+  // Initialize light states from RV state manager
   useEffect(() => {
-    const initialLightStates = {};
-    const initialSliderValues = {};
-    
-    // Combine all light groups to get all lights
-    const allLights = [
-      ...lightGroups.main,
-      ...lightGroups.bedroom,
-      ...lightGroups.bathroom
-    ];
-    
-    // Remove duplicates
-    const uniqueLights = [...new Set(allLights)];
-    
-    uniqueLights.forEach(lightId => {
-      initialLightStates[lightId] = false;
-      initialSliderValues[lightId] = 50; // Default to middle value
-    });
-    
-    setLightStates(initialLightStates);
-    setSliderValues(initialSliderValues);
-    
-    // Load saved light states from storage
-    const loadSavedLightStates = async () => {
+    const initializeState = async () => {
       try {
-        const savedLightStates = await AsyncStorage.getItem('lightStates');
-        const savedSliderValues = await AsyncStorage.getItem('sliderValues');
+        // Get current light state from RV state manager
+        const currentLightState = rvStateManager.getCategoryState('lights');
+        const currentWaterState = rvStateManager.getCategoryState('water');
         
-        if (savedLightStates) {
-          setLightStates(JSON.parse(savedLightStates));
-        }
+        // Combine all light groups to get all lights
+        const allLights = [
+          ...lightGroups.main,
+          ...lightGroups.bedroom,
+          ...lightGroups.bathroom
+        ];
         
-        if (savedSliderValues) {
-          setSliderValues(JSON.parse(savedSliderValues));
-        }
+        // Remove duplicates
+        const uniqueLights = [...new Set(allLights)];
         
-        // Update master light state based on loaded light states
-        const loadedStates = savedLightStates ? JSON.parse(savedLightStates) : {};
-        const anyLightOn = Object.values(loadedStates).some(state => state);
+        // Initialize from RV state manager or set defaults
+        const initialLightStates = {};
+        const initialLightBrightness = {};
+        
+        uniqueLights.forEach(lightId => {
+          if (currentLightState[lightId]) {
+            initialLightStates[lightId] = currentLightState[lightId].isOn || false;
+            initialLightBrightness[lightId] = currentLightState[lightId].brightness || 50;
+          } else {
+            initialLightStates[lightId] = false;
+            initialLightBrightness[lightId] = 50;
+            // Initialize in RV state manager
+            rvStateManager.updateLightState(lightId, false, 50);
+          }
+        });
+        
+        setLightStates(initialLightStates);
+        setLocalLightBrightness(initialLightBrightness);
+        
+        // Set master light state based on any lights being on
+        const anyLightOn = Object.values(initialLightStates).some(state => state);
         setMasterLightOn(anyLightOn);
+        
+        // Fall back to AsyncStorage for backwards compatibility and sync to RV state
+        try {
+          const savedLightStates = await AsyncStorage.getItem('lightStates');
+          const savedSliderValues = await AsyncStorage.getItem('sliderValues');
+          
+          if (savedLightStates) {
+            const savedStates = JSON.parse(savedLightStates);
+            // Update RV state manager with saved states
+            Object.entries(savedStates).forEach(([lightId, isOn]) => {
+              const brightness = initialLightBrightness[lightId] || 50;
+              rvStateManager.updateLightState(lightId, isOn, brightness);
+            });
+            setLightStates(savedStates);
+          }
+          
+          if (savedSliderValues) {
+            const savedValues = JSON.parse(savedSliderValues);
+            // Update RV state manager with saved values
+            Object.entries(savedValues).forEach(([lightId, brightness]) => {
+              const isOn = initialLightStates[lightId] || false;
+              rvStateManager.updateLightState(lightId, isOn, brightness);
+            });
+            setLocalLightBrightness(savedValues);
+          }
+        } catch (error) {
+          console.error('Error loading saved light states from AsyncStorage:', error);
+        }
+        
       } catch (error) {
-        console.error('Error loading saved light states:', error);
+        console.error('Error initializing Devices state:', error);
       }
     };
     
-    loadSavedLightStates();
+    initializeState();
   }, []);
 
-  // Add a useEffect to save light states when they change
+  // Subscribe to RV State Manager for light states
+  useEffect(() => {
+    const unsubscribe = rvStateManager.subscribe(({ category, state }) => {
+      if (category === 'lights') {
+        const currentLights = state.lights || {};
+        const newLightStates = {};
+        const newLightBrightness = {};
+        
+        Object.entries(currentLights).forEach(([lightId, lightState]) => {
+          newLightStates[lightId] = lightState.isOn;
+          newLightBrightness[lightId] = lightState.brightness || 0;
+        });
+        
+        setLightStates(newLightStates);
+        setLocalLightBrightness(newLightBrightness);
+      }
+    });
+
+    // Initialize light states on component mount
+    const currentLights = rvStateManager.getCategoryState('lights');
+    const initialLightStates = {};
+    const initialLightBrightness = {};
+    
+    Object.entries(currentLights).forEach(([lightId, lightState]) => {
+      initialLightStates[lightId] = lightState ? lightState.isOn : false;
+      initialLightBrightness[lightId] = lightState ? lightState.brightness || 0 : 0;
+    });
+    
+    setLightStates(initialLightStates);
+    setLocalLightBrightness(initialLightBrightness);
+
+    return unsubscribe;
+  }, []);
+
+  // Subscribe to external state changes from RV state manager
+  useEffect(() => {
+    const unsubscribe = rvStateManager.subscribeToExternalChanges((newState) => {
+      if (newState.lights) {
+        // Update local state when external light changes occur
+        const updatedLightStates = {};
+        const updatedLightBrightness = {};
+        let hasChanges = false;
+        
+        Object.entries(newState.lights).forEach(([lightId, lightData]) => {
+          if (lightData.isOn !== lightStates[lightId] || lightData.brightness !== localLightBrightness[lightId]) {
+            updatedLightStates[lightId] = lightData.isOn;
+            updatedLightBrightness[lightId] = lightData.brightness;
+            hasChanges = true;
+          }
+        });
+        
+        if (hasChanges) {
+          setLightStates(prev => ({ ...prev, ...updatedLightStates }));
+          setLocalLightBrightness(prev => ({ ...prev, ...updatedLightBrightness }));
+          
+          // Show notification of external change
+          const changedLights = Object.keys(updatedLightStates);
+          if (changedLights.length === 1) {
+            const lightName = lightDisplayNames[changedLights[0]] || changedLights[0];
+            setStatusMessage(`${lightName} ${updatedLightStates[changedLights[0]] ? 'turned on' : 'turned off'} remotely`);
+          } else if (changedLights.length > 1) {
+            setStatusMessage(`${changedLights.length} lights changed remotely`);
+          }
+          setShowStatus(true);
+          setTimeout(() => setShowStatus(false), 3000);
+        }
+      }
+      
+      if (newState.water) {
+        // Update water system states from external changes
+        if (newState.water.pumpOn !== undefined) {
+          setStatusMessage(`Water pump ${newState.water.pumpOn ? 'turned on' : 'turned off'} remotely`);
+          setShowStatus(true);
+          setTimeout(() => setShowStatus(false), 3000);
+        }
+        
+        if (newState.water.heaterOn !== undefined) {
+          setStatusMessage(`Water heater ${newState.water.heaterOn ? 'turned on' : 'turned off'} remotely`);
+          setShowStatus(true);
+          setTimeout(() => setShowStatus(false), 3000);
+        }
+      }
+    });
+    
+    return unsubscribe;
+  }, [lightStates, localLightBrightness]);
+
+  // Sync light states to AsyncStorage when they change (backwards compatibility)
   useEffect(() => {
     const saveLightStates = async () => {
       try {
         await AsyncStorage.setItem('lightStates', JSON.stringify(lightStates));
-        await AsyncStorage.setItem('sliderValues', JSON.stringify(sliderValues));
+        await AsyncStorage.setItem('sliderValues', JSON.stringify(localLightBrightness));
       } catch (error) {
         console.error('Error saving light states:', error);
       }
@@ -162,24 +287,36 @@ const Devices = () => {
     if (Object.keys(lightStates).length > 0) {
       saveLightStates();
     }
-  }, [lightStates, sliderValues]);
+  }, [lightStates, localLightBrightness]);
+
+  // Show status message helper
+  const showStatusMessage = (message, duration = 3000) => {
+    setStatusMessage(message);
+    setShowStatus(true);
+    setTimeout(() => setShowStatus(false), duration);
+  };
 
   // Handle bathroom fan toggle with API integration
   const toggleBathroomFan = async () => {
     try {
       setIsLoading(true);
+      const newState = !isBathroomFanOn;
+      
+      // Update state first for immediate UI feedback
+      setBathroomFanOn(newState);
       
       const result = await FanService.toggleBathroomFan();
       
       if (result.success) {
-        setBathroomFanOn(!isBathroomFanOn);
-        
         // Show status message
-        setStatusMessage(`Bathroom fan ${!isBathroomFanOn ? 'turned on' : 'turned off'}`);
+        setStatusMessage(`Bathroom fan ${newState ? 'turned on' : 'turned off'}`);
         setShowStatus(true);
         setTimeout(() => setShowStatus(false), 3000);
       } else {
         console.error('Failed to toggle bathroom fan:', result.error);
+        
+        // Revert state on error
+        setBathroomFanOn(!newState);
         
         // Show error message
         setStatusMessage('Failed to toggle bathroom fan');
@@ -188,6 +325,9 @@ const Devices = () => {
       }
     } catch (error) {
       console.error('Error toggling bathroom fan:', error);
+      
+      // Revert state on error
+      setBathroomFanOn(!isBathroomFanOn);
       
       // Show error message
       setStatusMessage(`Error: ${error.message}`);
@@ -202,18 +342,23 @@ const Devices = () => {
   const toggleBayVentFan = async () => {
     try {
       setIsLoading(true);
+      const newState = !isBayVentFanOn;
+      
+      // Update state first for immediate UI feedback
+      setBayVentFanOn(newState);
       
       const result = await FanService.toggleBayVentFan();
       
       if (result.success) {
-        setBayVentFanOn(!isBayVentFanOn);
-        
         // Show status message
-        setStatusMessage(`Bay vent fan ${!isBayVentFanOn ? 'turned on' : 'turned off'}`);
+        setStatusMessage(`Bay vent fan ${newState ? 'turned on' : 'turned off'}`);
         setShowStatus(true);
         setTimeout(() => setShowStatus(false), 3000);
       } else {
         console.error('Failed to toggle bay vent fan:', result.error);
+        
+        // Revert state on error
+        setBayVentFanOn(!newState);
         
         // Show error message
         setStatusMessage('Failed to toggle bay vent fan');
@@ -223,6 +368,9 @@ const Devices = () => {
     } catch (error) {
       console.error('Error toggling bay vent fan:', error);
       
+      // Revert state on error
+      setBayVentFanOn(!isBayVentFanOn);
+      
       // Show error message
       setStatusMessage(`Error: ${error.message}`);
       setShowStatus(true);
@@ -232,171 +380,124 @@ const Devices = () => {
     }
   };
   
-  // Water heater toggle (async)
- const handleWaterHeaterToggle = async () => {
-   setIsLoading(true);
-   try {
-     const result = await WaterService.toggleWaterHeater();
-     if (result.success) {
-       setWaterHeaterOn(prev => !prev);
-       setStatusMessage(`Water heater ${!isWaterHeaterOn ? 'turned on' : 'turned off'}`);
-     } else {
-       setStatusMessage('Failed to toggle water heater');
-     }
-   } catch (e) {
-     setStatusMessage(`Error: ${e.message}`);
-   } finally {
-     setShowStatus(true);
-     setTimeout(() => setShowStatus(false), 3000);
-     setIsLoading(false);
-   }
- };
-
- // Water pump toggle (async)
- const handleWaterPumpToggle = async () => {
-   setIsLoading(true);
-   try {
-     const result = await WaterService.toggleWaterPump();
-     if (result.success) {
-       setWaterPumpOn(prev => !prev);
-       setStatusMessage(`Water pump ${!isWaterPumpOn ? 'turned on' : 'turned off'}`);
-     } else {
-       setStatusMessage('Failed to toggle water pump');
-     }
-   } catch (e) {
-     setStatusMessage(`Error: ${e.message}`);
-   } finally {
-     setShowStatus(true);
-     setTimeout(() => setShowStatus(false), 3000);
-     setIsLoading(false);
-   }
- };
-
-  // Handler for slider value changes
-  const handleSliderChange = (lightId, value) => {
-    setSliderValues(prev => ({
-      ...prev,
-      [lightId]: value
-    }));
+  // Water heater toggle with RV state management
+  const handleWaterHeaterToggle = async () => {
+    setIsLoading(true);
+    const newState = !water.heaterOn;
+    
+    try {
+      // Update RV state first for immediate UI feedback
+      rvStateManager.updateWaterState({ 
+        heaterOn: newState,
+        lastUpdated: new Date().toISOString()
+      });
+      
+      const result = await WaterService.toggleWaterHeater();
+      if (result.success) {
+        setStatusMessage(`Water heater ${newState ? 'turned on' : 'turned off'}`);
+      } else {
+        // Revert state on error
+        rvStateManager.updateWaterState({ 
+          heaterOn: !newState,
+          lastUpdated: new Date().toISOString()
+        });
+        setStatusMessage('Failed to toggle water heater');
+      }
+    } catch (e) {
+      // Revert state on error
+      rvStateManager.updateWaterState({ 
+        heaterOn: !newState,
+        lastUpdated: new Date().toISOString()
+      });
+      setStatusMessage(`Error: ${e.message}`);
+    } finally {
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
+      setIsLoading(false);
+    }
   };
-  
-  // Handler for light toggle
- // Handler for light toggle
-// Handler for individual EnhancedMainLight toggles
-const handleLightToggle = async (lightId, isOn) => {
-  try {
-    // 1) Update just this specific light's state
-    const updatedStates = {
-      ...lightStates,
-      [lightId]: isOn
-    };
-    setLightStates(updatedStates);
 
-    // 2) Persist the new per-light states
-    await AsyncStorage.setItem('lightStates', JSON.stringify(updatedStates));
+  // Water pump toggle with RV state management
+  const handleWaterPumpToggle = async () => {
+    setIsLoading(true);
+    const newState = !water.pumpOn;
+    
+    try {
+      // Update RV state first for immediate UI feedback
+      rvStateManager.updateWaterState({ 
+        pumpOn: newState,
+        lastUpdated: new Date().toISOString()
+      });
+      
+      const result = await WaterService.toggleWaterPump();
+      if (result.success) {
+        setStatusMessage(`Water pump ${newState ? 'turned on' : 'turned off'}`);
+      } else {
+        // Revert state on error
+        rvStateManager.updateWaterState({ 
+          pumpOn: !newState,
+          lastUpdated: new Date().toISOString()
+        });
+        setStatusMessage('Failed to toggle water pump');
+      }
+    } catch (e) {
+      // Revert state on error
+      rvStateManager.updateWaterState({ 
+        pumpOn: !newState,
+        lastUpdated: new Date().toISOString()
+      });
+      setStatusMessage(`Error: ${e.message}`);
+    } finally {
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
+      setIsLoading(false);
+    }
+  };
 
-    // NOTE: no more touching masterLightOn here — it stays completely independent
-
-  } catch (error) {
-    console.error(`Failed to toggle light ${lightId}:`, error);
-    // Revert on error
-    setLightStates(prev => ({ ...prev }));
-    setStatusMessage(`Error toggling ${lightId}: ${error.message}`);
-    setShowStatus(true);
-    setTimeout(() => setShowStatus(false), 3000);
-  }
-};
-
-
-  // Master light toggle handler
-  
+  // Master light toggle handler - updated to use LightControlService like LightScreenTablet
   const handleMasterLightToggle = async (isOn) => {
     try {
       setIsLoading(true);
       console.log(`Master light toggle called with isOn=${isOn}`);
       
       if (isOn) {
-        // Turn on all lights
-        const result = await LightService.allLightsOn();
-        console.log('allLightsOn result:', result);
+        // Turn on all lights using LightControlService
+        const result = await LightControlService.allLightsOn();
         
         if (result.success) {
-          // IMPORTANT: Update UI state FIRST to prevent flickering
-          setMasterLightOn(true);
-          
-          // Update all light states to ON and set brightness to 50
-          const newLightStates = {};
-          const newSliderValues = {};
-          
-          Object.keys(lightStates).forEach(lightId => {
-            newLightStates[lightId] = true;
-            newSliderValues[lightId] = 50;
+          // Update RV state manager for all lights
+          allLights.forEach(lightId => {
+            rvStateManager.updateLightState(lightId, true, 75); // Default to 75% brightness
           });
           
-          // Use the setState updater function to ensure we have the latest state
-          setLightStates(newLightStates);
-          setSliderValues(newSliderValues);
-          
-          // Save the new states to storage for synchronization
-          await AsyncStorage.setItem('lightStates', JSON.stringify(newLightStates));
-          await AsyncStorage.setItem('sliderValues', JSON.stringify(newSliderValues));
-          
-          console.log('Master light set to ON, all lights updated');
-          
-          // Show status message
-          setStatusMessage('All lights turned ON');
-          setShowStatus(true);
-          setTimeout(() => setShowStatus(false), 3000);
+          setMasterLightOn(true);
+          showStatusMessage('All lights turned ON');
+        } else {
+          showStatusMessage('Failed to turn all lights ON');
         }
       } else {
-        // Turn off all lights
-        const result = await LightService.allLightsOff();
-        console.log('allLightsOff result:', result);
+        // Turn off all lights using LightControlService
+        const result = await LightControlService.allLightsOff();
         
         if (result.success) {
-          // IMPORTANT: Update UI state FIRST to prevent flickering
-          setMasterLightOn(false);
-          
-          // Update all light states to OFF and set brightness to 0
-          const newLightStates = {};
-          const newSliderValues = {};
-          
-          Object.keys(lightStates).forEach(lightId => {
-            newLightStates[lightId] = false;
-            newSliderValues[lightId] = 0;
+          // Update RV state manager for all lights
+          allLights.forEach(lightId => {
+            rvStateManager.updateLightState(lightId, false, 0);
           });
           
-          // Update the states
-          setLightStates(newLightStates);
-          setSliderValues(newSliderValues);
-          
-          // Save the new states to storage for synchronization
-          await AsyncStorage.setItem('lightStates', JSON.stringify(newLightStates));
-          await AsyncStorage.setItem('sliderValues', JSON.stringify(newSliderValues));
-          
-          console.log('Master light set to OFF, all lights updated');
-          
-          // Show status message
-          setStatusMessage('All lights turned OFF');
-          setShowStatus(true);
-          setTimeout(() => setShowStatus(false), 3000);
+          setMasterLightOn(false);
+          showStatusMessage('All lights turned OFF');
+        } else {
+          showStatusMessage('Failed to turn all lights OFF');
         }
       }
     } catch (error) {
-      console.error('Failed to control master lights:', error);
-      // If there's an error, revert the UI state to match reality
-      const anyLightOn = Object.values(lightStates).some(state => state);
-      setMasterLightOn(anyLightOn);
-      
-      // Show error message
-      setStatusMessage(`Error: ${error.message}`);
-      setShowStatus(true);
-      setTimeout(() => setShowStatus(false), 3000);
+      showStatusMessage(`Error: ${error.message}`);
+      console.error('Error controlling master lights:', error);
     } finally {
       setIsLoading(false);
     }
   };
-  
 
   const renderTabContent = () => {
     if (selectedTab === TABS.MAIN) {
@@ -430,34 +531,33 @@ const handleLightToggle = async (lightId, isOn) => {
           
           {/* Master Light Toggle */}
           <MasterLightControl 
-  isOn={masterLightOn}
-  onToggleOn={async () => {
-    await handleMasterLightToggle(true);
-  }}
-  onToggleOff={async () => {
-    await handleMasterLightToggle(false);
-  }}
-  isLoading={isLoading}
-/>
+            isOn={masterLightOn}
+            onToggleOn={async () => {
+              await handleMasterLightToggle(true);
+            }}
+            onToggleOff={async () => {
+              await handleMasterLightToggle(false);
+            }}
+            isLoading={isLoading}
+          />
           
           <View style={styles.divider} />
           
-          <View>
+          <ScrollView 
+            contentContainerStyle={{ paddingBottom: 80 }}
+            style={{ marginHorizontal: 20 }}
+          >
             {lightGroups.main.map((lightId) => (
-              <EnhancedMainLight
+              <SimpleHoldToDimLight
                 key={lightId}
                 name={lightDisplayNames[lightId] || lightId}
                 lightId={lightId}
-                min={0}
-                max={100}
-                value={sliderValues[lightId] || 0}
+                value={localLightBrightness[lightId] || 0}
                 isOn={lightStates[lightId] || false}
-                onToggle={(isOn) => handleLightToggle(lightId, isOn)}
-                onValueChange={(value) => handleSliderChange(lightId, value)}
-                supportsDimming={true}
+                supportsDimming={supportsDimming}
               />
             ))}
-          </View>
+          </ScrollView>
         </>
       );
     } else if (selectedTab === TABS.BEDROOM) {
@@ -466,105 +566,98 @@ const handleLightToggle = async (lightId, isOn) => {
         {/* ───── Water Controls (Bedroom Tab) ───── */}
          <View style={styles.fanControlsContainer}>
             <TouchableOpacity
-   style={[
-     styles.waterControlButton,
-     isWaterHeaterOn
-       ? styles.waterControlButtonActive
-       : styles.waterControlButtonInactive,
-     isLoading && styles.disabledButton,
-   ]}
-    onPress={handleWaterHeaterToggle}
-    disabled={isLoading}
-  >
+              style={[
+                styles.waterControlButton,
+                water.heaterOn
+                  ? styles.waterControlButtonActive
+                  : styles.waterControlButtonInactive,
+                isLoading && styles.disabledButton,
+              ]}
+              onPress={handleWaterHeaterToggle}
+              disabled={isLoading}
+            >
              <View style={styles.fanIconContainer}>
-  <View
-    style={[
-      styles.fanIconCircle,
-      isWaterHeaterOn
-        ? styles.waterIconCircleActive
-        : styles.waterIconCircleInactive,
-    ]}
-  >
-    <Ionicons
-      name={isWaterHeaterOn ? 'water' : 'water-outline'}
-      size={24}
-      color={isWaterHeaterOn ? '#FFF' : '#888'}
-    />
-  </View>
-</View>
+              <View
+                style={[
+                  styles.fanIconCircle,
+                  water.heaterOn
+                    ? styles.waterIconCircleActive
+                    : styles.waterIconCircleInactive,
+                ]}
+              >
+                <Ionicons
+                  name={water.heaterOn ? 'water' : 'water-outline'}
+                  size={24}
+                  color={water.heaterOn ? '#FFF' : '#888'}
+                />
+              </View>
+             </View>
 
              <Text style={styles.fanButtonLabel}>Water Heater</Text>
-             <View style={[styles.statusIndicator, isWaterHeaterOn ? styles.statusActive : styles.statusInactive]}>
-               <Text style={styles.statusText}>{isWaterHeaterOn ? 'ON' : 'OFF'}</Text>
+             <View style={[styles.statusIndicator, water.heaterOn ? styles.statusActive : styles.statusInactive]}>
+               <Text style={styles.statusText}>{water.heaterOn ? 'ON' : 'OFF'}</Text>
              </View>
            </TouchableOpacity>
 
-            <TouchableOpacity style={[
-     styles.waterControlButton,
-     isWaterPumpOn
-       ? styles.waterControlButtonActive
-       : styles.waterControlButtonInactive,
-     isLoading && styles.disabledButton,
-   ]}
-    onPress={handleWaterPumpToggle}
-    disabled={isLoading}
-  >
-<View style={styles.fanIconContainer}>
-               
-                         <View style={[
-       styles.fanIconCircle,
-       isWaterPumpOn
-         ? styles.waterIconCircleActive
-         : styles.waterIconCircleInactive
-     ]}>
+            <TouchableOpacity 
+              style={[
+                styles.waterControlButton,
+                water.pumpOn
+                  ? styles.waterControlButtonActive
+                  : styles.waterControlButtonInactive,
+                isLoading && styles.disabledButton,
+              ]}
+              onPress={handleWaterPumpToggle}
+              disabled={isLoading}
+            >
+             <View style={styles.fanIconContainer}>
+               <View style={[
+                 styles.fanIconCircle,
+                 water.pumpOn
+                   ? styles.waterIconCircleActive
+                   : styles.waterIconCircleInactive
+               ]}>
                  <Ionicons
-                   name={isWaterPumpOn ? 'pie-chart' : 'pie-chart-outline'}
+                   name={water.pumpOn ? 'pie-chart' : 'pie-chart-outline'}
                    size={24}
-                   color={isWaterPumpOn ? '#FFF' : '#888'}
+                   color={water.pumpOn ? '#FFF' : '#888'}
                  />
                </View>
              </View>
              <Text style={styles.fanButtonLabel}>Water Pump</Text>
-             <View style={[styles.statusIndicator, isWaterPumpOn ? styles.statusActive : styles.statusInactive]}>
-               <Text style={styles.statusText}>{isWaterPumpOn ? 'ON' : 'OFF'}</Text>
+             <View style={[styles.statusIndicator, water.pumpOn ? styles.statusActive : styles.statusInactive]}>
+               <Text style={styles.statusText}>{water.pumpOn ? 'ON' : 'OFF'}</Text>
              </View>
             </TouchableOpacity>
-   
-             
-           
          </View>
+         
          <MasterLightControl 
-  isOn={masterLightOn}
-  onToggleOn={async () => {
-    await handleMasterLightToggle(true);
-  }}
-  onToggleOff={async () => {
-    await handleMasterLightToggle(false);
-  }}
-  isLoading={isLoading}
-/>
+            isOn={masterLightOn}
+            onToggleOn={async () => {
+              await handleMasterLightToggle(true);
+            }}
+            onToggleOff={async () => {
+              await handleMasterLightToggle(false);
+            }}
+            isLoading={isLoading}
+          />
           
           <View style={styles.divider} />
           
           <ScrollView 
-            contentContainerStyle={{ paddingBottom: 80 }} // use your brown tone here
+            contentContainerStyle={{ paddingBottom: 80 }}
+            style={{ marginHorizontal: 20 }}
           >
-            <View>
-              {lightGroups.bedroom.map((lightId) => (
-                <EnhancedMainLight
-                  key={lightId}
-                  name={lightDisplayNames[lightId] || lightId}
-                  lightId={lightId}
-                  min={0}
-                  max={100}
-                  value={sliderValues[lightId] || 0}
-                  isOn={lightStates[lightId] || false}
-                  onToggle={(isOn) => handleLightToggle(lightId, isOn)}
-                  onValueChange={(value) => handleSliderChange(lightId, value)}
-                  supportsDimming={true}
-                />
-              ))}
-            </View>
+            {lightGroups.bedroom.map((lightId) => (
+              <SimpleHoldToDimLight
+                key={lightId}
+                name={lightDisplayNames[lightId] || lightId}
+                lightId={lightId}
+                value={localLightBrightness[lightId] || 0}
+                isOn={lightStates[lightId] || false}
+                supportsDimming={supportsDimming}
+              />
+            ))}
           </ScrollView>
         </>
       );
@@ -616,35 +709,35 @@ const handleLightToggle = async (lightId, isOn) => {
     
           {/* Light Master Control */}
           <MasterLightControl 
-  isOn={masterLightOn}
-  onToggleOn={async () => {
-    await handleMasterLightToggle(true);
-  }}
-  onToggleOff={async () => {
-    await handleMasterLightToggle(false);
-  }}
-  isLoading={isLoading}
-/>
+            isOn={masterLightOn}
+            onToggleOn={async () => {
+              await handleMasterLightToggle(true);
+            }}
+            onToggleOff={async () => {
+              await handleMasterLightToggle(false);
+            }}
+            isLoading={isLoading}
+          />
     
           {/* Divider */}
           <View style={styles.divider} />
     
-          {/* Light Controls */}
-          {lightGroups.bathroom.map((lightId) => (
-            <EnhancedMainLight
-              key={lightId}
-              name={lightDisplayNames[lightId] || lightId}
-              lightId={lightId}
-              min={0}
-              max={100}
-              value={sliderValues[lightId] || 0}
-              isOn={lightStates[lightId] || false}
-              onToggle={(isOn) => handleLightToggle(lightId, isOn)}
-              onValueChange={(value) => handleSliderChange(lightId, value)}
-              supportsDimming={true}
-            />
-          ))}
-          <View className="h-6 pb-7"></View>
+          {/* Light Controls with SimpleHoldToDimLight */}
+          <ScrollView 
+            contentContainerStyle={{ paddingBottom: 80 }}
+            style={{ marginHorizontal: 20 }}
+          >
+            {lightGroups.bathroom.map((lightId) => (
+              <SimpleHoldToDimLight
+                key={lightId}
+                name={lightDisplayNames[lightId] || lightId}
+                lightId={lightId}
+                value={localLightBrightness[lightId] || 0}
+                isOn={lightStates[lightId] || false}
+                supportsDimming={supportsDimming}
+              />
+            ))}
+          </ScrollView>
         </View>
       );
     }
@@ -692,7 +785,7 @@ const handleLightToggle = async (lightId, isOn) => {
         {/* Status message */}
         {showStatus && (
           <View style={styles.statusContainer}>
-            <Text style={styles.statusText}>{statusMessage}</Text>
+            <Text style={styles.statusMessageText}>{statusMessage}</Text>
           </View>
         )}
       </ScrollView>
@@ -985,7 +1078,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 40,
     zIndex: 1000,
   },
-  statusText: {
+  statusMessageText: {
     color: 'white',
     fontWeight: 'bold',
     textAlign: 'center',
@@ -1075,4 +1168,3 @@ disabledButton: {
 
 
 export default Devices;
-

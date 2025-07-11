@@ -1,7 +1,10 @@
 {
   "expo": {
     "packagerOpts": {
-      "ignoredFolders": ["node_modules", "assets"]
+      "ignoredFolders": [
+        "node_modules",
+        "assets"
+      ]
     },
     "entryPoint": "app/_layout.jsx",
     "name": "coast",
@@ -39,7 +42,8 @@
     },
     "owner": "melissastan",
     "plugins": [
-      "expo-font"
+      "expo-font",
+      "expo-router"
     ]
   }
 }

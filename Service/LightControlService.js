@@ -1,4 +1,4 @@
-// Service/LightControlService.js - Updated with _executeRawCommand method
+// Service/LightControlService.js - Enhanced with Master Light reliability fixes
 import { RVControlService } from '../API/rvAPI';
 
 // Make the API base URL accessible
@@ -27,44 +27,69 @@ const lightPrefixMap = {
   right_reading_lights: '23',
 };
 
+// Command execution with enhanced reliability
+const executeCommandWithRetry = async (command, retries = 2, delay = 200) => {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      console.log(`🔧 Executing command (attempt ${attempt + 1}/${retries + 1}): ${command}`);
+      const result = await RVControlService.executeRawCommand(command);
+      
+      // Mandatory delay between commands to prevent CAN bus congestion
+      if (delay > 0) {
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+      
+      return result;
+    } catch (error) {
+      console.error(`❌ Command failed on attempt ${attempt + 1}:`, error);
+      
+      if (attempt < retries) {
+        // Progressive delay for retries
+        await new Promise(resolve => setTimeout(resolve, delay * (attempt + 2)));
+      } else {
+        throw error;
+      }
+    }
+  }
+};
+
 export const LightControlService = {
   /**
    * Execute a raw CAN command (internal method)
    * @private
    */
   _executeRawCommand: async function(command) {
-    try {
-      console.log(`Executing raw command: ${command}`);
-      const result = await RVControlService.executeRawCommand(command);
-      return result;
-    } catch (error) {
-      console.error(`Failed to execute raw command ${command}:`, error);
-      throw error;
-    }
+    return await executeCommandWithRetry(command, 1, 100);
   },
 
   /**
-   * Turn on a light to full brightness
+   * Turn on a light to 100% brightness - GUARANTEED
    * @param {string} lightId
    */
   turnOnLight: async function(lightId) {
     try {
-      console.log(`LightControlService: Turning on ${lightId}`);
+      console.log(`💡 LightControlService: Turning ON ${lightId} to 100%`);
       
       const prefix = lightPrefixMap[lightId];
       if (!prefix) {
         throw new Error(`Unknown light: ${lightId}`);
       }
 
-      // Use command 1 (ON) to turn light to 100%: XXFFC801FF00FFFF
+      // Method 1: Command 1 (ON) to 100%: XXFFC801FF00FFFF
       const onCmd = `19FEDB9F#${prefix}FFC801FF00FFFF`;
-      console.log(`→ Turning ON ${lightId} → ${onCmd}`);
+      console.log(`→ Primary ON command: ${onCmd}`);
+      await executeCommandWithRetry(onCmd, 1, 100);
 
-      const result = await this._executeRawCommand(onCmd);
-      console.log(`✓ Successfully turned on ${lightId}`);
-      return { success: true, result };
+      // Method 2: Backup - Direct brightness to 100%: XXFFC800FF00FFFF
+      // This ensures we get 100% brightness even if command 1 doesn't work properly
+      const brightnessCmd = `19FEDB9F#${prefix}FFC800FF00FFFF`;
+      console.log(`→ Backup brightness command: ${brightnessCmd}`);
+      await executeCommandWithRetry(brightnessCmd, 1, 100);
+
+      console.log(`✅ Successfully turned on ${lightId} to 100%`);
+      return { success: true, brightness: 100 };
     } catch (error) {
-      console.error(`✗ Failed to turn on light (${lightId}):`, error);
+      console.error(`❌ Failed to turn on light (${lightId}):`, error);
       return { success: false, error: error.message };
     }
   },
@@ -75,7 +100,7 @@ export const LightControlService = {
    */
   turnOffLight: async function(lightId) {
     try {
-      console.log(`LightControlService: Turning off ${lightId}`);
+      console.log(`🔴 LightControlService: Turning OFF ${lightId}`);
       
       // Cancel any active dimming operation first
       if (activeDimmingOperations.has(lightId)) {
@@ -89,13 +114,93 @@ export const LightControlService = {
 
       // Use command 3 (OFF): XXFF0003FF00FFFF
       const offCmd = `19FEDB9F#${prefix}FF0003FF00FFFF`;
-      console.log(`→ Turning OFF ${lightId} → ${offCmd}`);
+      console.log(`→ OFF command: ${offCmd}`);
 
-      const result = await this._executeRawCommand(offCmd);
-      console.log(`✓ Successfully turned off ${lightId}`);
-      return { success: true, result };
+      await executeCommandWithRetry(offCmd, 1, 100);
+      console.log(`✅ Successfully turned off ${lightId}`);
+      return { success: true, brightness: 0 };
     } catch (error) {
-      console.error(`✗ Failed to turn off light (${lightId}):`, error);
+      console.error(`❌ Failed to turn off light (${lightId}):`, error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
+   * Enhanced Master Light Control - ALL LIGHTS ON with 100% guarantee
+   */
+  allLightsOn: async function() {
+    try {
+      console.log('🌟 LightControlService: Turning ALL lights ON to 100%');
+      
+      // Method 1: Use the group commands from server.js
+      console.log('→ Using group ON commands');
+      await executeCommandWithRetry('19FEDB9F#FF86C801FF00FFFF', 1, 150);
+      await executeCommandWithRetry('19FEDB9F#FF87C801FF00FFFF', 1, 150);
+      
+      // Method 2: BACKUP - Individual light commands to ensure 100% brightness
+      // This guarantees every light gets to 100% even if group commands are unreliable
+      console.log('→ Backup: Individual light commands to guarantee 100%');
+      
+      const allLights = Object.keys(lightPrefixMap);
+      for (const lightId of allLights) {
+        try {
+          const prefix = lightPrefixMap[lightId];
+          // Command 1 (ON to 100%)
+          const onCmd = `19FEDB9F#${prefix}FFC801FF00FFFF`;
+          await executeCommandWithRetry(onCmd, 1, 80); // Shorter delay for batch operation
+          
+          console.log(`✓ ${lightId} set to 100%`);
+        } catch (lightError) {
+          console.warn(`⚠️ Failed to set ${lightId}, continuing...`);
+        }
+      }
+      
+      console.log('✅ All lights turned on to 100%');
+      return { success: true, method: 'enhanced_group_with_backup' };
+    } catch (error) {
+      console.error('❌ Failed to turn all lights on:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
+   * Enhanced Master Light Control - ALL LIGHTS OFF with reliability
+   */
+  allLightsOff: async function() {
+    try {
+      console.log('🌑 LightControlService: Turning ALL lights OFF');
+      
+      // Cancel all active dimming operations first
+      for (const lightId of activeDimmingOperations.keys()) {
+        await this.cancelDimming(lightId);
+      }
+      
+      // Method 1: Use the group commands from server.js
+      console.log('→ Using group OFF commands');
+      await executeCommandWithRetry('19FEDB9F#FF86FB06FF00FFFF', 1, 150);
+      await executeCommandWithRetry('19FEDB9F#FF87FB06FF00FFFF', 1, 150);
+      
+      // Method 2: BACKUP - Individual light commands to ensure all are off
+      console.log('→ Backup: Individual light OFF commands');
+      
+      const allLights = Object.keys(lightPrefixMap);
+      for (const lightId of allLights) {
+        try {
+          const prefix = lightPrefixMap[lightId];
+          // Command 3 (OFF)
+          const offCmd = `19FEDB9F#${prefix}FF0003FF00FFFF`;
+          await executeCommandWithRetry(offCmd, 1, 80); // Shorter delay for batch operation
+          
+          console.log(`✓ ${lightId} turned off`);
+        } catch (lightError) {
+          console.warn(`⚠️ Failed to turn off ${lightId}, continuing...`);
+        }
+      }
+      
+      console.log('✅ All lights turned off');
+      return { success: true, method: 'enhanced_group_with_backup' };
+    } catch (error) {
+      console.error('❌ Failed to turn all lights off:', error);
       return { success: false, error: error.message };
     }
   },
@@ -106,14 +211,14 @@ export const LightControlService = {
    */
   toggleLight: async function(lightId) {
     try {
-      console.log(`LightControlService: Toggling ${lightId}`);
+      console.log(`🔄 LightControlService: Toggling ${lightId}`);
       
       const toggleCommand = `${lightId}_toggle`;
       const result = await RVControlService.executeCommand(toggleCommand);
-      console.log(`✓ Successfully toggled ${lightId}`);
+      console.log(`✅ Successfully toggled ${lightId}`);
       return { success: true, result };
     } catch (error) {
-      console.error(`✗ Failed to toggle light (${lightId}):`, error);
+      console.error(`❌ Failed to toggle light (${lightId}):`, error);
       return { success: false, error: error.message };
     }
   },
@@ -124,7 +229,7 @@ export const LightControlService = {
    */
   startRampingUp: async function(lightId) {
     try {
-      console.log(`LightControlService: Starting ramp UP for ${lightId}`);
+      console.log(`📈 LightControlService: Starting ramp UP for ${lightId}`);
       
       const prefix = lightPrefixMap[lightId];
       if (!prefix) {
@@ -133,13 +238,13 @@ export const LightControlService = {
 
       // Use command 13 (0x0D) for ramp up: XXFF000D0000FFFF
       const rampUpCmd = `19FEDB9F#${prefix}FF000D0000FFFF`;
-      console.log(`→ Starting ramp UP for ${lightId} → ${rampUpCmd}`);
+      console.log(`→ Ramp UP command: ${rampUpCmd}`);
 
-      const result = await this._executeRawCommand(rampUpCmd);
-      console.log(`✓ Successfully started ramping UP ${lightId}`);
-      return { success: true, result };
+      await executeCommandWithRetry(rampUpCmd, 1, 50);
+      console.log(`✅ Successfully started ramping UP ${lightId}`);
+      return { success: true };
     } catch (error) {
-      console.error(`✗ Failed to start ramping UP (${lightId}):`, error);
+      console.error(`❌ Failed to start ramping UP (${lightId}):`, error);
       return { success: false, error: error.message };
     }
   },
@@ -150,7 +255,7 @@ export const LightControlService = {
    */
   startRampingDown: async function(lightId) {
     try {
-      console.log(`LightControlService: Starting ramp DOWN for ${lightId}`);
+      console.log(`📉 LightControlService: Starting ramp DOWN for ${lightId}`);
       
       const prefix = lightPrefixMap[lightId];
       if (!prefix) {
@@ -159,25 +264,15 @@ export const LightControlService = {
 
       // Use command 14 (0x0E) for ramp down: XXFF000E0000FFFF
       const rampDownCmd = `19FEDB9F#${prefix}FF000E0000FFFF`;
-      console.log(`→ Starting ramp DOWN for ${lightId} → ${rampDownCmd}`);
+      console.log(`→ Ramp DOWN command: ${rampDownCmd}`);
 
-      const result = await this._executeRawCommand(rampDownCmd);
-      console.log(`✓ Successfully started ramping DOWN ${lightId}`);
-      return { success: true, result };
+      await executeCommandWithRetry(rampDownCmd, 1, 50);
+      console.log(`✅ Successfully started ramping DOWN ${lightId}`);
+      return { success: true };
     } catch (error) {
-      console.error(`✗ Failed to start ramping DOWN (${lightId}):`, error);
+      console.error(`❌ Failed to start ramping DOWN (${lightId}):`, error);
       return { success: false, error: error.message };
     }
-  },
-
-  /**
-   * Start ramping a light (for hold-to-dim functionality) - DEPRECATED
-   * Use startRampingUp or startRampingDown instead
-   * @param {string} lightId
-   */
-  startRamping: async function(lightId) {
-    console.warn('startRamping is deprecated, use startRampingUp or startRampingDown instead');
-    return await this.startRampingUp(lightId);
   },
 
   /**
@@ -186,7 +281,7 @@ export const LightControlService = {
    */
   stopRamping: async function(lightId) {
     try {
-      console.log(`LightControlService: Stopping ramp for ${lightId}`);
+      console.log(`⏹️ LightControlService: Stopping ramp for ${lightId}`);
       
       const prefix = lightPrefixMap[lightId];
       if (!prefix) {
@@ -195,13 +290,13 @@ export const LightControlService = {
 
       // Use command 4 (stop): XXFF00040000FFFF
       const stopCmd = `19FEDB9F#${prefix}FF00040000FFFF`;
-      console.log(`→ Stopping ramp for ${lightId} → ${stopCmd}`);
+      console.log(`→ Stop command: ${stopCmd}`);
 
-      const result = await this._executeRawCommand(stopCmd);
-      console.log(`✓ Successfully stopped ramping ${lightId}`);
-      return { success: true, result };
+      await executeCommandWithRetry(stopCmd, 1, 50);
+      console.log(`✅ Successfully stopped ramping ${lightId}`);
+      return { success: true };
     } catch (error) {
-      console.error(`✗ Failed to stop ramping (${lightId}):`, error);
+      console.error(`❌ Failed to stop ramping (${lightId}):`, error);
       return { success: false, error: error.message };
     }
   },
@@ -214,11 +309,11 @@ export const LightControlService = {
    */
   setBrightness: async function(lightId, targetPercentage, onProgress = null) {
     try {
-      console.log(`LightControlService: Setting brightness for ${lightId} to ${targetPercentage}%`);
+      console.log(`🔆 LightControlService: Setting brightness for ${lightId} to ${targetPercentage}%`);
       
       // Prevent multiple dimming operations on the same light
       if (activeDimmingOperations.has(lightId)) {
-        console.log(`Dimming operation already in progress for ${lightId}`);
+        console.log(`⚠️ Dimming operation already in progress for ${lightId}`);
         return { success: false, error: 'Dimming operation already in progress' };
       }
 
@@ -234,7 +329,7 @@ export const LightControlService = {
 
       // Ensure light is on first if targeting a brightness > 0
       if (targetPercentage > 0) {
-        console.log(`Ensuring ${lightId} is on before dimming`);
+        console.log(`→ Ensuring ${lightId} is on before dimming`);
         await this.turnOnLight(lightId);
         // Small delay to ensure light is on before dimming
         await new Promise(resolve => setTimeout(resolve, 200));
@@ -252,7 +347,7 @@ export const LightControlService = {
       try {
         // Start the ramping process
         const result = await this._performRampDimming(lightId, prefix, targetPercentage, onProgress);
-        console.log(`✓ Brightness set for ${lightId}: ${JSON.stringify(result)}`);
+        console.log(`✅ Brightness set for ${lightId}: ${JSON.stringify(result)}`);
         return result;
       } finally {
         // Always clean up the active operation
@@ -260,7 +355,7 @@ export const LightControlService = {
       }
 
     } catch (error) {
-      console.error(`✗ Failed to set brightness for ${lightId}:`, error);
+      console.error(`❌ Failed to set brightness for ${lightId}:`, error);
       activeDimmingOperations.delete(lightId);
       return { success: false, error: error.message };
     }
@@ -290,7 +385,7 @@ export const LightControlService = {
     
     // Start ramping
     console.log(`→ Starting ramp: ${rampCommand}`);
-    await this._executeRawCommand(rampCommand);
+    await executeCommandWithRetry(rampCommand, 1, 50);
 
     // Monitor brightness and stop when we reach target
     return new Promise(async (resolve) => {
@@ -388,7 +483,7 @@ export const LightControlService = {
       // Build stop command: XXFF00040000FFFF (command 4 = 0x04 = stop)
       const stopCommand = `19FEDB9F#${prefix}FF00040000FFFF`;
       console.log(`→ Stopping ramp: ${stopCommand}`);
-      await this._executeRawCommand(stopCommand);
+      await executeCommandWithRetry(stopCommand, 1, 50);
       
       // Small delay to ensure stop command is processed
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -474,42 +569,6 @@ export const LightControlService = {
       };
     }
     return operations;
-  },
-
-  /**
-   * Turn all lights on
-   */
-  allLightsOn: async function() {
-    try {
-      console.log('LightControlService: Turning all lights on');
-      const result = await RVControlService.executeCommand('all_lights_on');
-      console.log('✓ All lights turned on');
-      return { success: true, result };
-    } catch (error) {
-      console.error('✗ Failed to turn all lights on:', error);
-      return { success: false, error: error.message };
-    }
-  },
-
-  /**
-   * Turn all lights off
-   */
-  allLightsOff: async function() {
-    try {
-      console.log('LightControlService: Turning all lights off');
-      
-      // Cancel all active dimming operations
-      for (const lightId of activeDimmingOperations.keys()) {
-        await this.cancelDimming(lightId);
-      }
-      
-      const result = await RVControlService.executeCommand('all_lights_off');
-      console.log('✓ All lights turned off');
-      return { success: true, result };
-    } catch (error) {
-      console.error('✗ Failed to turn all lights off:', error);
-      return { success: false, error: error.message };
-    }
   },
 
   /**

@@ -64,6 +64,8 @@ const Map = () => {
   style={{
     width: isTablet ? 180 : 320,
     height: isTablet ? 210 : 180,
+    right: isTablet ? 15: null,
+    bottom: isTablet ? 30: null,
   }}
   customMapStyle={darkMapStyle}
   initialRegion={{
