@@ -7,7 +7,8 @@ import Settings from './Settings';
 import ModalComponent from '../components/ModalComponent';
 import Map from "../components/Map";
 import TankHeaterControl from "../components/TankHeaterControl";
-
+import TemperatureDisplay from "../components/TemperatureDisplay"; // New component
+import useTemperature from "../hooks/useTemperature"; // New hook
 import AwningControlModal from "../components/AwningControlModal";
 import AirCon from "./AirCon.jsx";
 import Home from "./Home";
@@ -30,6 +31,13 @@ const MainScreen = () => {
     const [isWaterPumpOn, setWaterPumpOn] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState(null);
+
+     const { 
+        temperature, 
+        isConnected: tempConnected, 
+        error: tempError,
+        refresh: refreshTemp 
+    } = useTemperature({ autoStart: true });
   
     // Clear error message after 5 seconds
     useEffect(() => {
@@ -76,6 +84,11 @@ const MainScreen = () => {
             setIsLoading(false);
         }
     };
+
+     const handleTemperaturePress = (tempData) => {
+        console.log('MainScreen: Current temperature:', tempData);
+        // You could open a climate control modal here
+    };
     
     return (
         <Grid className="bg-black">
@@ -112,6 +125,15 @@ const MainScreen = () => {
                 </View>
             )}
 
+             {/* Temperature error display */}
+            {tempError && (
+                <View style={[styles.errorContainer, { backgroundColor: "rgba(255, 165, 0, 0.1)", borderColor: "orange" }]}>
+                    <Text style={[styles.errorText, { color: "orange" }]}>
+                        Temperature monitoring: {tempError}
+                    </Text>
+                </View>
+            )}
+
             {/* Loading indicator */}
             {isLoading && (
                 <View style={styles.loadingOverlay}>
@@ -122,7 +144,14 @@ const MainScreen = () => {
             <Row size={80}>
                 <Col size={15} className="">
                     <Row className=" rounded-xl mr-3 ml-3 mt-1 top-5" size={28}>
-                       
+                        {/* Temperature Display - NEW */}
+                        <View style={styles.temperatureContainer}>
+                            <TemperatureDisplay 
+                                onTemperaturePress={handleTemperaturePress}
+                                showSetpoints={false}
+                                style={styles.temperatureDisplay}
+                            />
+                        </View>
                     </Row>
                     <Row className="bg-brown rounded-xl m-3 mb-10 top-15" 
                     style = {{
@@ -132,7 +161,7 @@ const MainScreen = () => {
                         shadowRadius: 2,
                         elevation: 6,
                     }}
-                    size={85}>
+                    size={65}>
                         <View className="mb-6">
         <Text className="text-white text-2g font-semibold mb-2 top-2 left-3">Live Location</Text>
         <Map />

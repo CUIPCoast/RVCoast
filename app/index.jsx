@@ -5,10 +5,16 @@ import RootNavigator from "../navigation/RootNavigator";
 import TabletNavigator from "../navigation/TabletNavigator"; // New tablet navigator
 import { NavigationContainer } from "@react-navigation/native";
 import useScreenSize from "../helper/useScreenSize";
+import { LogBox } from 'react-native';
+
+LogBox.ignoreAllLogs();
+
 export default function App() {
  
   return (
     <>
+    
+
       <StatusBar hidden />
       <NavigationContainer>
         {useScreenSize() ? <TabletNavigator /> : <RootNavigator />}
