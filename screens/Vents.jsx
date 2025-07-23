@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, Text, Image, ActivityIndicator } from 'react-native';
 import useScreenSize from '../helper/useScreenSize.jsx';
 import { Col, Row, Grid } from 'react-native-easy-grid';
@@ -17,16 +17,22 @@ const Vents = () => {
   const [statusMessage, setStatusMessage]      = useState('');
   const [showStatus, setShowStatus]            = useState(false);
 
+  // Use refs to track previous values and prevent unnecessary effects
+  const prevBathroomFanRef = useRef(isBathroomFanOn);
+  const prevBayVentFanRef = useRef(isBayVentFanOn);
+  const isInitializedRef = useRef(false);
+
   const currentDate   = moment().format('MMMM Do, YYYY');
   const dayOfTheWeek  = moment().format('dddd');
   const isTablet      = useScreenSize();
 
+  // Initialize from AsyncStorage once on mount
   useEffect(() => {
-    // initialize from AsyncStorage and sync to RV state
-    (async () => {
+    const initializeFromStorage = async () => {
       try {
         const savedBathroomFan = await AsyncStorage.getItem('bathroomFanState');
         const savedBayVentFan  = await AsyncStorage.getItem('bayVentFanState');
+        
         if (savedBathroomFan != null) {
           const state = JSON.parse(savedBathroomFan);
           setBathroomFanOn(state);
@@ -37,60 +43,105 @@ const Vents = () => {
           setBayVentFanOn(state);
           rvStateManager.updateState('fans', { bayVentFan: { isOn: state, lastUpdated: new Date().toISOString() } });
         }
-      } catch (e) { console.error(e); }
-    })();
+        isInitializedRef.current = true;
+      } catch (e) { 
+        console.error('Error initializing fan state:', e); 
+      }
+    };
 
-    // subscribe
-    const unsub = rvStateManager.subscribeToExternalChanges(newState => {
+    initializeFromStorage();
+  }, []); // Empty dependency array - only run on mount
+
+  // Subscribe to external state changes once on mount
+  useEffect(() => {
+    const unsubscribe = rvStateManager.subscribeToExternalChanges(newState => {
+      if (!isInitializedRef.current) return; // Don't process until initialized
+      
       if (newState.fans) {
-        if (newState.fans.bathroomFan?.isOn !== isBathroomFanOn) {
+        // Only update if the values actually changed and it's not from our own update
+        if (newState.fans.bathroomFan?.isOn !== undefined && 
+            newState.fans.bathroomFan.isOn !== prevBathroomFanRef.current) {
           setBathroomFanOn(newState.fans.bathroomFan.isOn);
+          prevBathroomFanRef.current = newState.fans.bathroomFan.isOn;
           setStatusMessage(`Bathroom fan ${newState.fans.bathroomFan.isOn ? 'turned on' : 'turned off'} remotely`);
           setShowStatus(true);
           setTimeout(() => setShowStatus(false), 3000);
         }
-        if (newState.fans.bayVentFan?.isOn !== isBayVentFanOn) {
+        
+        if (newState.fans.bayVentFan?.isOn !== undefined && 
+            newState.fans.bayVentFan.isOn !== prevBayVentFanRef.current) {
           setBayVentFanOn(newState.fans.bayVentFan.isOn);
+          prevBayVentFanRef.current = newState.fans.bayVentFan.isOn;
           setStatusMessage(`Bay vent fan ${newState.fans.bayVentFan.isOn ? 'turned on' : 'turned off'} remotely`);
           setShowStatus(true);
           setTimeout(() => setShowStatus(false), 3000);
         }
       }
     });
-    return unsub;
-  }, [isBathroomFanOn, isBayVentFanOn]);
 
+    return unsubscribe;
+  }, []); // Empty dependency array - only subscribe once on mount
+
+  // Persist state changes to AsyncStorage
   useEffect(() => {
-    // persist backwards-compatible
-    AsyncStorage.multiSet([
-      ['bathroomFanState', JSON.stringify(isBathroomFanOn)],
-      ['bayVentFanState', JSON.stringify(isBayVentFanOn)],
-    ]).catch(console.error);
+    if (!isInitializedRef.current) return; // Don't persist until initialized
+
+    const persistState = async () => {
+      try {
+        await AsyncStorage.multiSet([
+          ['bathroomFanState', JSON.stringify(isBathroomFanOn)],
+          ['bayVentFanState', JSON.stringify(isBayVentFanOn)],
+        ]);
+      } catch (error) {
+        console.error('Error persisting fan state:', error);
+      }
+    };
+
+    persistState();
+    
+    // Update refs to track current values
+    prevBathroomFanRef.current = isBathroomFanOn;
+    prevBayVentFanRef.current = isBayVentFanOn;
   }, [isBathroomFanOn, isBayVentFanOn]);
 
   const toggleFan = async (which) => {
+    if (isLoading) return; // Prevent multiple concurrent requests
+    
     setIsLoading(true);
     const newState = which === 'bath' ? !isBathroomFanOn : !isBayVentFanOn;
     const service   = which === 'bath' ? FanService.toggleBathroomFan : FanService.toggleBayVentFan;
     const setter    = which === 'bath' ? setBathroomFanOn : setBayVentFanOn;
+    const fanKey = which === 'bath' ? 'bathroomFan' : 'bayVentFan';
 
-    // optimistic UI + state manager
-    rvStateManager.updateState('fans', { [`${which}roomFan`]: { isOn: newState, lastUpdated: new Date().toISOString() } });
+    // Optimistic UI update
     setter(newState);
+    
+    // Update state manager
+    rvStateManager.updateState('fans', { 
+      [fanKey]: { 
+        isOn: newState, 
+        lastUpdated: new Date().toISOString() 
+      } 
+    });
 
     try {
       const res = await service();
       if (res.success) {
         setStatusMessage(`${which === 'bath' ? 'Bathroom' : 'Bay vent'} fan ${newState ? 'turned on' : 'turned off'}`);
       } else {
-        throw new Error(res.error || 'toggle failed');
+        throw new Error(res.error || 'Toggle failed');
       }
     } catch (e) {
-      // revert
-      rvStateManager.updateState('fans', { [`${which}roomFan`]: { isOn: !newState, lastUpdated: new Date().toISOString() } });
+      // Revert on error
       setter(!newState);
+      rvStateManager.updateState('fans', { 
+        [fanKey]: { 
+          isOn: !newState, 
+          lastUpdated: new Date().toISOString() 
+        } 
+      });
       setStatusMessage(`Error: ${e.message}`);
-      console.error(e);
+      console.error('Fan toggle error:', e);
     } finally {
       setShowStatus(true);
       setTimeout(() => setShowStatus(false), 3000);
@@ -170,11 +221,11 @@ const styles = StyleSheet.create({
   centered: { justifyContent: 'center', alignItems: 'center' },
   fanControlsContainer: { 
     flexDirection: 'row', 
-    justifyContent: 'space-around', // Changed from 'center' to 'space-around' for even spacing
+    justifyContent: 'space-around',
     alignItems: 'center', 
     marginVertical: 20, 
     paddingHorizontal: 10,
-    width: '50%', // Added to ensure full width utilization
+    width: '50%',
   },
   mobileStatusContainer: { position: 'absolute', bottom: 50, backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 5, alignSelf: 'center', zIndex: 1000 },
   statusText: { color: '#FFF', fontSize: 12, fontWeight: '700' },

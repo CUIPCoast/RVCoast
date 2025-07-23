@@ -113,10 +113,14 @@ const System = () => {
 
   // Get battery state of charge as percentage
   const getBatterySOC = () => {
-    if (!victronData || !victronData.battery) return 0;
-    return Math.round(victronData.battery.soc);
-  };
-
+  if (!victronData || !victronData.battery) return 0;
+  
+  // The SOC comes as a decimal (0.57 = 57%), so multiply by 100
+  const socDecimal = victronData.battery.soc;
+  const socPercentage = socDecimal * 100;
+  
+  return Math.round(socPercentage);
+};
   // Get battery power with proper sign
   const getBatteryPower = () => {
     if (!victronData || !victronData.battery) return 0;

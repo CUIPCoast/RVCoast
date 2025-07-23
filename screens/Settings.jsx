@@ -217,7 +217,7 @@ const Settings = () => {
 
           {/* Footer */}
           <View style={styles.tabletFooter}>
-            <Text style={[styles.tabletFooterText, { color: isDark ? Color.colorGray_100 : Color.colorGray_100 }]}>
+            <Text style={[styles.tabletFooterText, { color: isDark ? "#FFFFFF" : Color.colorGray_100 }]}>
               Coast App v1.0.0 • © 2025 All rights reserved
             </Text>
           </View>
@@ -514,6 +514,7 @@ const styles = StyleSheet.create({
   tabletFooterText: {
     fontSize: FontSize.size_sm,
     fontFamily: FontFamily.manropeRegular,
+    color: '#FFFFFF',
   },
 });
 
