@@ -195,72 +195,110 @@ const MainScreen = () => {
                     
                     <View className="mt-5 space-y-2 mb-5">
                     
-                  {/* Water Heater Button - Enhanced with connection status */}
-      <TouchableOpacity
-        onPress={handleWaterHeaterToggle}
-        disabled={isLoading}
-        activeOpacity={0.8}
-      >
-        <LinearGradient
-          colors={
-            isWaterHeaterOn
-              ? ['#00C6FB', '#005BEA']
-              : ['#1A1A1D', '#1A1A1D']
-          }
-          style={styles.waterbutton}
-        >
-          <View style={styles.buttonContent}>
-            <Ionicons
-              name={isWaterHeaterOn ? 'water' : 'water-outline'}
-              size={32}
-              color="#FFF"
-              style={styles.icon}
-            />
-            <View style={styles.labelContainer}>
-              <Text style={styles.label}>Water Heater</Text>
-              {/* Status indicator */}
-              <Text style={[styles.statusText, { 
-                color: isWaterHeaterOn ? '#00FF87' : '#888' 
-              }]}>
-                {isWaterHeaterOn ? 'ON' : 'OFF'}
-              </Text>
-            </View>
-          </View>
-        </LinearGradient>
-      </TouchableOpacity>
+                  {/* Water Heater Button - Modern styling from first code */}
+                  <TouchableOpacity
+                    onPress={handleWaterHeaterToggle}
+                    disabled={isLoading}
+                    activeOpacity={0.8}
+                    style={[
+                      styles.modernButton,
+                      { marginBottom: 16 },
+                      isLoading && styles.buttonDisabled
+                    ]}
+                  >
+                    <LinearGradient
+                      colors={isWaterHeaterOn 
+                        ? ["#FF6B6B", "#FF8E53", "#FF6B35"] 
+                        : ["#2C2C34", "#3A3A42", "#2C2C34"]
+                      }
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.modernGradientButton}
+                    >
+                      <View style={styles.buttonContent}>
+                        <View style={[
+                          styles.iconContainer,
+                          { backgroundColor: isWaterHeaterOn ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)' }
+                        ]}>
+                          <Ionicons
+                            name={isWaterHeaterOn ? "flame" : "flame-outline"}
+                            size={20}
+                            color={isWaterHeaterOn ? "#FFF" : "#B0B0B0"}
+                          />
+                        </View>
+                        <View style={styles.textContainer}>
+                          <Text style={[
+                            styles.buttonTitle,
+                            { color: isWaterHeaterOn ? "#FFF" : "#E0E0E0" }
+                          ]}>
+                            Water Heater
+                          </Text>
+                          <Text style={[
+                            styles.buttonSubtitle,
+                            { color: isWaterHeaterOn ? "rgba(255,255,255,0.8)" : "#888" }
+                          ]}>
+                            {isWaterHeaterOn ? "Heating" : "Off"}
+                          </Text>
+                        </View>
+                        <View style={[
+                          styles.statusIndicator,
+                          { backgroundColor: isWaterHeaterOn ? "#4CAF50" : "#666" }
+                        ]} />
+                      </View>
+                    </LinearGradient>
+                  </TouchableOpacity>
 
-      {/* Water Pump Button - Enhanced with status */}
-      <TouchableOpacity
-        onPress={handleWaterPumpToggle}
-        disabled={isLoading}
-        activeOpacity={0.8}
-      >
-        <LinearGradient
-          colors={
-            isWaterPumpOn
-              ? ['#00C6FB', '#005BEA']
-              : ['#1A1A1D', '#1A1A1D']
-          }
-          style={styles.waterbutton}
-        >
-          <View style={styles.buttonContent}>
-            <Ionicons
-              name={isWaterPumpOn ? 'pie-chart' : 'pie-chart-outline'}
-              size={32}
-              color="#FFF"
-              style={styles.icon}
-            />
-            <View style={styles.labelContainer}>
-              <Text style={styles.label}>Water Pump</Text>
-              <Text style={[styles.statusText, { 
-                color: isWaterPumpOn ? '#00FF87' : '#888' 
-              }]}>
-                {isWaterPumpOn ? 'ON' : 'OFF'}
-              </Text>
-            </View>
-          </View>
-        </LinearGradient>
-      </TouchableOpacity>
+                  {/* Water Pump Button - Modern styling from first code */}
+                  <TouchableOpacity
+                    onPress={handleWaterPumpToggle}
+                    disabled={isLoading}
+                    activeOpacity={0.8}
+                    style={[
+                      styles.modernButton,
+                      isLoading && styles.buttonDisabled
+                    ]}
+                  >
+                    <LinearGradient
+                      colors={isWaterPumpOn 
+                        ? ["#4FC3F7", "#29B6F6", "#0288D1"] 
+                        : ["#2C2C34", "#3A3A42", "#2C2C34"]
+                      }
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.modernGradientButton}
+                    >
+                      <View style={styles.buttonContent}>
+                        <View style={[
+                          styles.iconContainer,
+                          { backgroundColor: isWaterPumpOn ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)' }
+                        ]}>
+                          <Ionicons
+                            name={isWaterPumpOn ? "water" : "water-outline"}
+                            size={20}
+                            color={isWaterPumpOn ? "#FFF" : "#B0B0B0"}
+                          />
+                        </View>
+                        <View style={styles.textContainer}>
+                          <Text style={[
+                            styles.buttonTitle,
+                            { color: isWaterPumpOn ? "#FFF" : "#E0E0E0" }
+                          ]}>
+                            Water Pump
+                          </Text>
+                          <Text style={[
+                            styles.buttonSubtitle,
+                            { color: isWaterPumpOn ? "rgba(255,255,255,0.8)" : "#888" }
+                          ]}>
+                            {isWaterPumpOn ? "Running" : "Off"}
+                          </Text>
+                        </View>
+                        <View style={[
+                          styles.statusIndicator,
+                          { backgroundColor: isWaterPumpOn ? "#4CAF50" : "#666" }
+                        ]} />
+                      </View>
+                    </LinearGradient>
+                  </TouchableOpacity>
                     </View>
                 </View>
 
@@ -418,42 +456,64 @@ const MainScreen = () => {
 };
 
 const styles = {
-    // Enhanced water button styles
-    waterbutton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'flex-start',
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        borderRadius: 12,
+    // Modern button styles from first code
+    modernButton: {
+        borderRadius: 16,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
-        shadowRadius: 4,
-        elevation: 5,
-        marginVertical: 8,
-        minWidth: 180,
+        shadowRadius: 8,
+        elevation: 8,
+        marginVertical: 4,
+    },
+    modernGradientButton: {
+        borderRadius: 16,
+        padding: 2,
     },
     buttonContent: {
         flexDirection: 'row',
         alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.1)',
+        borderRadius: 14,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        minWidth: 150,
+        position: 'relative',
+    },
+    iconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 10,
+    },
+    textContainer: {
         flex: 1,
+        justifyContent: 'center',
     },
-    icon: {
-        marginRight: 12,
+    buttonTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        letterSpacing: 0.5,
     },
-    labelContainer: {
-        flex: 1,
-    },
-    label: {
-        color: '#FFF',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    statusText: {
-        fontSize: 12,
+    buttonSubtitle: {
+        fontSize: 11,
         fontWeight: '500',
         marginTop: 2,
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+    },
+    statusIndicator: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        position: 'absolute',
+        top: 12,
+        right: 12,
+    },
+    buttonDisabled: {
+        opacity: 0.6,
     },
     
     // New temperature display styles

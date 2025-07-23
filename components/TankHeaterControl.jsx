@@ -1,19 +1,24 @@
 import React, { useState, useEffect, useRef } from "react";
 import { View, Text } from "react-native";
 import VerticalSlider from "react-native-vertical-slider-smartlife";
-import ToggleSwitch from "./ToggleSwitch"; // Adjust the path to your ToggleSwitch component
 import useScreenSize from "../helper/useScreenSize.jsx";
-import { RVControlService } from "../API/rvAPI";
 import { createCANBusListener } from "../Service/CANBusListener";
 
-const TankHeaterControl = ({ name, tankType, isOn, setIsOn, trackColor }) => {
+const TankHeaterControl = ({ name, tankType, trackColor }) => {
   const [percentage, setPercentage] = useState(25); // Start with current actual levels
-  const [isLoading, setIsLoading] = useState(false);
+  const [rawData, setRawData] = useState(null); // Store raw CAN data for debugging
   const [isConnected, setIsConnected] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
   const canListener = useRef(null);
   const reconnectTimeout = useRef(null);
   const isTablet = useScreenSize();
+
+  // Calibration offsets - adjust these based on observed differences
+  const CALIBRATION_OFFSETS = {
+    fresh: -7,  // RV shows 25%, app shows 32%, so subtract 7%
+    gray: 0,    // Adjust if needed
+    black: 0    // Adjust if needed
+  };
 
   // Initialize tank levels based on current real data
   useEffect(() => {
@@ -107,13 +112,19 @@ const TankHeaterControl = ({ name, tankType, isOn, setIsOn, trackColor }) => {
   const handleTankStatusMessage = (message) => {
     try {
       // Parse tank status from CAN message
-      // From the CAN traffic, we see messages like:
-      // {"dgn": "1FFB7", "name": "TANK_STATUS", "instance": 0, "instance definition": "fresh water", "relative level": 1, "resolution": 4, ...}
-      
       const tankInstance = message.instance;
       const instanceDefinition = message["instance definition"];
       const relativeLevel = message["relative level"];
       const resolution = message.resolution || 4;
+      
+      // Store raw data for debugging
+      setRawData({
+        instance: tankInstance,
+        definition: instanceDefinition,
+        relativeLevel: relativeLevel,
+        resolution: resolution,
+        timestamp: new Date().toISOString()
+      });
       
       // Map tank instances to our tank types
       let matchesTankType = false;
@@ -127,39 +138,54 @@ const TankHeaterControl = ({ name, tankType, isOn, setIsOn, trackColor }) => {
       }
       
       if (matchesTankType && relativeLevel !== undefined) {
-        // Calculate percentage based on relative level and resolution
-        // Resolution 4 means levels are reported in 25% increments (0, 1, 2, 3, 4)
+        // Try multiple calculation methods to see which matches RV display
+        
+        // Method 1: Original calculation (what you're currently using)
         const maxLevel = Math.pow(2, resolution) - 1;
-        const newPercentage = Math.round((relativeLevel / maxLevel) * 100);
+        const originalPercentage = Math.round((relativeLevel / maxLevel) * 100);
         
-        console.log(`TankHeaterControl: ${name} tank level update: ${newPercentage}% (raw: ${relativeLevel}/${maxLevel})`);
+        // Method 2: Discrete 25% increments (common in RVs)
+        const discretePercentage = relativeLevel * 25;
         
-        setPercentage(newPercentage);
+        // Method 3: Simple division by resolution
+        const simplePercentage = Math.round((relativeLevel / resolution) * 100);
+        
+        // Method 4: Alternative max level calculation
+        const altMaxLevel = Math.pow(2, resolution);
+        const altPercentage = Math.round((relativeLevel / altMaxLevel) * 100);
+        
+        console.log(`=== TANK DEBUG: ${name} ===`);
+        console.log(`Raw data: level=${relativeLevel}, resolution=${resolution}`);
+        console.log(`Method 1 (current): ${originalPercentage}% (${relativeLevel}/${maxLevel})`);
+        console.log(`Method 2 (discrete): ${discretePercentage}% (${relativeLevel} * 25)`);
+        console.log(`Method 3 (simple): ${simplePercentage}% (${relativeLevel}/${resolution})`);
+        console.log(`Method 4 (alt max): ${altPercentage}% (${relativeLevel}/${altMaxLevel})`);
+        
+        // Choose the calculation method - start with discrete since RVs often use 25% increments
+        let calculatedPercentage;
+        
+        if (resolution === 4 && relativeLevel <= 4) {
+          // For resolution 4, try discrete 25% increments first
+          calculatedPercentage = discretePercentage;
+          console.log(`Using discrete method: ${calculatedPercentage}%`);
+        } else {
+          // Fall back to original method
+          calculatedPercentage = originalPercentage;
+          console.log(`Using original method: ${calculatedPercentage}%`);
+        }
+        
+        // Apply calibration offset
+        const calibrationOffset = CALIBRATION_OFFSETS[tankType] || 0;
+        const finalPercentage = Math.max(0, Math.min(100, calculatedPercentage + calibrationOffset));
+        
+        console.log(`After calibration offset (${calibrationOffset}%): ${finalPercentage}%`);
+        console.log(`=== END DEBUG ===`);
+        
+        setPercentage(finalPercentage);
         setLastUpdate(new Date());
       }
     } catch (error) {
       console.error(`TankHeaterControl: Error parsing tank status for ${name}:`, error);
-    }
-  };
-
-  // Handle toggle for water heater
-  const handleToggle = async (newIsOn) => {
-    setIsLoading(true);
-    
-    try {
-      // Use the water_heater_toggle command from server.js
-      const result = await RVControlService.executeCommand('water_heater_toggle');
-      
-      if (result.status === 'success') {
-        setIsOn(newIsOn);
-        console.log(`${name} heater toggled to: ${newIsOn ? 'ON' : 'OFF'}`);
-      } else {
-        console.error(`Failed to toggle ${name} heater:`, result.error);
-      }
-    } catch (error) {
-      console.error(`Error toggling ${name} heater:`, error);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -183,8 +209,8 @@ const TankHeaterControl = ({ name, tankType, isOn, setIsOn, trackColor }) => {
   // This preserves the original UI while adding real-time data
   if (isTablet) {
     return (
-      <View className="flex-row justify-center items-center py-4">
-        <View className="items-center" style={{ minHeight: 220 }}> {/* Fixed height container */}
+      <View className="flex-row justify-center items-center py-4" style={{ marginHorizontal: 8 }}> {/* Added spacing between tanks */}
+        <View className="items-center" style={{ minHeight: 180 }}> {/* Reduced height since no toggle */}
           <View className="flex-row items-center mb-2">
             <Text className="text-white text-lg font-semibold">{name}</Text>
             <Text style={{ color: connectionStatus.color, marginLeft: 8, fontSize: 16 }}>
@@ -208,28 +234,23 @@ const TankHeaterControl = ({ name, tankType, isOn, setIsOn, trackColor }) => {
           
           <Text className="text-white text-md font-semibold mt-2">{percentage}%</Text>
           
+          {/* Debug info display */}
+          {rawData && __DEV__ && (
+            <View className="mt-1 p-2 bg-gray-800 rounded">
+              <Text className="text-gray-300 text-xs">
+                Raw: L{rawData.relativeLevel}/R{rawData.resolution}
+              </Text>
+              <Text className="text-gray-300 text-xs">
+                Inst: {rawData.instance} ({rawData.definition})
+              </Text>
+            </View>
+          )}
+          
           {lastUpdate && (
             <Text className="text-gray-400 text-xs mt-1">
               {lastUpdate.toLocaleTimeString()}
             </Text>
           )}
-          
-          {/* Water heater toggle for fresh water tank - with consistent spacing */}
-          <View className="mt-4" style={{ minHeight: 60 }}> {/* Fixed height for heater section */}
-            {tankType === "fresh" ? (
-              <>
-                <Text className="text-white text-sm mb-2">Water Heater</Text>
-                <ToggleSwitch 
-                  isOn={isOn} 
-                  setIsOn={handleToggle} 
-                  disabled={isLoading}
-                />
-              </>
-            ) : (
-              // Empty space to maintain consistent height
-              <View style={{ height: 60 }} />
-            )}
-          </View>
         </View>
       </View>
     );
@@ -237,7 +258,7 @@ const TankHeaterControl = ({ name, tankType, isOn, setIsOn, trackColor }) => {
 
   return (
     <View className="flex-row justify-between py-2">
-      <View className="items-center" style={{ minHeight: 140 }}> {/* Fixed height container */}
+      <View className="items-center" style={{ minHeight: 120 }}> {/* Reduced height */}
         <Text className="text-white">{percentage}%</Text>
         <VerticalSlider
           value={percentage}
@@ -252,6 +273,16 @@ const TankHeaterControl = ({ name, tankType, isOn, setIsOn, trackColor }) => {
           maximumTrackTintColor={trackColor.maximum}
           onChange={handleSliderChange}
         />
+        
+        {/* Debug info display for phone layout */}
+        {rawData && __DEV__ && (
+          <View className="mt-1 p-1 bg-gray-800 rounded">
+            <Text className="text-gray-300 text-xs">
+              L{rawData.relativeLevel}/R{rawData.resolution}
+            </Text>
+          </View>
+        )}
+        
         {lastUpdate && (
           <Text className="text-gray-400 text-xs mt-1">
             {lastUpdate.toLocaleTimeString()}
@@ -265,22 +296,6 @@ const TankHeaterControl = ({ name, tankType, isOn, setIsOn, trackColor }) => {
           <Text style={{ color: connectionStatus.color, fontSize: 14 }}>
             {connectionStatus.text}
           </Text>
-        </View>
-        
-        {/* Water heater toggle for fresh water tank - with consistent spacing */}
-        <View className="ml-10" style={{ minHeight: 40, justifyContent: 'flex-start' }}> {/* Fixed positioning */}
-          {tankType === "fresh" ? (
-            <View className="mt-1">
-              <ToggleSwitch 
-                isOn={isOn} 
-                setIsOn={handleToggle} 
-                disabled={isLoading}
-              />
-            </View>
-          ) : (
-            // Empty space to maintain consistent layout
-            <View style={{ width: 50, height: 40 }} />
-          )}
         </View>
       </View>
     </View>
