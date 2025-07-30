@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, Image, TouchableOpacity, TouchableWithoutFeedback, Keyboard, ScrollView } from "react-native";
 import { Border, Color, Gap, FontSize, FontFamily, isDarkMode } from "../GlobalStyles";
-import useScreenSize from "../helper/useScreenSize.jsx";
+import { useScreenSize, dismissKeyboard, setLowFanSpeed, setAutoMode, getImageForLabel } from "../helper";
 import { Col, Row, Grid } from "react-native-easy-grid";
 import { RadialSlider } from 'react-native-radial-slider';
 import moment from 'moment';
@@ -273,10 +273,6 @@ const ClimateControlScreenTablet = () => {
     return () => clearTimeout(timeoutId);
   }, [temp, lastTemp, isCoolToggled, isToekickToggled, isFurnaceToggled]);
 
-  // Dismiss keyboard when tapping anywhere - Added from AirCon
-  const dismissKeyboard = () => {
-    Keyboard.dismiss();
-  };
 
   // Night Setting Toggle - Using service with RV state management
   const handleNightPress = async () => {
@@ -601,66 +597,6 @@ const ClimateControlScreenTablet = () => {
     }
   };
   
-  // Direct implementation of low fan speed using raw commands
-  const setLowFanSpeed = async () => {
-    try {
-      // Attempt to execute the individual commands instead of the command group
-      // This is a workaround for the 400 error issue
-      const commands = [
-        '19FED99F#FF96AA0F3200D1FF', // low_fan_speed_1
-        '195FCE98#AA00320000000000', // low_fan_speed_2
-        '19FEF998#A110198A24AE19FF'  // low_fan_speed_3
-      ];
-      
-      // Send each command individually using the raw command API
-      for (const command of commands) {
-        await RVControlService.executeRawCommand(command);
-        // Short delay to avoid overwhelming the CAN bus
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-      
-      return { success: true };
-    } catch (error) {
-      console.error('Failed to set low fan speed:', error);
-      
-      // Provide a more detailed error message for debugging
-      return { 
-        success: false, 
-        error: error.message,
-        details: 'Error sending raw fan speed commands. Check server logs for details.'
-      };
-    }
-  };
-  
-  // Direct implementation of auto mode using raw commands
-  const setAutoMode = async () => {
-    try {
-      // Auto setting commands from server.js
-      const commands = [
-        '19FEF99F#01C0FFFFFFFFFFFF', // auto_setting_on_1
-        '19FED99F#FF96AA0F0000D1FF', // auto_setting_on_2
-        '19FFE198#010064A924A92400'  // auto_setting_on_3
-      ];
-      
-      // Send each command individually using the raw command API
-      for (const command of commands) {
-        await RVControlService.executeRawCommand(command);
-        // Short delay to avoid overwhelming the CAN bus
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-      
-      return { success: true };
-    } catch (error) {
-      console.error('Failed to set auto mode:', error);
-      
-      // Provide a more detailed error message for debugging
-      return { 
-        success: false, 
-        error: error.message,
-        details: 'Error sending raw auto mode commands. Check server logs for details.'
-      };
-    }
-  };
 
   // Load saved states on component mount - updated with RV state management
   useEffect(() => {
@@ -1168,14 +1104,6 @@ const ClimateControlScreenTablet = () => {
   return null; // Return null if not tablet
 }
 
-const getImageForLabel = (label) => {
-  const images = {
-    "Cool": require("../assets/snowflake.png"),
-    "Toe Kick": require("../assets/toekick.png"),
-    "Furnace": require("../assets/furnace.png"),
-  };
-  return images[label] || require("../assets/questionmark.png");
-};
 
 // Update the FanSpeedButton component to handle active state:
 const FanSpeedButton = ({ speed, onPress, isLoading, isActive }) => {

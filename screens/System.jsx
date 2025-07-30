@@ -11,7 +11,7 @@ import {
 } from "react-native";
 
 import Map from "../components/Map";
-import useScreenSize from "../helper/useScreenSize.jsx";
+import { useScreenSize, formatGridPower, getBatterySOC, getBatteryPower, getBatteryVoltage, getBatteryCurrent, getSystemStatus } from "../helper";
 import VictronEnergyPanel from "../components/VictronEnergyPanel";
 import EnergyFlowDiagram from "../components/EnergyFlowDiagram";
 import { VictronEnergyService } from "../API/VictronEnergyService";
@@ -70,73 +70,6 @@ const System = () => {
     setShowDetailedView(!showDetailedView);
   };
 
-  // Create a formatted display for grid power
-  const formatGridPower = () => {
-    if (!victronData || !victronData.grid) {
-      return "--";
-    }
-    
-    // If grid is not connected, show as disconnected
-    if (!victronData.grid.isConnected) {
-      return "Shore Disconnected";
-    }
-    
-    // Build a string with total power and individual line info if available
-    let displayText = `${victronData.grid.power}W`;
-    
-    // Add line info if we have multiple lines or specific line data
-    const l1 = victronData.grid.l1Power;
-    const l2 = victronData.grid.l2Power;
-    
-    if (l1 !== 0 || l2 !== 0) {
-      displayText += `\nL1: ${l1}W L2: ${l2}W`;
-    }
-    
-    return displayText;
-  };
-
-  // Get battery state of charge as percentage
-  const getBatterySOC = () => {
-    if (!victronData || !victronData.battery) return 0;
-    return Math.round(victronData.battery.soc * 100);
-  };
-
-  // Get battery power with proper sign
-  const getBatteryPower = () => {
-    if (!victronData || !victronData.battery) return 0;
-    return victronData.battery.power;
-  };
-
-  // Get battery voltage
-  const getBatteryVoltage = () => {
-    if (!victronData || !victronData.battery) return 0;
-    return victronData.battery.voltage?.toFixed(1) || '0.0';
-  };
-
-  // Get battery current
-  const getBatteryCurrent = () => {
-    if (!victronData || !victronData.battery) return 0;
-    return victronData.battery.current?.toFixed(1) || '0.0';
-  };
-
-  // Get system status indicator
-  const getSystemStatus = () => {
-    if (!victronData) return { status: 'Unknown', color: '#666' };
-    
-    if (victronData.apiStatus === 'simulation') {
-      return { status: 'Simulation', color: '#FF9800' };
-    }
-    
-    if (victronData.grid && victronData.grid.isConnected) {
-      return { status: 'Shore Power', color: '#4CAF50' };
-    }
-    
-    if (victronData.pvCharger && victronData.pvCharger.power > 0) {
-      return { status: 'Solar Charging', color: '#FFD700' };
-    }
-    
-    return { status: 'Battery Power', color: '#2196F3' };
-  };
 
   // Tablet view with integrated Victron data
   if (isTablet) {
@@ -164,7 +97,7 @@ const System = () => {
                   <Text style={styles.redCardHeaderText}>Grid Power</Text>
                 </View>
                 <Text style={styles.cardValue}>
-                  {formatGridPower()}
+                  {formatGridPower(victronData)}
                 </Text>
               </View>
             </GlowingCard>
@@ -198,10 +131,10 @@ const System = () => {
               {victronData ? (
                 <>
                   <Text style={styles.cardValue}>
-                    {`${getBatterySOC()}%`}
+                    {`${getBatterySOC(victronData)}%`}
                   </Text>
                   <Text style={styles.cardSubtitle}>
-                    {`${getBatteryPower()}W`}
+                    {`${getBatteryPower(victronData)}W`}
                   </Text>
                 </>
               ) : (
@@ -289,8 +222,8 @@ const System = () => {
           <View style={styles.headerLeft}>
             <Text style={styles.mobileHeaderTitle}>RV Energy System</Text>
             <View style={styles.statusRow}>
-              <View style={[styles.statusDot, { backgroundColor: getSystemStatus().color }]} />
-              <Text style={styles.statusText}>{getSystemStatus().status}</Text>
+              <View style={[styles.statusDot, { backgroundColor: getSystemStatus(victronData).color }]} />
+              <Text style={styles.statusText}>{getSystemStatus(victronData).status}</Text>
               {refreshing && <Text style={styles.refreshText}>Updating...</Text>}
             </View>
           </View>
@@ -313,26 +246,26 @@ const System = () => {
               </View>
               <View style={styles.batteryMainContent}>
                 <View style={styles.batteryLeft}>
-                  <Text style={styles.batterySOC}>{getBatterySOC()}%</Text>
+                  <Text style={styles.batterySOC}>{getBatterySOC(victronData)}%</Text>
                   <Text style={styles.batterySOCLabel}>State of Charge</Text>
                 </View>
                 <View style={styles.batteryRight}>
                   <View style={styles.batteryStats}>
-                    <Text style={styles.batteryStatValue}>{getBatteryVoltage()}V</Text>
+                    <Text style={styles.batteryStatValue}>{getBatteryVoltage(victronData)}V</Text>
                     <Text style={styles.batteryStatLabel}>Voltage</Text>
                   </View>
                   <View style={styles.batteryStats}>
-                    <Text style={styles.batteryStatValue}>{getBatteryCurrent()}A</Text>
+                    <Text style={styles.batteryStatValue}>{getBatteryCurrent(victronData)}A</Text>
                     <Text style={styles.batteryStatLabel}>Current</Text>
                   </View>
                   <View style={styles.batteryStats}>
                     <Text style={[styles.batteryStatValue, { 
-                      color: getBatteryPower() > 0 ? '#4CAF50' : '#FF5722' 
+                      color: getBatteryPower(victronData) > 0 ? '#4CAF50' : '#FF5722' 
                     }]}>
-                      {getBatteryPower()}W
+                      {getBatteryPower(victronData)}W
                     </Text>
                     <Text style={styles.batteryStatLabel}>
-                      {getBatteryPower() > 0 ? 'Charging' : 'Discharging'}
+                      {getBatteryPower(victronData) > 0 ? 'Charging' : 'Discharging'}
                     </Text>
                   </View>
                 </View>

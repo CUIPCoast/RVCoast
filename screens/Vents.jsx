@@ -152,7 +152,7 @@ const Vents = () => {
   const renderControls = () => (
     <View style={styles.fanControlsContainer}>
       <FanButton
-        size={180}
+        size={240}
         isOn={isBayVentFanOn}
         onPress={() => toggleFan('bay')}
         iconName="sun"
@@ -160,7 +160,7 @@ const Vents = () => {
         loading={isLoading}
       />
       <FanButton
-        size={180}
+        size={240}
         isOn={isBathroomFanOn}
         onPress={() => toggleFan('bath')}
         iconName="wind"

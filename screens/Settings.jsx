@@ -3,9 +3,10 @@ import { StyleSheet, View, Text, SectionList, Image, TouchableOpacity, Alert, Sc
 import GroupComponent from '../components/GroupComponent';
 import ToggleSwitch from '../components/ToggleSwitch.jsx';
 import { Color, Gap, FontSize, FontFamily, isDarkMode } from '../GlobalStyles';
-import useScreenSize from '../helper/useScreenSize.jsx';
+import { useScreenSize, handleSettingsToggle, handleSettingsItemPress } from '../helper';
 import moment from 'moment';
 import { router } from 'expo-router';
+
 
 const Settings = () => {
   const isTablet = useScreenSize();
@@ -21,11 +22,7 @@ const Settings = () => {
   });
 
   const onToggle = key => {
-    const notificationKeys = ['notifyMessages', 'notifyReminders'];
-    if (notificationKeys.includes(key) && !toggles.pushNotifications) {
-      return;
-    }
-    setToggles(prev => ({ ...prev, [key]: !prev[key] }));
+    handleSettingsToggle(key, toggles, setToggles);
   };
 
   const sections = [
@@ -92,35 +89,7 @@ const Settings = () => {
   ];
 
   const handleItemPress = (item) => {
-    if (item.key === 'about') {
-      Alert.alert('About This App', 'App Version: 1.0.0\n© 2025 Coast\nAll rights reserved.');
-    } else if (item.key === 'profile') {
-      Alert.alert('Profile', 'This would take you to your profile screen.');
-    } else if (item.key === 'changePassword') {
-      Alert.alert('Change Password', 'This would take you to the change password screen.');
-    } else if (item.key === 'signOut') {
-      Alert.alert('Signing Out', 'You have been signed out.');
-    } else if (item.key === 'wifiSetup') {
-      Alert.alert('Wi-Fi Setup', 'This would take you to a screen for scanning and connecting to Wi-Fi networks.');
-    } else if (item.key === 'wifiStatus') {
-      Alert.alert('Wi-Fi Status', 'Currently connected to: Home_Network');
-    } else if (item.key === 'featureSettings') {
-      router.push('/feature-settings');
-    } else if (item.key === 'batteryThresholds') {
-      Alert.alert('Battery Thresholds', 'This would open settings for configuring battery alerts.');
-    } else if (item.key === 'generatorRules') {
-      Alert.alert('Generator Rules', 'This would open auto-start rules for generator settings.');
-    } else if (item.key === 'shorePowerPrefs') {
-      Alert.alert('Shore Power Preferences', 'This would open shore power preference settings.');
-    } else if (item.key === 'solarOptimization') {
-      Alert.alert('Solar Optimization', 'This would open solar optimization settings.');
-    } else if (item.key === 'displayBrightness') {
-      Alert.alert('Display Brightness', 'This would open brightness control settings.');
-    } else if (item.key === 'layoutCustomization') {
-      Alert.alert('Layout Customization', 'This would open layout customization settings.');
-    } else if (item.key === 'widgetConfig') {
-      Alert.alert('Widget Configuration', 'This would open widget configuration settings.');
-    }
+    handleSettingsItemPress(item, Alert.alert, router);
   };
 
   const renderTabletSettingsCard = (section) => (

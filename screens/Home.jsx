@@ -20,9 +20,8 @@ import {
   Padding,
   isDarkMode
 } from "../GlobalStyles";
-import useScreenSize from "../helper/useScreenSize.jsx";
+import { useScreenSize, getWeatherIcon, fetchHourlyWeather, formatWeatherItem } from "../helper";
 import AirCon from "./AirCon.jsx";
-import axios from "axios";
 import ToggleSwitch from "../components/ToggleSwitch.jsx";
 
 const { width, height } = Dimensions.get('window');
@@ -40,28 +39,8 @@ const Home = () => {
     setShowAirCon(!showAirCon);
   };
 
-  const getWeatherIcon = (condition) => {
-    const conditionLower = condition.toLowerCase();
-    if (conditionLower.includes('clear')) return '☀️';
-    if (conditionLower.includes('cloud')) return '☁️';
-    if (conditionLower.includes('rain')) return '🌧️';
-    if (conditionLower.includes('snow')) return '❄️';
-    if (conditionLower.includes('storm')) return '⛈️';
-    return '🌤️';
-  };
-
   const renderWeatherItem = ({ item }) => {
-    const date = new Date(item.dt * 1000);
-    const hour = date.toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    });
-
-    const tempF = (((item.main.temp - 273.15) * 9/5) + 32).toFixed(0);
-    const weatherIcon = getWeatherIcon(item.weather[0].main);
-
-    
+    const { hour, weatherIcon, tempF } = formatWeatherItem(item);
 
     return (
       <View style={styles.weatherItemContainer}>
@@ -73,26 +52,14 @@ const Home = () => {
   };
 
   useEffect(() => {
-    const fetchHourlyWeather = async () => {
-      const apiKey = "5819cdd3f2d4610ea874f8bab06d02cb";
-      const city = "Chattanooga";
-      const url = `https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${apiKey}`;
-      
+    const loadWeatherData = async () => {
       try {
-        const response = await axios.get(url);
-        const currentTime = new Date();
-        const futureForecasts = response.data.list.filter(
-          item => new Date(item.dt * 1000) > currentTime
-        );
-        const sortedForecasts = futureForecasts.sort(
-          (a, b) => new Date(a.dt * 1000) - new Date(b.dt * 1000)
-        );
-        
-        setHourlyWeather(sortedForecasts.slice(0, isTablet ? 1 : 5));
+        const weatherData = await fetchHourlyWeather("Chattanooga", isTablet);
+        setHourlyWeather(weatherData);
         
         // Set weather condition for the first forecast
-        if (sortedForecasts.length > 0) {
-          setWeatherCondition(sortedForecasts[0].weather[0].description);
+        if (weatherData.length > 0) {
+          setWeatherCondition(weatherData[0].weather[0].description);
         }
       } catch (error) {
         console.error("Error fetching weather data:", error);
@@ -102,7 +69,7 @@ const Home = () => {
       }
     };
 
-    fetchHourlyWeather();
+    loadWeatherData();
   }, [isTablet]);
 
   if (isTablet) {

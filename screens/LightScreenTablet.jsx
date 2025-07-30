@@ -8,6 +8,7 @@ import { LightControlService } from "../Service/LightControlService.js";
 import { CANBusMonitor } from "../Service/CANBusMonitor.js";
 import { LightingScenes } from "../API/rvAPI.js";
 import rvStateManager from "../API/RVStateManager/RVStateManager";
+import { handleAllLightsOn, handleAllLightsOff, getLightDisplayName, getLightGroups, showStatusMessage } from "../helper";
 
 const ImprovedLightScreenTablet = () => {
   // Current date/time
@@ -88,120 +89,36 @@ const ImprovedLightScreenTablet = () => {
     };
   }, []);
 
-  // Show status message helper
-  const showStatusMessage = (message, duration = 3000) => {
-    setStatusMessage(message);
-    setShowStatus(true);
-    setTimeout(() => setShowStatus(false), duration);
-  };
 
   // Turn all lights on
-  const handleAllLightsOn = async () => {
-    try {
-      setIsLoading(true);
-      
-      const result = await LightControlService.allLightsOn();
-      
-      if (result.success) {
-        // Update RV State Manager for all lights
-        allLights.forEach(lightId => {
-          rvStateManager.updateLightState(lightId, true, 75); // Default to 75% brightness
-        });
-        
-        setMasterLightOn(true);
-        showStatusMessage('All lights turned ON');
-      } else {
-        showStatusMessage('Failed to turn all lights ON');
-      }
-    } catch (error) {
-      showStatusMessage(`Error: ${error.message}`);
-      console.error('Error turning all lights on:', error);
-    } finally {
-      setIsLoading(false);
+  const handleAllLightsOnPress = async () => {
+    const success = await handleAllLightsOn(
+      allLights,
+      setIsLoading,
+      (message) => showStatusMessage(message, setStatusMessage, setShowStatus)
+    );
+    if (success) {
+      setMasterLightOn(true);
     }
   };
   
   // Turn all lights off
-  const handleAllLightsOff = async () => {
-    try {
-      setIsLoading(true);
-      
-      // Cancel any active dimming operations first
-      for (const lightId of activeDimmingLights) {
-        try {
-          await LightControlService.cancelDimming(lightId);
-        } catch (cancelError) {
-          console.warn(`Could not cancel dimming for ${lightId}:`, cancelError);
-        }
-      }
-      setActiveDimmingLights(new Set());
-      
-      const result = await LightControlService.allLightsOff();
-      
-      if (result.success) {
-        // Update RV State Manager for all lights
-        allLights.forEach(lightId => {
-          rvStateManager.updateLightState(lightId, false, 0);
-        });
-        
-        setMasterLightOn(false);
-        showStatusMessage('All lights turned OFF');
-      } else {
-        showStatusMessage('Failed to turn all lights OFF');
-      }
-    } catch (error) {
-      showStatusMessage(`Error: ${error.message}`);
-      console.error('Error turning all lights off:', error);
-    } finally {
-      setIsLoading(false);
+  const handleAllLightsOffPress = async () => {
+    const success = await handleAllLightsOff(
+      allLights,
+      activeDimmingLights,
+      setActiveDimmingLights,
+      setIsLoading,
+      (message) => showStatusMessage(message, setStatusMessage, setShowStatus)
+    );
+    if (success) {
+      setMasterLightOn(false);
     }
   };
 
   // Group lights by category
-  const lightGroups = {
-    kitchen: [
-      'kitchen_lights',
-      'dinette_lights',
-      'under_cab_lights',
-      'strip_lights',
-      'awning_lights',
-      'porch_lights',
-      'hitch_lights'
-    ],
-    bedroom: [
-      'bed_ovhd_light',
-      'left_reading_lights',
-      'right_reading_lights',
-      'vibe_light'
-    ],
-    bathroom: [
-      'bath_light',
-      'vanity_light',
-      'shower_lights'
-    ]
-  };
+  const lightGroups = getLightGroups();
 
-  // Helper to convert API light IDs to user-friendly names
-  const getLightDisplayName = (lightId) => {
-    const nameMap = {
-      'kitchen_lights': 'Kitchen Lights',
-      'bath_light': 'Bathroom Light',
-      'bed_ovhd_light': 'Bedroom Overhead Light',
-      'vibe_light': 'Vibe Light',
-      'vanity_light': 'Vanity Light',
-      'awning_lights': 'Awning Lights',
-      'shower_lights': 'Shower Lights',
-      'under_cab_lights': 'Under Cabinet Lights',
-      'hitch_lights': 'Hitch Lights',
-      'porch_lights': 'Porch Lights', 
-      'left_reading_lights': 'Left Reading Light',
-      'right_reading_lights': 'Right Reading Light',
-      'dinette_lights': 'Dinette Lights',
-      'strip_lights': 'Strip Lights'
-    };
-    
-    return nameMap[lightId] || lightId;
-  };
 
   return (
     <Grid className="bg-black">
@@ -310,7 +227,7 @@ const ImprovedLightScreenTablet = () => {
                       borderBottomLeftRadius: 20,
                       marginRight: 1,
                     }}
-                    onPress={handleAllLightsOn}
+                    onPress={handleAllLightsOnPress}
                     disabled={isLoading}
                   >
                     <Text style={{ 
@@ -328,7 +245,7 @@ const ImprovedLightScreenTablet = () => {
                       borderTopRightRadius: 20,
                       borderBottomRightRadius: 20,
                     }}
-                    onPress={handleAllLightsOff}
+                    onPress={handleAllLightsOffPress}
                     disabled={isLoading}
                   >
                     <Text style={{ 
