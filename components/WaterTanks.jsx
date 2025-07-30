@@ -304,12 +304,7 @@ const WaterTanks = ({ name, tankType, trackColor }) => {
             <Text style={{ color: connectionStatus.color, marginLeft: 8, fontSize: 16 }}>
               {connectionStatus.text}
             </Text>
-            {/* Show heater status with a small indicator */}
-            {heaterStatus && (
-              <Text style={{ color: '#F59E0B', marginLeft: 4, fontSize: 12 }}>
-                🔥
-              </Text>
-            )}
+           
           </View>
           
           <VerticalSlider

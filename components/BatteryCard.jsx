@@ -12,6 +12,7 @@ import {
   StyleSheet,
 } from "react-native";
 
+// Original BatteryCard component (unchanged)
 const BatteryCard = ({ width = 280, height = 180, children, subtitleStyle = {}, percentageStyle = {} }) => {
   // State to track parsed values
   const [batteryLevel, setBatteryLevel] = useState(0);
@@ -243,7 +244,7 @@ const BatteryCard = ({ width = 280, height = 180, children, subtitleStyle = {}, 
         {/* Battery label */}
         <SvgText
           x={width / 2}
-          y={25}
+          y={30}
           fontSize="16"
           fontWeight="bold"
           fill="#ffffff"
@@ -252,18 +253,7 @@ const BatteryCard = ({ width = 280, height = 180, children, subtitleStyle = {}, 
           Battery
         </SvgText>
         
-        {/* Highlight effect on top */}
-        <Path
-          d={`M${padding + 5},${padding + 5} 
-              H${batteryBody - padding - 10} 
-              C${batteryBody - padding - 5},${padding + 5} 
-              ${batteryBody - padding - 5},${padding + 5} 
-              ${batteryBody - padding - 5},${padding + 10} 
-              V${padding + 15}`}
-          stroke="rgba(255,255,255,0.2)"
-          strokeWidth="2"
-          fill="none"
-        />
+        
         
         {/* Battery terminals */}
         <Rect 
@@ -290,6 +280,35 @@ const BatteryCard = ({ width = 280, height = 180, children, subtitleStyle = {}, 
       <View style={styles.contentContainer}>
         {enhanceChildren(children)}
       </View>
+    </View>
+  );
+};
+
+// NEW: Custom SmallBatteryCard component for positioning and scaling
+const SmallBatteryCard = ({ 
+  x = 20, 
+  y = 20, 
+  scale = 0.7, 
+  children, 
+  width = 200,  // Smaller default width
+  height = 120, // Smaller default height
+  ...props 
+}) => {
+  return (
+    <View style={{
+      position: 'absolute',
+      top: y,
+      left: x,
+      transform: [{ scale }],
+      zIndex: 10 // Ensure it appears above other elements
+    }}>
+      <BatteryCard 
+        width={width}
+        height={height}
+        {...props}
+      >
+        {children}
+      </BatteryCard>
     </View>
   );
 };
@@ -342,4 +361,6 @@ const styles = StyleSheet.create({
   }
 });
 
+// Export both components
 export default BatteryCard;
+export { SmallBatteryCard };

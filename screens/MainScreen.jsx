@@ -1,20 +1,20 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, Image, Switch, ScrollView, Pressable, TouchableOpacity } from 'react-native';
 import { Col, Row, Grid } from "react-native-easy-grid";
-import System from './System';
+
 import moment from 'moment';
-import Settings from './Settings';
-import ModalComponent from '../components/ModalComponent';
+
 import Map from "../components/Map";
 import WaterTanks from "../components/WaterTanks.jsx";
 import TemperatureDisplay from "../components/TemperatureDisplay"; // New component
 import useTemperature from "../hooks/useTemperature"; // New hook
 import AwningControlModal from "../components/AwningControlModal";
 import AirCon from "./AirCon.jsx";
-import Home from "./Home";
+import {BatteryCard, SmallBatteryCard} from "../components/BatteryCard.jsx";
 import { WaterService } from '../API/RVControlServices.js';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { VictronEnergyService } from "../API/VictronEnergyService";
 
 const MainScreen = () => {
     
@@ -24,13 +24,16 @@ const MainScreen = () => {
     const [isModalVisible, setModalVisible] = useState(false);
     const [isOn, setIsOn] = useState(false);
     const [isOnGray, setIsOnGray] = useState(false);
-
+    const [victronData, setVictronData] = useState(null);
     const [isFreshHeaterOn, setFreshHeaterOn] = useState(false);
     const [isGreyHeaterOn, setGreyHeaterOn] = useState(false);
     const [isWaterHeaterOn, setWaterHeaterOn] = useState(false);
     const [isWaterPumpOn, setWaterPumpOn] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState(null);
+    const [refreshing, setRefreshing] = useState(false);
+    const [energyError, setEnergyError] = useState(null);
+    const [batteryLevel, setBatteryLevel] = useState(12.5);
 
      const { 
         temperature, 
@@ -48,6 +51,8 @@ const MainScreen = () => {
             return () => clearTimeout(timer);
         }
     }, [errorMessage]);
+
+    
 
     // Handle water pump toggle
     const handleWaterPumpToggle = async () => {
@@ -87,8 +92,62 @@ const MainScreen = () => {
 
      const handleTemperaturePress = (tempData) => {
         console.log('MainScreen: Current temperature:', tempData);
-        // You could open a climate control modal here
+         
     };
+
+    // Fetch Victron data when component mounts
+      useEffect(() => {
+        const fetchVictronData = async () => {
+          try {
+            setRefreshing(true);
+            const data = await VictronEnergyService.getAllData();
+            setVictronData(data);
+            setEnergyError(null);
+            
+            // Update battery level if available
+            if (data && data.battery && data.battery.voltage) {
+              setBatteryLevel(data.battery.voltage);
+            }
+          } catch (error) {
+            console.error("Failed to load Victron data:", error);
+            setEnergyError("Could not connect to the Victron system");
+          } finally {
+            setRefreshing(false);
+          }
+        };
+    
+        fetchVictronData();
+        
+        // Set up refresh interval
+        const intervalId = setInterval(fetchVictronData, 10000); // Refresh every 10 seconds
+        
+        // Clean up on unmount
+        return () => clearInterval(intervalId);
+      }, []);
+
+    // Helper function to format power values specifically
+  const formatPower = (value) => {
+    if (value === null || value === undefined) return '--';
+    const num = parseFloat(value);
+    if (isNaN(num)) return '--';
+    return `${num.toFixed(2)}W`;
+  };
+
+  // Get battery state of charge as percentage
+  const getBatterySOC = () => {
+  if (!victronData || !victronData.battery) return 0;
+  
+  // The SOC comes as a decimal (0.57 = 57%), so multiply by 100
+  const socDecimal = victronData.battery.soc;
+  const socPercentage = socDecimal * 100;
+  
+  return Math.round(socPercentage);
+};
+  // Get battery power with proper sign
+  const getBatteryPower = () => {
+    if (!victronData || !victronData.battery) return 0;
+    return parseFloat(victronData.battery.power).toFixed(2);
+  };
     
     return (
         <Grid className="bg-black">
@@ -343,41 +402,38 @@ const MainScreen = () => {
                   }}>
                     
                 <Col className="pb-5 mt15" size={60} style={{ justifyContent: "center", alignItems: "center" }}>
-                    <Row
-                        className="bg-brown rounded-xl ml-2 mt8"
-                        style={{
-                            flexDirection: "column",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            padding: 10,
-                            overflow: "visible",
-                            width: 260,
-                            height: 280,
-                            position: "relative",
-                            shadowColor: "#FFF",
-                            
-                            shadowOpacity: 1,
-                            shadowRadius: 2,
-                            elevation: 6,
-                        }}
-                    >
-                        <Text
-                            className="text-white text-2g font-semibold"
-                            style={{
-                                position: "absolute",
-                                top: 10,
-                                left: 10,
-                                zIndex: 1,
-                            }}
-                        >
-                            Wifi
-                        </Text>
-                        <Pressable onPress={() => setModalVisible(true)}>
-                        <ModalComponent nameComponent="Wifi" />
+                   // Small battery in top-right corner
+<SmallBatteryCard x={10} y={-160} scale={1.45} percentageStyle={{
+    left: -20,     // Move percentage text left/right
+    top: -10,       // Move percentage text up/down
+    fontSize: 20, // Custom font size
+  }}
+  subtitleStyle={{
+    left: -25,      // Move subtitle left/right
+    top: -5,      // Move subtitle up/down
+    fontSize: 10, // Custom font size
+    marginTop: 2, // Spacing from percentage
+  }}>
+  {victronData ? (
+    <>
+      <Text style={styles.cardValue}>
+        {`${getBatterySOC()}%`}
+      </Text>
+      <Text style={styles.cardSubtitle}>
+        {formatPower(getBatteryPower())}
+      </Text>
+    </>
+  ) : (
+    <Text style={styles.cardValue}>--</Text>
+  )}
+</SmallBatteryCard>
 
-                        </Pressable>
-                        
-                    </Row>
+// Tiny battery in bottom-left corner
+<SmallBatteryCard x={50} y={400} scale={0.4}>
+  <Text style={styles.cardValue}>75%</Text>
+  <Text style={styles.cardSubtitle}>250W</Text>
+</SmallBatteryCard>
+
                 </Col>
 
                 <Col className="pb-5 mt15" size={60} style={{ justifyContent: "center", alignItems: "center" }}>
@@ -535,6 +591,7 @@ const styles = {
         borderColor: "red",
         zIndex: 1000,
     },
+   
     errorText: {
         color: "white",
         textAlign: "center",

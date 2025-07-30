@@ -465,6 +465,8 @@ const SimpleHoldToDimLight = ({
             backgroundColor: localIsOn ? "#FFB267" : "#666",
             width: 40,
             height: 40,
+            right: 13,
+            top: 7,
             borderRadius: 20,
             alignItems: 'center',
             justifyContent: 'center',
