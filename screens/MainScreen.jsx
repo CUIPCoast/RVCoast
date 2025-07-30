@@ -6,7 +6,7 @@ import moment from 'moment';
 import Settings from './Settings';
 import ModalComponent from '../components/ModalComponent';
 import Map from "../components/Map";
-import TankHeaterControl from "../components/TankHeaterControl";
+import WaterTanks from "../components/WaterTanks.jsx";
 import TemperatureDisplay from "../components/TemperatureDisplay"; // New component
 import useTemperature from "../hooks/useTemperature"; // New hook
 import AwningControlModal from "../components/AwningControlModal";
@@ -313,7 +313,7 @@ const MainScreen = () => {
 
     {/* Right column: tank sliders */}
     <View className="flex-row">
-      <TankHeaterControl
+      <WaterTanks
         name="Fresh"
         icon="water"
         initialPercentage={80}
@@ -322,7 +322,7 @@ const MainScreen = () => {
         trackColor={{ minimum: "#00C6FB", maximum: "#555" }}
       />
       <View style={{ width: 40 }} />
-      <TankHeaterControl
+      <WaterTanks
         name="Gray"
         icon="water-outline"
         initialPercentage={40}
