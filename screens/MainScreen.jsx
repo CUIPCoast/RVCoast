@@ -374,19 +374,13 @@ const MainScreen = () => {
     <View className="flex-row">
       <WaterTanks
         name="Fresh"
-        icon="water"
-        initialPercentage={80}
-        isOn={isOn}
-        setIsOn={setIsOn}
+        tankType="fresh"
         trackColor={{ minimum: "#00C6FB", maximum: "#555" }}
       />
       <View style={{ width: 40 }} />
       <WaterTanks
         name="Gray"
-        icon="water-outline"
-        initialPercentage={40}
-        isOn={isOnGray}
-        setIsOn={setIsOnGray}
+        tankType="gray"
         trackColor={{ minimum: "#AAA", maximum: "#555" }}
       />
     </View>

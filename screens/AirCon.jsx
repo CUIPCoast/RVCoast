@@ -12,6 +12,7 @@ import {
 } from "../GlobalStyles";
 import { RadialSlider } from 'react-native-radial-slider';
 import useScreenSize from "../helper/useScreenSize.jsx";
+import useTemperature from "../hooks/useTemperature.js";
 
 // Import RV State Management hooks
 import { useRVClimate } from "../API/RVStateManager/RVStateHooks";
@@ -27,6 +28,14 @@ const AirCon = ({ onClose }) => {
   // Use RV state management hook for climate data
   const { climate, setTemperature, toggleCooling, toggleHeating } = useRVClimate();
   
+  // Use real temperature readings
+  const { 
+    temperature: currentTemp, 
+    isConnected: tempConnected, 
+    error: tempError,
+    refresh: refreshTemp 
+  } = useTemperature({ autoStart: true });
+  
   // Local state for UI interactions and status
   const [temp, setTemp] = useState(72);
   const [lastTemp, setLastTemp] = useState(72);
@@ -34,15 +43,20 @@ const AirCon = ({ onClose }) => {
   const [showStatus, setShowStatus] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   
-  // Initialize state from RV state manager
+  // Initialize state from RV state manager and real temperature readings
   useEffect(() => {
     const initializeState = async () => {
       try {
         // Get current climate state from RV state manager
         const currentClimateState = rvStateManager.getCategoryState('climate');
         
-        // Set temperature from state or AsyncStorage
-        if (currentClimateState.temperature) {
+        // Use real temperature reading if available, otherwise fall back to saved temperature
+        if (currentTemp && currentTemp.value) {
+          setTemp(Math.round(currentTemp.value));
+          setLastTemp(Math.round(currentTemp.value));
+          // Update RV state with real temperature
+          rvStateManager.updateClimateState({ temperature: Math.round(currentTemp.value) });
+        } else if (currentClimateState.temperature) {
           setTemp(currentClimateState.temperature);
           setLastTemp(currentClimateState.temperature);
         } else {
@@ -69,7 +83,7 @@ const AirCon = ({ onClose }) => {
     };
     
     initializeState();
-  }, []);
+  }, [currentTemp]);
 
   // Subscribe to external state changes (from other devices/screens)
   useEffect(() => {

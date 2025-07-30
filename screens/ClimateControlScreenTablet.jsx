@@ -8,6 +8,9 @@ import moment from 'moment';
 import { ClimateService } from '../API/RVControlServices.js';
 import { RVControlService } from "../API/rvAPI";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import useTemperature from "../hooks/useTemperature.js";
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // Import RV State Management hooks
 import { useRVClimate } from "../API/RVStateManager/RVStateHooks";
@@ -16,6 +19,14 @@ import rvStateManager from "../API/RVStateManager/RVStateManager";
 const ClimateControlScreenTablet = () => {
   // Use RV state management hook for climate data
   const { climate, setTemperature, toggleCooling, toggleHeating } = useRVClimate();
+  
+  // Use real temperature readings
+  const { 
+    temperature: currentTemp, 
+    isConnected: tempConnected, 
+    error: tempError,
+    refresh: refreshTemp 
+  } = useTemperature({ autoStart: true });
   
   const [activeButtons, setActiveButtons] = useState([]); // State for active buttons
   const [speed, setSpeed] = useState(0);
@@ -65,8 +76,13 @@ const ClimateControlScreenTablet = () => {
         // Get current climate state from RV state manager
         const currentClimateState = rvStateManager.getCategoryState('climate');
         
-        // Set temperature from state
-        if (currentClimateState.temperature) {
+        // Use real temperature reading if available, otherwise fall back to saved temperature
+        if (currentTemp && currentTemp.value) {
+          setTemp(Math.round(currentTemp.value));
+          setLastTemp(Math.round(currentTemp.value));
+          // Update RV state with real temperature
+          rvStateManager.updateClimateState({ temperature: Math.round(currentTemp.value) });
+        } else if (currentClimateState.temperature) {
           setTemp(currentClimateState.temperature);
           setLastTemp(currentClimateState.temperature);
         } else {
@@ -114,7 +130,7 @@ const ClimateControlScreenTablet = () => {
     };
     
     initializeState();
-  }, []);
+  }, [currentTemp]);
 
   // Subscribe to external state changes (from other devices/screens)
   useEffect(() => {
@@ -1044,35 +1060,163 @@ const ClimateControlScreenTablet = () => {
     flex: 0.75, 
     justifyContent: "flex-start"
   }}>
-    {features.map((feature, index) => (
-      <TouchableOpacity
-        key={index}
-        onPress={() => handleButtonPress(feature.label)}
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          backgroundColor: activeButtons.includes(feature.label) ? "#444" : "#1B1B1B",
-          borderRadius: 5,
-          paddingVertical: 10,
-          paddingHorizontal: 15,
-          marginVertical: 15,
-          width: 220,
-        }}
+    {/* Cool Button */}
+    <TouchableOpacity
+      onPress={() => handleButtonPress("Cool")}
+      disabled={isLoading}
+      activeOpacity={0.8}
+      style={[
+        styles.modernButton,
+        { marginBottom: 12 },
+        isLoading && styles.buttonDisabled
+      ]}
+    >
+      <LinearGradient
+        colors={isCoolToggled 
+          ? ["#4FC3F7", "#29B6F6", "#0288D1"] 
+          : ["#2C2C34", "#3A3A42", "#2C2C34"]
+        }
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.modernGradientButton}
       >
-        <Image
-          source={getImageForLabel(feature.label)}
-          style={{ width: 30, height: 30, marginRight: 5 }}
-        />
-        <Text
-          style={{
-            color: "white",
-            fontSize: 16,
-          }}
-        >
-          {feature.label}
-        </Text>
-      </TouchableOpacity>
-    ))}
+        <View style={styles.buttonContent}>
+          <View style={[
+            styles.iconContainer,
+            { backgroundColor: isCoolToggled ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)' }
+          ]}>
+            <Ionicons
+              name={isCoolToggled ? "snow" : "snow-outline"}
+              size={20}
+              color={isCoolToggled ? "#FFF" : "#B0B0B0"}
+            />
+          </View>
+          <View style={styles.textContainer}>
+            <Text style={[
+              styles.buttonTitle,
+              { color: isCoolToggled ? "#FFF" : "#E0E0E0" }
+            ]}>
+              Cool
+            </Text>
+            <Text style={[
+              styles.buttonSubtitle,
+              { color: isCoolToggled ? "rgba(255,255,255,0.8)" : "#888" }
+            ]}>
+              {isCoolToggled ? "Cooling" : "Off"}
+            </Text>
+          </View>
+          <View style={[
+            styles.statusIndicator,
+            { backgroundColor: isCoolToggled ? "#4CAF50" : "#666" }
+          ]} />
+        </View>
+      </LinearGradient>
+    </TouchableOpacity>
+
+    {/* Toe Kick Button */}
+    <TouchableOpacity
+      onPress={() => handleButtonPress("Toe Kick")}
+      disabled={isLoading}
+      activeOpacity={0.8}
+      style={[
+        styles.modernButton,
+        { marginBottom: 12 },
+        isLoading && styles.buttonDisabled
+      ]}
+    >
+      <LinearGradient
+        colors={isToekickToggled 
+          ? ["#FFA726", "#FF9800", "#FF6F00"] 
+          : ["#2C2C34", "#3A3A42", "#2C2C34"]
+        }
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.modernGradientButton}
+      >
+        <View style={styles.buttonContent}>
+          <View style={[
+            styles.iconContainer,
+            { backgroundColor: isToekickToggled ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)' }
+          ]}>
+            <Ionicons
+              name={isToekickToggled ? "arrow-up" : "arrow-up-outline"}
+              size={20}
+              color={isToekickToggled ? "#FFF" : "#B0B0B0"}
+            />
+          </View>
+          <View style={styles.textContainer}>
+            <Text style={[
+              styles.buttonTitle,
+              { color: isToekickToggled ? "#FFF" : "#E0E0E0" }
+            ]}>
+              Toe Kick
+            </Text>
+            <Text style={[
+              styles.buttonSubtitle,
+              { color: isToekickToggled ? "rgba(255,255,255,0.8)" : "#888" }
+            ]}>
+              {isToekickToggled ? "Active" : "Off"}
+            </Text>
+          </View>
+          <View style={[
+            styles.statusIndicator,
+            { backgroundColor: isToekickToggled ? "#4CAF50" : "#666" }
+          ]} />
+        </View>
+      </LinearGradient>
+    </TouchableOpacity>
+
+    {/* Furnace Button */}
+    <TouchableOpacity
+      onPress={() => handleButtonPress("Furnace")}
+      disabled={isLoading}
+      activeOpacity={0.8}
+      style={[
+        styles.modernButton,
+        isLoading && styles.buttonDisabled
+      ]}
+    >
+      <LinearGradient
+        colors={isFurnaceToggled 
+          ? ["#FF6B6B", "#FF8E53", "#FF6B35"] 
+          : ["#2C2C34", "#3A3A42", "#2C2C34"]
+        }
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.modernGradientButton}
+      >
+        <View style={styles.buttonContent}>
+          <View style={[
+            styles.iconContainer,
+            { backgroundColor: isFurnaceToggled ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)' }
+          ]}>
+            <Ionicons
+              name={isFurnaceToggled ? "flame" : "flame-outline"}
+              size={20}
+              color={isFurnaceToggled ? "#FFF" : "#B0B0B0"}
+            />
+          </View>
+          <View style={styles.textContainer}>
+            <Text style={[
+              styles.buttonTitle,
+              { color: isFurnaceToggled ? "#FFF" : "#E0E0E0" }
+            ]}>
+              Furnace
+            </Text>
+            <Text style={[
+              styles.buttonSubtitle,
+              { color: isFurnaceToggled ? "rgba(255,255,255,0.8)" : "#888" }
+            ]}>
+              {isFurnaceToggled ? "Heating" : "Off"}
+            </Text>
+          </View>
+          <View style={[
+            styles.statusIndicator,
+            { backgroundColor: isFurnaceToggled ? "#4CAF50" : "#666" }
+          ]} />
+        </View>
+      </LinearGradient>
+    </TouchableOpacity>
   </View>
   
   {/* Right column: Fan Speed container */}
@@ -1216,6 +1360,65 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  // Modern button styles
+  modernButton: {
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    marginVertical: 4,
+  },
+  modernGradientButton: {
+    borderRadius: 16,
+    padding: 2,
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    minWidth: 180,
+    position: 'relative',
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  textContainer: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  buttonTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  buttonSubtitle: {
+    fontSize: 10,
+    fontWeight: '500',
+    marginTop: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  statusIndicator: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    position: 'absolute',
+    top: 8,
+    right: 8,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   // Styles for the toggle buttons
   toggleButtonsContainer: {
