@@ -2,16 +2,20 @@ import React, { useState } from 'react';
 import { StyleSheet, View, Text, SectionList, Image, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import GroupComponent from '../components/GroupComponent';
 import ToggleSwitch from '../components/ToggleSwitch.jsx';
+import RVConnectionModal from '../components/RVConnectionModal';
 import { Color, Gap, FontSize, FontFamily, isDarkMode } from '../GlobalStyles';
 import { useScreenSize, handleSettingsToggle, handleSettingsItemPress } from '../helper';
+import { useAuth } from '../components/AuthContext';
 import moment from 'moment';
 import { router } from 'expo-router';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 
 const Settings = () => {
   const isTablet = useScreenSize();
   const isDark = isDarkMode;
-  const [username, setUsername] = useState('Guest User');
+  const { user, logout, disconnectFromRV } = useAuth();
+  const [showRVModal, setShowRVModal] = useState(false);
   const [toggles, setToggles] = useState({
     pushNotifications: false,
     notifyMessages: true,
@@ -25,6 +29,43 @@ const Settings = () => {
     handleSettingsToggle(key, toggles, setToggles);
   };
 
+  const handleSignOut = () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Sign Out', 
+          style: 'destructive',
+          onPress: async () => {
+            await logout();
+          }
+        },
+      ]
+    );
+  };
+
+  const handleDisconnectRV = () => {
+    Alert.alert(
+      'Disconnect RV',
+      'Are you sure you want to disconnect from your RV?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Disconnect', 
+          style: 'destructive',
+          onPress: async () => {
+            const result = await disconnectFromRV();
+            if (result.success) {
+              Alert.alert('Success', 'Disconnected from RV successfully');
+            }
+          }
+        },
+      ]
+    );
+  };
+
   const sections = [
     {
       title: 'Account',
@@ -32,6 +73,14 @@ const Settings = () => {
         { key: 'profile', label: 'Profile', type: 'link' },
         { key: 'changePassword', label: 'Change Password', type: 'link' },
         { key: 'signOut', label: 'Sign Out', type: 'action' },
+      ],
+    },
+    {
+      title: 'RV Connection',
+      data: [
+        { key: 'rvConnect', label: user?.rvConnection ? 'Update RV Connection' : 'Connect to RV', type: 'action' },
+        ...(user?.rvConnection ? [{ key: 'rvDisconnect', label: 'Disconnect from RV', type: 'action' }] : []),
+        ...(user?.rvConnection ? [{ key: 'rvStatus', label: `Connected to ${user.rvConnection.rvName}`, type: 'info' }] : []),
       ],
     },
     {
@@ -89,7 +138,15 @@ const Settings = () => {
   ];
 
   const handleItemPress = (item) => {
-    handleSettingsItemPress(item, Alert.alert, router);
+    if (item.key === 'signOut') {
+      handleSignOut();
+    } else if (item.key === 'rvConnect') {
+      setShowRVModal(true);
+    } else if (item.key === 'rvDisconnect') {
+      handleDisconnectRV();
+    } else {
+      handleSettingsItemPress(item, Alert.alert, router);
+    }
   };
 
   const renderTabletSettingsCard = (section) => (
@@ -155,16 +212,26 @@ const Settings = () => {
             <View style={styles.tabletProfileContent}>
               <View style={styles.tabletProfileAvatar}>
                 <Text style={[styles.tabletProfileInitials, { color: isDark ? Color.colorBlack : Color.colorWhite }]}>
-                  {username.split(' ').map(n => n[0]).join('')}
+                  {user?.firstName && user?.lastName 
+                    ? `${user.firstName[0]}${user.lastName[0]}` 
+                    : user?.username ? user.username.substring(0, 2).toUpperCase() : 'GU'}
                 </Text>
               </View>
               <View style={styles.tabletProfileInfo}>
                 <Text style={[styles.tabletProfileName, { color: isDark ? Color.colorWhitesmoke_100 : Color.colorGray_200 }]}>
-                  {username}
+                  {user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.username || 'Guest User'}
                 </Text>
                 <Text style={[styles.tabletProfileEmail, { color: isDark ? Color.colorGray_100 : Color.colorGray_100 }]}>
-                  guest@coastapp.com
+                  {user?.email || 'guest@coastapp.com'}
                 </Text>
+                {user?.rvConnection && (
+                  <View style={styles.rvConnectionBadge}>
+                    <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+                    <Text style={styles.rvConnectionText}>
+                      Connected to {user.rvConnection.rvName}
+                    </Text>
+                  </View>
+                )}
               </View>
               <TouchableOpacity style={styles.tabletProfileEditButton}>
                 <Text style={[styles.tabletProfileEditText, { color: isDark ? Color.colorWhitesmoke_100 : Color.colorGray_200 }]}>
@@ -191,6 +258,12 @@ const Settings = () => {
             </Text>
           </View>
         </ScrollView>
+        
+        {/* RV Connection Modal */}
+        <RVConnectionModal 
+          visible={showRVModal} 
+          onClose={() => setShowRVModal(false)} 
+        />
       </View>
     );
   }
@@ -258,6 +331,12 @@ const Settings = () => {
         }}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         contentContainerStyle={styles.sectionListContent}
+      />
+      
+      {/* RV Connection Modal */}
+      <RVConnectionModal 
+        visible={showRVModal} 
+        onClose={() => setShowRVModal(false)} 
       />
     </View>
   );
@@ -484,6 +563,24 @@ const styles = StyleSheet.create({
     fontSize: FontSize.size_sm,
     fontFamily: FontFamily.manropeRegular,
     color: '#FFFFFF',
+  },
+  
+  // RV Connection Badge Styles
+  rvConnectionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 5,
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+  },
+  rvConnectionText: {
+    color: '#4CAF50',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
   },
 });
 

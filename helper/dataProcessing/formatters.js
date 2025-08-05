@@ -36,7 +36,7 @@ export const formatGridPower = (victronData) => {
  */
 export const getBatterySOC = (victronData) => {
   if (!victronData || !victronData.battery) return 0;
-  return Math.round(victronData.battery.soc * 100);
+  return Math.round(victronData.battery.soc);
 };
 
 /**

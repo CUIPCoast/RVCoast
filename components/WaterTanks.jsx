@@ -2,10 +2,11 @@ import React, { useState, useEffect, useRef } from "react";
 import { View, Text } from "react-native";
 import VerticalSlider from "react-native-vertical-slider-smartlife";
 import useScreenSize from "../helper/useScreenSize.jsx";
-import { createCANBusListener } from "../Service/CANBusListener";
+import { createCANBusListener } from "../Service/CANBusListener.js";
 
-const TankHeaterControl = ({ name, tankType, trackColor }) => {
+const WaterTanks = ({ name, tankType, trackColor }) => {
   const [percentage, setPercentage] = useState(25); // Start with current actual levels
+  const [heaterStatus, setHeaterStatus] = useState(false); // Track heater status
   const [rawData, setRawData] = useState(null); // Store raw CAN data for debugging
   const [isConnected, setIsConnected] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
@@ -18,6 +19,13 @@ const TankHeaterControl = ({ name, tankType, trackColor }) => {
     fresh: -7,  // RV shows 25%, app shows 32%, so subtract 7%
     gray: 0,    // Adjust if needed
     black: 0    // Adjust if needed
+  };
+
+  // Tank heater CAN instance mapping (adjust based on your RV's configuration)
+  const HEATER_INSTANCES = {
+    fresh: 1,   // Fresh water tank heater instance
+    gray: 2,    // Gray water tank heater instance  
+    black: 3    // Black water tank heater instance (if equipped)
   };
 
   // Initialize tank levels based on current real data
@@ -35,7 +43,7 @@ const TankHeaterControl = ({ name, tankType, trackColor }) => {
     initializeTankLevels();
   }, [tankType]);
 
-  // Set up CAN bus listener for real-time tank data
+  // Set up CAN bus listener for real-time tank and heater data
   useEffect(() => {
     const setupCANListener = () => {
       try {
@@ -43,15 +51,28 @@ const TankHeaterControl = ({ name, tankType, trackColor }) => {
         
         canListener.current = createCANBusListener();
         
-        // Listen for tank status messages
+        // Listen for tank status and heater status messages
         canListener.current.on('message', (message) => {
           try {
             // Look for TANK_STATUS messages (DGN 1FFB7)
             if (message.dgn === '1FFB7' || message.name === 'TANK_STATUS') {
               handleTankStatusMessage(message);
             }
+            // Look for heater status messages - these could come from different DGNs
+            // Common heater/climate control DGNs: 19FEF9, 19FED9, 19FFE2
+            else if (message.dgn === '19FEF9' || message.dgn === '1FEF9' || 
+                     message.dgn === '19FED9' || message.dgn === '1FED9' ||
+                     message.dgn === '19FFE2' || message.dgn === '1FFE2' ||
+                     message.type === 'heater' || message.name === 'HEATER_STATUS') {
+              handleHeaterStatusMessage(message);
+            }
+            // Look for DC load status messages that might include heaters
+            else if (message.dgn === '1FEDB' || message.dgn === '19FEDB9F' || 
+                     message.name === 'DC_DIMMER_STATUS_3') {
+              handleDCLoadStatusMessage(message);
+            }
           } catch (error) {
-            console.error('Error processing tank message:', error);
+            console.error('Error processing tank/heater message:', error);
           }
         });
 
@@ -64,7 +85,6 @@ const TankHeaterControl = ({ name, tankType, trackColor }) => {
         canListener.current.on('disconnected', () => {
           console.log(`TankHeaterControl: CAN listener disconnected for ${name}`);
           setIsConnected(false);
-          // Try to reconnect after a delay
           scheduleReconnect();
         });
 
@@ -189,6 +209,74 @@ const TankHeaterControl = ({ name, tankType, trackColor }) => {
     }
   };
 
+  const handleHeaterStatusMessage = (message) => {
+    try {
+      // Try to determine if this message is for our tank's heater
+      const expectedInstance = HEATER_INSTANCES[tankType];
+      let isOurHeater = false;
+      let heaterOn = false;
+
+      // Method 1: Check by instance number
+      if (message.instance === expectedInstance) {
+        isOurHeater = true;
+      }
+      // Method 2: Check by device name or type
+      else if (message.device && message.device.includes(tankType)) {
+        isOurHeater = true;
+      }
+      // Method 3: Parse from raw CAN data
+      else if (message.rawData && Array.isArray(message.rawData)) {
+        const instanceFromData = parseInt(message.rawData[0], 16);
+        if (instanceFromData === expectedInstance) {
+          isOurHeater = true;
+        }
+      }
+
+      if (isOurHeater) {
+        // Parse heater status from message
+        if (message.isOn !== undefined) {
+          heaterOn = message.isOn;
+        } else if (message.status !== undefined) {
+          heaterOn = message.status === 'on' || message.status === 'active' || message.status === 1;
+        } else if (message.rawData && Array.isArray(message.rawData)) {
+          // Parse from raw CAN data - adjust based on your heater's CAN format
+          const statusByte = parseInt(message.rawData[2] || '0', 16);
+          heaterOn = statusByte > 0;
+        }
+
+        // Update heater state
+        setHeaterStatus(heaterOn);
+        console.log(`Heater ${name}: ${heaterOn ? 'ON' : 'OFF'}`);
+      }
+    } catch (error) {
+      console.error(`TankHeaterControl: Error parsing heater status for ${name}:`, error);
+    }
+  };
+
+  const handleDCLoadStatusMessage = (message) => {
+    try {
+      // Some tank heaters might be controlled as DC loads
+      const instance = message.instance;
+      
+      // Map DC load instances to tank heaters (adjust based on your RV)
+      let isOurHeater = false;
+      
+      // Example mappings - you'll need to adjust these based on your RV's configuration
+      if (tankType === "fresh" && (instance === 50 || instance === 51)) {
+        isOurHeater = true;
+      } else if (tankType === "gray" && (instance === 52 || instance === 53)) {
+        isOurHeater = true;
+      }
+      
+      if (isOurHeater && message.isOn !== undefined) {
+        setHeaterStatus(message.isOn);
+        console.log(`DC Load Heater ${name}: ${message.isOn ? 'ON' : 'OFF'}`);
+      }
+    } catch (error) {
+      console.error(`TankHeaterControl: Error parsing DC load status for ${name}:`, error);
+    }
+  };
+
   // Handle manual slider changes (for testing/calibration)
   const handleSliderChange = (value) => {
     console.log(`TankHeaterControl: Manual adjustment for ${name}: ${value}%`);
@@ -216,6 +304,7 @@ const TankHeaterControl = ({ name, tankType, trackColor }) => {
             <Text style={{ color: connectionStatus.color, marginLeft: 8, fontSize: 16 }}>
               {connectionStatus.text}
             </Text>
+           
           </View>
           
           <VerticalSlider
@@ -242,6 +331,9 @@ const TankHeaterControl = ({ name, tankType, trackColor }) => {
               </Text>
               <Text className="text-gray-300 text-xs">
                 Inst: {rawData.instance} ({rawData.definition})
+              </Text>
+              <Text className="text-gray-300 text-xs">
+                Heater: {heaterStatus ? 'ON' : 'OFF'}
               </Text>
             </View>
           )}
@@ -280,6 +372,9 @@ const TankHeaterControl = ({ name, tankType, trackColor }) => {
             <Text className="text-gray-300 text-xs">
               L{rawData.relativeLevel}/R{rawData.resolution}
             </Text>
+            <Text className="text-gray-300 text-xs">
+              H: {heaterStatus ? 'ON' : 'OFF'}
+            </Text>
           </View>
         )}
         
@@ -296,10 +391,16 @@ const TankHeaterControl = ({ name, tankType, trackColor }) => {
           <Text style={{ color: connectionStatus.color, fontSize: 14 }}>
             {connectionStatus.text}
           </Text>
+          {/* Show heater status with a small indicator */}
+          {heaterStatus && (
+            <Text style={{ color: '#F59E0B', marginLeft: 4, fontSize: 12 }}>
+              🔥
+            </Text>
+          )}
         </View>
       </View>
     </View>
   );
 };
 
-export default TankHeaterControl;
+export default WaterTanks;

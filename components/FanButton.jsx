@@ -68,8 +68,8 @@ export default function FanButton({
         style={[
           styles.glowEffect,
           {
-            width: size,
-            height: size,
+            width: size + 20,
+            height: size + 20,
             borderRadius: borderRadius + 10,
             backgroundColor: isOn ? glowColors.active : glowColors.inactive,
             opacity: glowOpacity,
@@ -83,8 +83,7 @@ export default function FanButton({
           { 
             width: size, 
             height: size, 
-            borderRadius ,
-            overflow: 'hidden',
+            borderRadius,
           },
           loading && styles.disabled,
         ]}
@@ -92,36 +91,33 @@ export default function FanButton({
         disabled={loading}
         activeOpacity={0.8}
       >
-        <View style={{
-          width: size,
-          height: size,
-          borderRadius,
-          overflow: 'hidden',
-          backgroundColor: 'transparent',
-        }}>
-          <LinearGradient
-            colors={isOn ? activeGradient : inactiveGradient}
+        <LinearGradient
+          colors={isOn ? activeGradient : inactiveGradient}
+          style={[
+            styles.gradientBackground,
+            { borderRadius }
+          ]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          {/* Frosted glass overlay */}
+          <View style={[styles.frostOverlay, isOn && styles.frostOverlayActive]} />
+          
+          {/* Icon circle with glassmorphism effect */}
+          <View
             style={[
-              styles.gradientBackground,
-              { 
-                width: size,
-                height: size,
-              }
+              styles.iconContainer,
+              {
+                width: circleDiameter,
+                height: circleDiameter,
+                borderRadius: circleDiameter / 2,
+              },
             ]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
           >
-            {/* Frosted glass overlay */}
-            <View style={[
-              styles.frostOverlay, 
-              isOn && styles.frostOverlayActive,
-              { borderRadius }
-            ]} />
-            
-            {/* Icon circle with glassmorphism effect */}
-            <View
+            <LinearGradient
+              colors={isOn ? ['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.1)'] : ['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
               style={[
-                styles.iconContainer,
+                styles.iconGradient,
                 {
                   width: circleDiameter,
                   height: circleDiameter,
@@ -129,99 +125,72 @@ export default function FanButton({
                 },
               ]}
             >
-              <LinearGradient
-                colors={isOn ? ['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.1)'] : ['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
+              <Animated.View
                 style={[
-                  styles.iconGradient,
+                  styles.iconWrapper,
                   {
-                    width: circleDiameter,
-                    height: circleDiameter,
-                    borderRadius: circleDiameter / 2,
-                  },
+                    transform: [{
+                      rotate: animatedValue.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0deg', '360deg'],
+                      })
+                    }]
+                  }
                 ]}
               >
-                <Animated.View
-                  style={[
-                    styles.iconWrapper,
-                    {
-                      transform: [{
-                        rotate: animatedValue.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: ['0deg', '360deg'],
-                        })
-                      }]
-                    }
-                  ]}
-                >
-                  <Icon 
-                    name={iconName} 
-                    size={iconSize} 
-                    color={isOn ? '#ffffff' : '#b0bec5'} 
-                  />
-                </Animated.View>
-              </LinearGradient>
-            </View>
+                <Icon 
+                  name={iconName} 
+                  size={iconSize} 
+                  color={isOn ? '#ffffff' : '#b0bec5'} 
+                />
+              </Animated.View>
+            </LinearGradient>
+          </View>
 
-            {/* Label with better typography */}
+          {/* Label with better typography */}
+          <Text style={[
+            styles.label, 
+            { 
+              fontSize,
+              color: isOn ? '#ffffff' : '#b0bec5',
+              fontWeight: isOn ? '700' : '600',
+            }
+          ]}>
+            {label}
+          </Text>
+
+          {/* Modern status indicator */}
+          <View style={styles.statusContainer}>
+            <View
+              style={[
+                styles.statusDot,
+                {
+                  backgroundColor: isOn ? '#4ade80' : '#64748b',
+                  width: size * 0.03,
+                  height: size * 0.03,
+                  borderRadius: size * 0.015,
+                },
+              ]}
+            />
             <Text style={[
-              styles.label, 
+              styles.statusText, 
               { 
-                fontSize,
-                color: isOn ? '#ffffff' : '#b0bec5',
-                fontWeight: isOn ? '700' : '600',
+                fontSize: fontSize * 0.8,
+                color: isOn ? '#4ade80' : '#64748b',
+                marginLeft: size * 0.02,
               }
             ]}>
-              {label}
+              {isOn ? 'ACTIVE' : 'INACTIVE'}
             </Text>
+          </View>
 
-            {/* Modern status indicator */}
-            <View style={[
-              styles.statusContainer,
-              {
-                backgroundColor: 'rgba(0, 0, 0, 0.2)',
-                paddingHorizontal: badgePadH,
-                paddingVertical: badgePadV,
-                borderRadius: size * 0.05,
-              }
-            ]}>
-              <View
-                style={[
-                  styles.statusDot,
-                  {
-                    backgroundColor: isOn ? '#4ade80' : '#64748b',
-                    width: size * 0.03,
-                    height: size * 0.03,
-                    borderRadius: size * 0.015,
-                  },
-                ]}
-              />
-              <Text style={[
-                styles.statusText, 
-                { 
-                  fontSize: fontSize * 0.8,
-                  color: isOn ? '#4ade80' : '#64748b',
-                  marginLeft: size * 0.02,
-                }
-              ]}>
-                {isOn ? 'ACTIVE' : 'INACTIVE'}
-              </Text>
+          {/* Loading indicator overlay */}
+          {loading && (
+            <View style={styles.loadingOverlay}>
+              <View style={styles.loadingSpinner} />
             </View>
-
-            {/* Loading indicator overlay */}
-            {loading && (
-              <View style={[
-                styles.loadingOverlay, 
-                { 
-                  borderRadius,
-                  width: size,
-                  height: size,
-                }
-              ]}>
-                <View style={styles.loadingSpinner} />
-              </View>
-            )}
-          </LinearGradient>
-        </View>
+          )}
+        </LinearGradient>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -243,8 +212,11 @@ const styles = StyleSheet.create({
   button: {
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
   },
   gradientBackground: {
+    flex: 1,
+    width: '100%',
     justifyContent: 'space-evenly',
     alignItems: 'center',
     padding: 20,
@@ -283,9 +255,12 @@ const styles = StyleSheet.create({
   statusContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
-    overflow: 'hidden',
   },
   statusDot: {
     shadowColor: '#4ade80',
@@ -305,6 +280,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',

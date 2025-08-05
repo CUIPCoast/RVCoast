@@ -1,23 +1,25 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, Image, Switch, ScrollView, Pressable, TouchableOpacity } from 'react-native';
-import { Col, Row, Grid } from "react-native-easy-grid";
-import System from './System';
+import { View, Text, Image, Switch, ScrollView, Pressable, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { Col, Row, Grid } from "react-native-easy-grid";import System from './System';
 import moment from 'moment';
-import Settings from './Settings';
-import ModalComponent from '../components/ModalComponent';
-import Map from "../components/Map";
-import TankHeaterControl from "../components/TankHeaterControl"; // Enhanced version
+import WaterTanks from "../components/WaterTanks.jsx"; // Enhanced version
 import TemperatureDisplay from "../components/TemperatureDisplay"; // New component
 import useTemperature from "../hooks/useTemperature"; // New hook
-
+import {BatteryCard, SmallBatteryCard} from "../components/BatteryCard.jsx";
 import AwningControlModal from "../components/AwningControlModal";
 import AirCon from "./AirCon.jsx";
-import Home from "./Home";
+
 import { WaterService } from '../API/RVControlServices.js';
+import { useAuth } from '../components/AuthContext';
+import { useScreenSize } from '../helper';
+import RVConnectionModal from '../components/RVConnectionModal';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const MainScreen = () => {
+    const { user } = useAuth();
+    const isTablet = useScreenSize();
+    const [showRVModal, setShowRVModal] = useState(false);
     
     var currentDate = moment().format("MMMM Do, YYYY");
     var DayOfTheWeek = moment().format("dddd");
@@ -25,13 +27,14 @@ const MainScreen = () => {
     const [isModalVisible, setModalVisible] = useState(false);
     const [isOn, setIsOn] = useState(false);
     const [isOnGray, setIsOnGray] = useState(false);
-
+     const [victronData, setVictronData] = useState(null);
     const [isFreshHeaterOn, setFreshHeaterOn] = useState(false);
     const [isGreyHeaterOn, setGreyHeaterOn] = useState(false);
     const [isWaterHeaterOn, setWaterHeaterOn] = useState(false);
     const [isWaterPumpOn, setWaterPumpOn] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState(null);
+    const [showErrors, setShowErrors] = useState(true);
 
     // Add temperature monitoring
     const { 
@@ -51,8 +54,32 @@ const MainScreen = () => {
         }
     }, [errorMessage]);
 
+    // Check RV connection before allowing control
+    const checkRVConnection = () => {
+        // Tablet has direct access to RV (hardwired connection)
+        if (isTablet) {
+            return true;
+        }
+        
+        // Mobile requires user to be connected to RV remotely
+        if (!user?.rvConnection) {
+            Alert.alert(
+                'RV Not Connected',
+                'Please connect to your RV first to control devices remotely.',
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Connect Now', onPress: () => setShowRVModal(true) }
+                ]
+            );
+            return false;
+        }
+        return true;
+    };
+
     // Handle water pump toggle
     const handleWaterPumpToggle = async () => {
+        if (!checkRVConnection()) return;
+        
         setIsLoading(true);
         try {
             const result = await WaterService.toggleWaterPump();
@@ -60,10 +87,18 @@ const MainScreen = () => {
                 setWaterPumpOn(!isWaterPumpOn);
                 setErrorMessage(null);
             } else {
-                setErrorMessage(`Failed to toggle water pump: ${result.error}`);
+                // Only show non-connection errors
+                if (!result.error.includes('connection') && !result.error.includes('network')) {
+                    setErrorMessage(`Failed to toggle water pump: ${result.error}`);
+                }
+                console.log('Water pump toggle failed (likely not connected to RV):', result.error);
             }
         } catch (error) {
-            setErrorMessage(`Error: ${error.message}`);
+            // Only show errors that aren't connection-related
+            if (!error.message.includes('connection') && !error.message.includes('network') && !error.message.includes('timeout')) {
+                setErrorMessage(`Error: ${error.message}`);
+            }
+            console.log('Water pump error (likely not connected to RV):', error.message);
         } finally {
             setIsLoading(false);
         }
@@ -71,6 +106,8 @@ const MainScreen = () => {
     
     // Handle water heater toggle - enhanced with state sync
     const handleWaterHeaterToggle = async () => {
+        if (!checkRVConnection()) return;
+        
         setIsLoading(true);
         try {
             const result = await WaterService.toggleWaterHeater();
@@ -81,10 +118,18 @@ const MainScreen = () => {
                 setErrorMessage(null);
                 console.log(`MainScreen: Water heater toggled to ${newState ? 'ON' : 'OFF'}`);
             } else {
-                setErrorMessage(`Failed to toggle water heater: ${result.error}`);
+                // Only show non-connection errors
+                if (!result.error.includes('connection') && !result.error.includes('network')) {
+                    setErrorMessage(`Failed to toggle water heater: ${result.error}`);
+                }
+                console.log('Water heater toggle failed (likely not connected to RV):', result.error);
             }
         } catch (error) {
-            setErrorMessage(`Error: ${error.message}`);
+            // Only show errors that aren't connection-related
+            if (!error.message.includes('connection') && !error.message.includes('network') && !error.message.includes('timeout')) {
+                setErrorMessage(`Error: ${error.message}`);
+            }
+            console.log('Water heater error (likely not connected to RV):', error.message);
         } finally {
             setIsLoading(false);
         }
@@ -95,14 +140,85 @@ const MainScreen = () => {
         console.log('MainScreen: Current temperature:', tempData);
         // You could open a climate control modal here
     };
+
+     // Fetch Victron data when component mounts
+      useEffect(() => {
+        const fetchVictronData = async () => {
+          try {
+            setRefreshing(true);
+            const data = await VictronEnergyService.getAllData();
+            setVictronData(data);
+            setEnergyError(null);
+            
+            // Update battery level if available
+            if (data && data.battery && data.battery.voltage) {
+              setBatteryLevel(data.battery.voltage);
+            }
+          } catch (error) {
+            console.error("Failed to load Victron data:", error);
+            setEnergyError("Could not connect to the Victron system");
+          } finally {
+            setRefreshing(false);
+          }
+        };
+    
+        fetchVictronData();
+        
+        // Set up refresh interval
+        const intervalId = setInterval(fetchVictronData, 10000); // Refresh every 10 seconds
+        
+        // Clean up on unmount
+        return () => clearInterval(intervalId);
+      }, []);
+
+    // Helper function to format power values specifically
+  const formatPower = (value) => {
+    if (value === null || value === undefined) return '--';
+    const num = parseFloat(value);
+    if (isNaN(num)) return '--';
+    return `${num.toFixed(2)}W`;
+  };
+
+  // Get battery state of charge as percentage
+  const getBatterySOC = () => {
+  if (!victronData || !victronData.battery) return 0;
+  
+  // The SOC comes as a decimal (0.57 = 57%), so multiply by 100
+  const socDecimal = victronData.battery.soc;
+  const socPercentage = socDecimal * 100;
+  
+  return Math.round(socPercentage);
+};
+  // Get battery power with proper sign
+  const getBatteryPower = () => {
+    if (!victronData || !victronData.battery) return 0;
+    return parseFloat(victronData.battery.power).toFixed(2);
+  };
     
     return (
         <Grid className="bg-black">
             <Row size={10}>
                 <Row className="bg-black" size={9}>
                     <Col className="m-1 ml-3">
-                        <Text className="text-3xl text-white">{DayOfTheWeek}</Text>
-                        <Text className="text-lg text-white">{currentDate}</Text>
+                        <View style={styles.headerRow}>
+                            <View>
+                                <Text className="text-3xl text-white">{DayOfTheWeek}</Text>
+                                <Text className="text-lg text-white">{currentDate}</Text>
+                            </View>
+                            
+                            {/* Error Toggle Button */}
+                            <TouchableOpacity 
+                                style={styles.errorToggleButton}
+                                onPress={() => setShowErrors(!showErrors)}
+                            >
+                                <Ionicons 
+                                    name={showErrors ? "notifications" : "notifications-off"} 
+                                    size={20} 
+                                    color={showErrors ? "#4FC3F7" : "#666"} 
+                                />
+                            </TouchableOpacity>
+                        </View>
+                        
                     </Col>
                 </Row>
                 <Row className="bg-black" size={1}>
@@ -121,26 +237,46 @@ const MainScreen = () => {
                 </Row>
             </Row>
 
-            {/* Error message display */}
-            {errorMessage && (
-                <View style={styles.errorContainer}>
-                    <Text style={styles.errorText}>{errorMessage}</Text>
+            {/* Non-intrusive Error Messages - Fixed Position Overlays */}
+            {errorMessage && showErrors && (
+                <View style={styles.errorToast}>
+                    <TouchableOpacity 
+                        style={styles.errorContent}
+                        onPress={() => setErrorMessage(null)}
+                    >
+                        <Ionicons name="warning" size={16} color="#FF6B6B" />
+                        <Text style={styles.errorToastText} numberOfLines={2}>
+                            {errorMessage}
+                        </Text>
+                        <TouchableOpacity onPress={() => setErrorMessage(null)}>
+                            <Ionicons name="close" size={16} color="#FF6B6B" />
+                        </TouchableOpacity>
+                    </TouchableOpacity>
                 </View>
             )}
 
-            {/* Temperature error display */}
-            {tempError && (
-                <View style={[styles.errorContainer, { backgroundColor: "rgba(255, 165, 0, 0.1)", borderColor: "orange" }]}>
-                    <Text style={[styles.errorText, { color: "orange" }]}>
-                        Temperature monitoring: {tempError}
-                    </Text>
+            {/* Temperature Error - Less intrusive */}
+            {tempError && showErrors && (
+                <View style={styles.warningToast}>
+                    <TouchableOpacity 
+                        style={styles.warningContent}
+                        onPress={() => setShowErrors(false)}
+                    >
+                        <Ionicons name="thermometer" size={16} color="#FF9800" />
+                        <Text style={styles.warningToastText} numberOfLines={1}>
+                            Temp sensor offline
+                        </Text>
+                    </TouchableOpacity>
                 </View>
             )}
 
-            {/* Loading indicator */}
+            {/* Loading indicator - Non-blocking */}
             {isLoading && (
-                <View style={styles.loadingOverlay}>
-                    <Text style={styles.loadingText}>Processing command...</Text>
+                <View style={styles.loadingToast}>
+                    <View style={styles.loadingContent}>
+                        <ActivityIndicator size="small" color="#4FC3F7" />
+                        <Text style={styles.loadingToastText}>Processing...</Text>
+                    </View>
                 </View>
             )}
 
@@ -166,8 +302,24 @@ const MainScreen = () => {
                     }}
                     size={30}>
                         <View className="bg-brown rounded-xl m-3 mb-10 top-15">
+                            {/* User Info Display */}
+                        
                             
-                            <Map />
+                            <View style={styles.userInfo}>
+                                <View style={styles.connectionStatus}>
+                                    <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+                                    <Text style={styles.connectionText}>
+                                        RV System Connected
+                                    </Text>
+                                </View>
+                                {user && (
+                                    <Text style={styles.welcomeText}>
+                                        Remote user: {user.firstName || user.username}
+                                    </Text>
+                                )}
+                            </View>
+                      
+                            
                         </View>
                     </Row>
                 </Col>
@@ -304,7 +456,7 @@ const MainScreen = () => {
 
                 {/* Enhanced TankHeaterControls with real-time CAN data */}
                 <View className="flex-row justify-between w-60 px-4">
-                <TankHeaterControl
+                <WaterTanks
                     name="Fresh Water"
                     tankType="fresh" // NEW: Specify tank type for CAN monitoring
                     isOn={isOn}
@@ -312,7 +464,7 @@ const MainScreen = () => {
                     trackColor={{ minimum: "lightblue", maximum: "white" }}
                 />
                 
-                <TankHeaterControl
+                <WaterTanks
                     name="Gray Water"
                     tankType="gray" // NEW: Specify tank type for CAN monitoring
                     isOn={isOnGray}
@@ -373,21 +525,32 @@ const MainScreen = () => {
                             elevation: 6,
                         }}
                     >
-                        <Text
-                            className="text-white"
-                            style={{
-                                position: "absolute",
-                                top: 10,
-                                left: 10,
-                                zIndex: 1,
-                            }}
-                        >
-                            Wifi
-                        </Text>
-                        <Pressable onPress={() => setModalVisible(true)}>
-                        <ModalComponent nameComponent="Wifi" />
+                        
+<SmallBatteryCard  x={-20} y={-35} scale={1.05} percentageStyle={{
+    left: -28,     // Move percentage text left/right
+    top: -20,       // Move percentage text up/down
+    fontSize: 20, // Custom font size
+  }}
+  subtitleStyle={{
+    left: -35,      // Move subtitle left/right
+    top: -7,      // Move subtitle up/down
+    fontSize: 10, // Custom font size
+    marginTop: 2, // Spacing from percentage
+  }}>
+  {victronData ? (
+    <>
+      <Text style={styles.cardValue}>
+        {`${getBatterySOC()}%`}
+      </Text>
+      <Text style={styles.cardSubtitle}>
+        {formatPower(getBatteryPower())}
+      </Text>
+    </>
+  ) : (
+    <Text style={styles.cardValue}>--</Text>
+  )}
+</SmallBatteryCard>
 
-                        </Pressable>
                         
                     </Row>
                 </Col>
@@ -451,6 +614,11 @@ const MainScreen = () => {
                 </Col>
             </Row>
             
+            {/* RV Connection Modal */}
+            <RVConnectionModal 
+                visible={showRVModal} 
+                onClose={() => setShowRVModal(false)} 
+            />
         </Grid>
     );
 };
@@ -560,34 +728,142 @@ const styles = {
         fontWeight: '600',
     },
     
-    // Existing styles
-    errorContainer: {
-        backgroundColor: "rgba(255, 0, 0, 0.1)",
-        padding: 10,
-        margin: 10,
-        borderRadius: 5,
-        borderWidth: 1,
-        borderColor: "red",
+    // Toast-style error messages (non-intrusive)
+    errorToast: {
+        position: 'absolute',
+        top: 80,
+        left: 15,
+        right: 15,
         zIndex: 1000,
+        elevation: 1000,
     },
-    errorText: {
-        color: "white",
-        textAlign: "center",
+    errorContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 107, 107, 0.95)',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 5,
     },
-    loadingOverlay: {
-        position: "absolute",
-        top: "50%",
-        left: "50%",
-        transform: [{ translateX: -100 }, { translateY: -25 }],
-        backgroundColor: "rgba(0, 0, 0, 0.7)",
-        padding: 20,
-        borderRadius: 10,
-        zIndex: 1000,
+    errorToastText: {
+        color: 'white',
+        fontSize: 12,
+        fontWeight: '500',
+        flex: 1,
+        marginHorizontal: 8,
     },
-    loadingText: {
-        color: "white",
-        fontSize: 16,
-    }
+    warningToast: {
+        position: 'absolute',
+        top: 80,
+        right: 15,
+        zIndex: 999,
+        elevation: 999,
+    },
+    warningContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 152, 0, 0.9)',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 6,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 3,
+        elevation: 4,
+    },
+    warningToastText: {
+        color: 'white',
+        fontSize: 11,
+        fontWeight: '500',
+        marginLeft: 4,
+    },
+    loadingToast: {
+        position: 'absolute',
+        bottom: 100,
+        alignSelf: 'center',
+        zIndex: 998,
+        elevation: 998,
+    },
+    loadingContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 5,
+    },
+    loadingToastText: {
+        color: 'white',
+        fontSize: 12,
+        fontWeight: '500',
+        marginLeft: 8,
+    },
+    
+    // Header styles
+    headerRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        width: '100%',
+    },
+    errorToggleButton: {
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        padding: 8,
+        borderRadius: 20,
+        marginTop: 5,
+    },
+    
+    // User info styles
+    userInfo: {
+        marginTop: 8,
+    },
+    welcomeText: {
+        color: '#E0E0E0',
+        fontSize: 14,
+        fontWeight: '500',
+        marginBottom: 4,
+    },
+    connectionStatus: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(76, 175, 80, 0.1)',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        alignSelf: 'flex-start',
+    },
+    connectionText: {
+        color: '#4CAF50',
+        fontSize: 12,
+        fontWeight: '600',
+        marginLeft: 4,
+    },
+    connectButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 152, 0, 0.1)',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        alignSelf: 'flex-start',
+    },
+    connectText: {
+        color: '#FF9800',
+        fontSize: 12,
+        fontWeight: '600',
+        marginLeft: 4,
+    },
 };
 
 export default MainScreen;

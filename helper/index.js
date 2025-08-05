@@ -57,3 +57,6 @@ export {
 
 // Screen size helper (existing)
 export { default as useScreenSize } from './useScreenSize.jsx';
+
+// Device detection helper
+export { default as deviceDetection } from './deviceDetection.js';

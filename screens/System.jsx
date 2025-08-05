@@ -127,20 +127,19 @@ const System = () => {
 
           {/* ————————————— BOTTOM ROW OF CARDS ————————————— */}
           <View style={styles.panelRow}>
-            <BatteryCard>
-              {victronData ? (
-                <>
-                  <Text style={styles.cardValue}>
-                    {`${getBatterySOC(victronData)}%`}
-                  </Text>
-                  <Text style={styles.cardSubtitle}>
-                    {`${getBatteryPower(victronData)}W`}
-                  </Text>
-                </>
-              ) : (
-                <Text style={styles.cardValue}>--</Text>
-              )}
-            </BatteryCard>
+            <BatteryCard
+  /* preserves the original offset only for this screen */
+  containerStyle={{ top: 20, left: 10,   transform: [{ scale: 0.8 }], }}
+>
+  {victronData ? (
+    <>
+      <Text style={styles.cardValue}>{`${getBatterySOC(victronData)}%`}</Text>
+      <Text style={styles.cardSubtitle}>{`${getBatteryPower(victronData)}W`}</Text>
+    </>
+  ) : (
+    <Text style={styles.cardValue}>--</Text>
+  )}
+</BatteryCard>
             
             <GlowingCard glowColor="#228B22" style={styles.cardWrapper}>
               <View style={styles.darkerGreenCard}>
