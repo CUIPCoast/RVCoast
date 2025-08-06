@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { StyleSheet, View, Text, Image, TouchableOpacity, TouchableWithoutFeedback, Keyboard, ScrollView } from "react-native";
 import { Border, Color, Gap, FontSize, FontFamily, isDarkMode } from "../GlobalStyles";
 import { useScreenSize, dismissKeyboard, setLowFanSpeed, setAutoMode, getImageForLabel } from "../helper";
@@ -944,40 +946,98 @@ const ClimateControlScreenTablet = () => {
   flexDirection: "row", 
   marginTop: 10
 }}>
-  {/* Left column: Feature buttons */}
+  {/* Left column: Feature buttons - Made scrollable */}
   <View style={{ 
     flex: 0.75, 
-    justifyContent: "flex-start"
+    justifyContent: "flex-start",
+    maxHeight: 180 // Limit height to prevent overflow
   }}>
-    {features.map((feature, index) => (
-      <TouchableOpacity
-        key={index}
-        onPress={() => handleButtonPress(feature.label)}
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          backgroundColor: activeButtons.includes(feature.label) ? "#444" : "#1B1B1B",
-          borderRadius: 5,
-          paddingVertical: 10,
-          paddingHorizontal: 15,
-          marginVertical: 8,
-          width: 220,
-        }}
-      >
-        <Image
-          source={getImageForLabel(feature.label)}
-          style={{ width: 30, height: 30, marginRight: 5 }}
-        />
-        <Text
-          style={{
-            color: "white",
-            fontSize: 16,
-          }}
-        >
-          {feature.label}
-        </Text>
-      </TouchableOpacity>
-    ))}
+    <ScrollView 
+      style={styles.buttonsScrollView}
+      contentContainerStyle={styles.buttonsScrollContent}
+      showsVerticalScrollIndicator={false}
+    >
+      {features.map((feature, index) => {
+        const isActive = (feature.label === "Cool" && isCoolToggled) || 
+                        (feature.label === "Toe Kick" && isToekickToggled) || 
+                        (feature.label === "Furnace" && isFurnaceToggled);
+        
+        const getColors = (label) => {
+          if (label === "Cool") {
+            return isActive 
+              ? ["#4FC3F7", "#29B6F6", "#0288D1"] 
+              : ["#2C2C34", "#3A3A42", "#2C2C34"];
+          } else if (label === "Furnace") {
+            return isActive 
+              ? ["#FF6B6B", "#FF8E53", "#FF6B35"] 
+              : ["#2C2C34", "#3A3A42", "#2C2C34"];
+          } else { // Toe Kick
+            return isActive 
+              ? ["#10B981", "#059669", "#047857"] 
+              : ["#2C2C34", "#3A3A42", "#2C2C34"];
+          }
+        };
+        
+        const getIcon = (label) => {
+          if (label === "Cool") return "snow-outline";
+          if (label === "Furnace") return "flame-outline";
+          if (label === "Toe Kick") return "thermometer-outline";
+          return "settings-outline";
+        };
+        
+        return (
+          <TouchableOpacity
+            key={index}
+            onPress={() => handleButtonPress(feature.label)}
+            disabled={isLoading}
+            activeOpacity={0.8}
+            style={[
+              styles.modernButton,
+              { marginBottom: 8, width: 200 }, // Reduced width and margin
+              isLoading && styles.buttonDisabled
+            ]}
+          >
+            <LinearGradient
+              colors={getColors(feature.label)}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.modernGradientButton, { width: '100%' }]}
+            >
+              <View style={styles.buttonContent}>
+                <View style={[
+                  styles.iconContainer,
+                  { backgroundColor: isActive ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)' }
+                ]}>
+                  <Ionicons
+                    name={getIcon(feature.label)}
+                    size={18} // Slightly smaller icon
+                    color={isActive ? "#FFF" : "#B0B0B0"}
+                  />
+                </View>
+                <View style={styles.textContainer}>
+                  <Text style={[
+                    styles.buttonTitle,
+                    { color: isActive ? "#FFF" : "#E0E0E0" }
+                  ]}>
+                    {feature.label}
+                  </Text>
+                  <Text style={[
+                    styles.buttonSubtitle,
+                    { color: isActive ? "rgba(255,255,255,0.8)" : "#888" }
+                  ]}>
+                    {isActive ? "Active" : "Off"}
+                  </Text>
+                </View>
+                <View style={[
+                  styles.statusIndicator,
+                  { backgroundColor: isActive ? "#4CAF50" : "#666" }
+                ]} />
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+        );
+      })}
+    </ScrollView>
   </View>
   
   {/* Right column: Fan Speed container */}
@@ -1159,6 +1219,74 @@ const styles = StyleSheet.create({
   buttonText: {
     color: "white",
     fontSize: 16,
+  },
+  
+  // Modern button styles (copied from MainScreen)
+  modernButton: {
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    marginVertical: 4,
+  },
+  modernGradientButton: {
+    borderRadius: 16,
+    padding: 2,
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    borderRadius: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    minWidth: 150,
+    position: 'relative',
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  textContainer: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  buttonTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  buttonSubtitle: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  statusIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    position: 'absolute',
+    top: 12,
+    right: 12,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  
+  // ScrollView styles for buttons
+  buttonsScrollView: {
+    flex: 1,
+  },
+  buttonsScrollContent: {
+    paddingVertical: 4,
   },
   errorContainer: {
     backgroundColor: "rgba(255, 0, 0, 0.1)",

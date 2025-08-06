@@ -15,7 +15,7 @@ const AwningControlModal = ({ isVisible, onClose }) => {
   // Core state
   const [statusMessage, setStatusMessage] = useState('Awning Ready');
   const [showStatus, setShowStatus] = useState(true);
-  const [demoMode, setDemoMode] = useState(true);
+  const [demoMode, setDemoMode] = useState(false);
   
   // Awning state - tracks actual awning status
   const [awningState, setAwningState] = useState({
@@ -251,12 +251,7 @@ const AwningControlModal = ({ isVisible, onClose }) => {
     }
     
     // Execute actual command in background (non-blocking)
-    if (!demoMode) {
-      executeRVCCommandBackground(command);
-    } else {
-      // Demo mode - simulate completion after delay
-      simulateDemoCompletion(command);
-    }
+    executeRVCCommandBackground(command);
   };
 
   /**
@@ -654,131 +649,7 @@ const AwningControlModal = ({ isVisible, onClose }) => {
         <View style={styles.modalContent}>
           <Text style={styles.modalTitle}>Awning Control</Text>
 
-          {/* Awning Animation */}
-          <View style={styles.animationContainer}>
-            {/* Ground */}
-            <View style={styles.ground} />
-            
-            {/* Shadow on ground */}
-            <Animated.View 
-              style={[
-                styles.groundShadow,
-                {
-                  opacity: shadowOpacity,
-                  transform: [{
-                    scaleX: awningExtension.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.3, 2.0]
-                    })
-                  }]
-                }
-              ]} 
-            />
 
-            {/* RV with motor vibration */}
-            <Animated.View 
-              style={[
-                styles.rv,
-                {
-                  transform: [{
-                    translateX: motorVibration
-                  }]
-                }
-              ]}
-            >
-              <View style={styles.rvWindow} />
-              <View style={styles.rvVent} />
-              
-              {/* Motor housing */}
-              <View style={styles.motorHousing} />
-            </Animated.View>
-            
-            {/* Awning Mount */}
-            <View style={styles.awningMount} />
-            
-            {/* Main Awning Fabric */}
-            <Animated.View 
-              style={[
-                styles.awningFabric, 
-                { 
-                  width: awningExtension.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [20, 270]
-                  }),
-                  height: awningExtension.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [8, 15]
-                  }),
-                  transform: [
-                    {
-                      translateY: fabricWave.interpolate({
-                        inputRange: [-1, 0, 1],
-                        outputRange: [-2, 0, 6]
-                      })
-                    },
-                    { rotate: '3deg' }
-                  ]
-                }
-              ]}
-            />
-
-            {/* Awning Support Arm */}
-            <Animated.View 
-              style={[
-                styles.awningArm, 
-                { 
-                  width: awningExtension.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [8, 70]
-                  }),
-                  transform: [
-                    { 
-                      rotateZ: awningExtension.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: ['0deg', '-15deg']
-                      })
-                    }
-                  ]
-                }
-              ]} 
-            />
-            
-            {/* Status Indicator */}
-            <View style={styles.statusIndicator}>
-              <Text style={styles.animationStatus}>
-                {awningState.isExtending ? 'Extending...' : 
-                 awningState.isRetracting ? 'Retracting...' : 
-                 'Ready'}
-              </Text>
-              
-              {/* Progress Bar */}
-              {(awningState.isExtending || awningState.isRetracting) && (
-                <View style={styles.progressContainer}>
-                  <Animated.View 
-                    style={[
-                      styles.progressBar,
-                      { 
-                        width: awningExtension.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: awningState.isRetracting ? [200, 0] : [0, 200]
-                        })
-                      }
-                    ]} 
-                  />
-                </View>
-              )}
-            </View>
-          </View>
-
-          {/* Demo Mode Toggle */}
-          <TouchableOpacity 
-            style={[styles.demoToggle, demoMode && styles.demoToggleActive]}
-            onPress={() => setDemoMode(!demoMode)}
-          >
-            <Text style={styles.demoToggleText}>
-              {demoMode ? 'Demo Mode ON' : 'Live RVC Mode'}
-            </Text>
-          </TouchableOpacity>
 
           {/* Control Buttons - No loading states, instant response */}
           <View style={styles.buttonRow}>
@@ -818,11 +689,9 @@ const AwningControlModal = ({ isVisible, onClose }) => {
           {showStatus && (
             <View style={styles.statusContainer}>
               <Text style={styles.statusText}>{statusMessage}</Text>
-              {!demoMode && (
-                <Text style={styles.statusSubText}>
-                  CAN Bus: {canBusListener.current ? 'Monitoring' : 'Offline'}
-                </Text>
-              )}
+              <Text style={styles.statusSubText}>
+                CAN Bus: {canBusListener.current ? 'Monitoring' : 'Offline'}
+              </Text>
             </View>
           )}
 

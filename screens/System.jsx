@@ -70,6 +70,22 @@ const System = () => {
     setShowDetailedView(!showDetailedView);
   };
 
+  // Get battery state of charge as percentage
+  const getBatterySOC = () => {
+  if (!victronData || !victronData.battery) return 0;
+  
+  
+  const socDecimal = victronData.battery.soc;
+  const socPercentage = socDecimal * 100;
+  
+  return Math.round(socPercentage);
+};
+  // Get battery power with proper sign
+  const getBatteryPower = () => {
+    if (!victronData || !victronData.battery) return 0;
+    return parseFloat(victronData.battery.power).toFixed(2);
+  };
+
 
   // Tablet view with integrated Victron data
   if (isTablet) {

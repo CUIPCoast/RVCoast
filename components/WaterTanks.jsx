@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { View, Text } from "react-native";
-import VerticalSlider from "react-native-vertical-slider-smartlife";
+import { LinearGradient } from 'expo-linear-gradient';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import useScreenSize from "../helper/useScreenSize.jsx";
 import { createCANBusListener } from "../Service/CANBusListener.js";
 
@@ -277,10 +278,32 @@ const WaterTanks = ({ name, tankType, trackColor }) => {
     }
   };
 
-  // Handle manual slider changes (for testing/calibration)
-  const handleSliderChange = (value) => {
-    console.log(`TankHeaterControl: Manual adjustment for ${name}: ${value}%`);
-    setPercentage(value);
+  // Get tank icon based on type
+  const getTankIcon = () => {
+    switch (tankType) {
+      case 'fresh': return 'water';
+      case 'gray': return 'water-outline';
+      case 'black': return 'trash';
+      default: return 'water';
+    }
+  };
+  
+  // Get tank colors based on type and level
+  const getTankColors = () => {
+    const baseColors = {
+      fresh: ['#4FC3F7', '#29B6F6', '#0288D1'],
+      gray: ['#9E9E9E', '#757575', '#424242'],
+      black: ['#424242', '#212121', '#000000']
+    };
+    return baseColors[tankType] || baseColors.fresh;
+  };
+  
+  // Get level color based on percentage
+  const getLevelColor = () => {
+    if (percentage >= 75) return '#FF6B6B'; // Red for high
+    if (percentage >= 50) return '#FFB267'; // Orange for medium
+    if (percentage >= 25) return '#10B981'; // Green for good
+    return '#4FC3F7'; // Blue for low/empty
   };
 
   // Get connection status indicator
@@ -294,113 +317,241 @@ const WaterTanks = ({ name, tankType, trackColor }) => {
 
   const connectionStatus = getConnectionStatus();
 
-  // This preserves the original UI while adding real-time data
+  // Modern tank display design
   if (isTablet) {
     return (
-      <View className="flex-row justify-center items-center py-4" style={{ marginHorizontal: 8 }}> {/* Added spacing between tanks */}
-        <View className="items-center" style={{ minHeight: 180 }}> {/* Reduced height since no toggle */}
-          <View className="flex-row items-center mb-2">
-            <Text className="text-white text-lg font-semibold">{name}</Text>
-            <Text style={{ color: connectionStatus.color, marginLeft: 8, fontSize: 16 }}>
-              {connectionStatus.text}
-            </Text>
-           
-          </View>
-          
-          <VerticalSlider
-            value={percentage}
-            disabled={false} // Allow manual adjustment for testing
-            min={0}
-            max={100}
-            width={60}
-            height={120}
-            step={1}
-            borderRadius={5}
-            minimumTrackTintColor={trackColor.minimum}
-            maximumTrackTintColor={trackColor.maximum}
-            onChange={handleSliderChange}
-          />
-          
-          <Text className="text-white text-md font-semibold mt-2">{percentage}%</Text>
-          
-          {/* Debug info display */}
-          {rawData && __DEV__ && (
-            <View className="mt-1 p-2 bg-gray-800 rounded">
-              <Text className="text-gray-300 text-xs">
-                Raw: L{rawData.relativeLevel}/R{rawData.resolution}
-              </Text>
-              <Text className="text-gray-300 text-xs">
-                Inst: {rawData.instance} ({rawData.definition})
-              </Text>
-              <Text className="text-gray-300 text-xs">
-                Heater: {heaterStatus ? 'ON' : 'OFF'}
+      <View style={styles.tankContainer}>
+        <LinearGradient
+          colors={getTankColors()}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.tankGradient}
+        >
+          <View style={styles.tankContent}>
+            {/* Tank Header */}
+            <View style={styles.tankHeader}>
+              <View style={styles.tankIconContainer}>
+                <Ionicons
+                  name={getTankIcon()}
+                  size={18}
+                  color="#FFF"
+                />
+              </View>
+              <View style={styles.tankInfo}>
+                <Text style={styles.tankName}>{name}</Text>
+                <Text style={[styles.tankPercentage, { color: getLevelColor() }]}>
+                  {percentage}%
+                </Text>
+              </View>
+              <View style={styles.statusIndicators}>
+                <Text style={[styles.connectionDot, { color: connectionStatus.color }]}>
+                  {connectionStatus.text}
+                </Text>
+                {heaterStatus && (
+                  <Ionicons name="flame" size={14} color="#FF6B35" style={styles.heaterIcon} />
+                )}
+              </View>
+            </View>
+            
+            {/* Tank Level Bar */}
+            <View style={styles.tankLevelContainer}>
+              <View style={styles.tankLevelBackground}>
+                <View 
+                  style={[
+                    styles.tankLevelFill,
+                    { 
+                      width: `${percentage}%`,
+                      backgroundColor: getLevelColor()
+                    }
+                  ]} 
+                />
+              </View>
+              <Text style={styles.tankLevelText}>
+                {percentage < 10 ? 'Low' : percentage < 50 ? 'OK' : percentage < 75 ? 'Good' : 'Full'}
               </Text>
             </View>
-          )}
-          
-          {lastUpdate && (
-            <Text className="text-gray-400 text-xs mt-1">
-              {lastUpdate.toLocaleTimeString()}
-            </Text>
-          )}
-        </View>
+            
+            {/* Connection Status */}
+            {isConnected && lastUpdate && (
+              <Text style={styles.lastUpdateText}>
+                Updated: {lastUpdate.toLocaleTimeString()}
+              </Text>
+            )}
+          </View>
+        </LinearGradient>
       </View>
     );
   }
 
+  // Mobile layout (simplified)
   return (
-    <View className="flex-row justify-between py-2">
-      <View className="items-center" style={{ minHeight: 120 }}> {/* Reduced height */}
-        <Text className="text-white">{percentage}%</Text>
-        <VerticalSlider
-          value={percentage}
-          disabled={false} // Allow manual adjustment for testing
-          min={0}
-          max={100}
-          width={50}
-          height={70}
-          step={1}
-          borderRadius={5}
-          minimumTrackTintColor={trackColor.minimum}
-          maximumTrackTintColor={trackColor.maximum}
-          onChange={handleSliderChange}
-        />
-        
-        {/* Debug info display for phone layout */}
-        {rawData && __DEV__ && (
-          <View className="mt-1 p-1 bg-gray-800 rounded">
-            <Text className="text-gray-300 text-xs">
-              L{rawData.relativeLevel}/R{rawData.resolution}
-            </Text>
-            <Text className="text-gray-300 text-xs">
-              H: {heaterStatus ? 'ON' : 'OFF'}
-            </Text>
+    <View style={styles.mobileTankContainer}>
+      <LinearGradient
+        colors={getTankColors()}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.mobileTankGradient}
+      >
+        <View style={styles.mobileTankContent}>
+          <View style={styles.mobileTankHeader}>
+            <Ionicons name={getTankIcon()} size={16} color="#FFF" />
+            <Text style={styles.mobileTankName}>{name}</Text>
           </View>
-        )}
-        
-        {lastUpdate && (
-          <Text className="text-gray-400 text-xs mt-1">
-            {lastUpdate.toLocaleTimeString()}
+          <Text style={[styles.mobileTankPercentage, { color: getLevelColor() }]}>
+            {percentage}%
           </Text>
-        )}
-      </View>
-      
-      <View className="flex-row mt-10" style={{ alignItems: 'flex-start' }}> {/* Align to top */}
-        <View className="flex-row items-center">
-          <Text className="text-white text-lg mr-2">{name}</Text>
-          <Text style={{ color: connectionStatus.color, fontSize: 14 }}>
-            {connectionStatus.text}
-          </Text>
-          {/* Show heater status with a small indicator */}
-          {heaterStatus && (
-            <Text style={{ color: '#F59E0B', marginLeft: 4, fontSize: 12 }}>
-              🔥
-            </Text>
-          )}
+          <View style={styles.mobileLevelBar}>
+            <View 
+              style={[
+                styles.mobileLevelFill,
+                { 
+                  height: `${percentage}%`,
+                  backgroundColor: getLevelColor()
+                }
+              ]} 
+            />
+          </View>
         </View>
-      </View>
+      </LinearGradient>
     </View>
   );
+};
+
+const styles = {
+  // Tablet styles
+  tankContainer: {
+    marginHorizontal: 2,
+    marginVertical: 2,
+    width: 120,
+  },
+  tankGradient: {
+    borderRadius: 12,
+    padding: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  tankContent: {
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderRadius: 8,
+    padding: 8,
+    minHeight: 85,
+    justifyContent: 'space-between',
+  },
+  tankHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  tankIconContainer: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tankInfo: {
+    flex: 1,
+    marginLeft: 8,
+  },
+  tankName: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  tankPercentage: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginTop: 1,
+  },
+  statusIndicators: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  connectionDot: {
+    fontSize: 16,
+    marginRight: 4,
+  },
+  heaterIcon: {
+    marginLeft: 4,
+  },
+  tankLevelContainer: {
+    marginTop: 8,
+  },
+  tankLevelBackground: {
+    height: 6,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  tankLevelFill: {
+    height: '100%',
+    borderRadius: 3,
+    transition: 'width 0.3s ease',
+  },
+  tankLevelText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 10,
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  lastUpdateText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 9,
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  
+  // Mobile styles
+  mobileTankContainer: {
+    width: 80,
+    marginHorizontal: 4,
+  },
+  mobileTankGradient: {
+    borderRadius: 8,
+    padding: 1,
+  },
+  mobileTankContent: {
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderRadius: 7,
+    padding: 8,
+    minHeight: 100,
+    alignItems: 'center',
+  },
+  mobileTankHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  mobileTankName: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  mobileTankPercentage: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  mobileLevelBar: {
+    width: 20,
+    height: 40,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 10,
+    overflow: 'hidden',
+    position: 'relative',
+    justifyContent: 'flex-end',
+  },
+  mobileLevelFill: {
+    width: '100%',
+    borderRadius: 10,
+    minHeight: 2,
+  },
 };
 
 export default WaterTanks;

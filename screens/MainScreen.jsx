@@ -15,6 +15,7 @@ import { useScreenSize } from '../helper';
 import RVConnectionModal from '../components/RVConnectionModal';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { VictronEnergyService } from "../API/VictronEnergyService";
 
 const MainScreen = () => {
     const { user } = useAuth();
@@ -28,13 +29,14 @@ const MainScreen = () => {
     const [isOn, setIsOn] = useState(false);
     const [isOnGray, setIsOnGray] = useState(false);
      const [victronData, setVictronData] = useState(null);
-    const [isFreshHeaterOn, setFreshHeaterOn] = useState(false);
-    const [isGreyHeaterOn, setGreyHeaterOn] = useState(false);
+    
     const [isWaterHeaterOn, setWaterHeaterOn] = useState(false);
     const [isWaterPumpOn, setWaterPumpOn] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState(null);
     const [showErrors, setShowErrors] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [batteryLevel, setBatteryLevel] = useState(12.5);
 
     // Add temperature monitoring
     const { 
@@ -183,7 +185,7 @@ const MainScreen = () => {
   const getBatterySOC = () => {
   if (!victronData || !victronData.battery) return 0;
   
-  // The SOC comes as a decimal (0.57 = 57%), so multiply by 100
+  
   const socDecimal = victronData.battery.soc;
   const socPercentage = socDecimal * 100;
   
@@ -306,17 +308,46 @@ const MainScreen = () => {
                         
                             
                             <View style={styles.userInfo}>
-                                <View style={styles.connectionStatus}>
-                                    <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
-                                    <Text style={styles.connectionText}>
-                                        RV System Connected
-                                    </Text>
+                                <View style={styles.centeredContent}>
+                                    <View style={styles.connectionStatus}>
+                                        <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+                                        <Text style={styles.connectionText}>
+                                            RV System Connected
+                                        </Text>
+                                    </View>
+                                    
+                                    {/* Weather Information */}
+                                    <View style={styles.weatherSection}>
+                                        <View style={styles.weatherHeader}>
+                                            <Ionicons name="partly-sunny" size={18} color="#FFB267" />
+                                            <Text style={styles.weatherTitle}>Current Weather</Text>
+                                        </View>
+                                        <View style={styles.weatherContent}>
+                                            <View style={styles.weatherRow}>
+                                                <Ionicons name="thermometer" size={14} color="#4FC3F7" />
+                                                <Text style={styles.weatherText}>72°F</Text>
+                                            </View>
+                                            <View style={styles.weatherRow}>
+                                                <Ionicons name="water" size={14} color="#29B6F6" />
+                                                <Text style={styles.weatherText}>65% Humidity</Text>
+                                            </View>
+                                            <View style={styles.weatherRow}>
+                                                <Ionicons name="speedometer" size={14} color="#A5A5A5" />
+                                                <Text style={styles.weatherText}>1013 hPa</Text>
+                                            </View>
+                                            <View style={styles.weatherRow}>
+                                                <Ionicons name="leaf" size={14} color="#10B981" />
+                                                <Text style={styles.weatherText}>5 mph SW</Text>
+                                            </View>
+                                        </View>
+                                    </View>
+                                    
+                                    {user && (
+                                        <Text style={styles.welcomeText}>
+                                            Remote user: {user.firstName || user.username}
+                                        </Text>
+                                    )}
                                 </View>
-                                {user && (
-                                    <Text style={styles.welcomeText}>
-                                        Remote user: {user.firstName || user.username}
-                                    </Text>
-                                )}
                             </View>
                       
                             
@@ -454,23 +485,26 @@ const MainScreen = () => {
                     </View>
                 </View>
 
-                {/* Enhanced TankHeaterControls with real-time CAN data */}
-                <View className="flex-row justify-between w-60 px-4">
-                <WaterTanks
-                    name="Fresh Water"
-                    tankType="fresh" // NEW: Specify tank type for CAN monitoring
-                    isOn={isOn}
-                    setIsOn={setIsOn}
-                    trackColor={{ minimum: "lightblue", maximum: "white" }}
-                />
-                
-                <WaterTanks
-                    name="Gray Water"
-                    tankType="gray" // NEW: Specify tank type for CAN monitoring
-                    isOn={isOnGray}
-                    setIsOn={setIsOnGray}
-                    trackColor={{ minimum: "gray", maximum: "white" }}
-                />
+                {/* Enhanced TankHeaterControls with real-time CAN data - Reorganized Layout */}
+                <View style={styles.tanksSection}>
+                  <Text style={styles.tanksSectionTitle}>Tank Levels</Text>
+                  <View style={styles.tanksContainer}>
+                    <WaterTanks
+                        name="Fresh"
+                        tankType="fresh"
+                        isOn={isOn}
+                        setIsOn={setIsOn}
+                        trackColor={{ minimum: "lightblue", maximum: "white" }}
+                    />
+                    
+                    <WaterTanks
+                        name="Gray"
+                        tankType="gray"
+                        isOn={isOnGray}
+                        setIsOn={setIsOnGray}
+                        trackColor={{ minimum: "gray", maximum: "white" }}
+                    />
+                  </View>
                 </View>
                 </View>
 
@@ -826,7 +860,18 @@ const styles = {
     
     // User info styles
     userInfo: {
-        marginTop: 8,
+        marginTop: 35,
+
+        left:18,
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        
+    },
+    centeredContent: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '100%',
     },
     welcomeText: {
         color: '#E0E0E0',
@@ -863,6 +908,61 @@ const styles = {
         fontSize: 12,
         fontWeight: '600',
         marginLeft: 4,
+    },
+    
+    // Weather section styles
+    weatherSection: {
+        marginTop: 12,
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        borderRadius: 8,
+        padding: 10,
+    },
+    weatherHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    weatherTitle: {
+        color: '#FFB267',
+        fontSize: 14,
+        fontWeight: '600',
+        marginLeft: 6,
+    },
+    weatherContent: {
+        gap: 4,
+    },
+    weatherRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: 1,
+    },
+    weatherText: {
+        color: '#E0E0E0',
+        fontSize: 12,
+        fontWeight: '500',
+        marginLeft: 6,
+    },
+    
+    // Tank section styles
+    tanksSection: {
+        alignItems: 'center',
+        paddingHorizontal: 4,
+        marginTop: 35,
+    },
+    tanksSectionTitle: {
+        color: 'white',
+        fontSize: 14,
+        fontWeight: '600',
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    tanksContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 8,
+        flexWrap: 'wrap',
+        maxWidth: '100%',
     },
 };
 

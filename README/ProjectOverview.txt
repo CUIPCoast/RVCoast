@@ -1,0 +1,1 @@
+I’m currently working on a rv project creating a new react native app to replace the legacy firefly eclipse app. I have a raspberry pi 4 with a pican 3 connected to the multiplex using a drop cable and i currently have a server running on the pi that the app communicates with using an api. This api also connects to the victrons verbose gx to extract energy data from it
