@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     width: '50%',
   },
-  mobileStatusContainer: { position: 'absolute', bottom: 50, backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 5, alignSelf: 'center', zIndex: 1000 },
+  mobileStatusContainer: { position: 'absolute', bottom: 50, backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 25, paddingVertical: 8, borderRadius: 5, alignSelf: 'center', zIndex: 1000 },
   statusText: { color: '#FFF', fontSize: 12, fontWeight: '700' },
   loadingIndicator: { marginVertical: 20 },
 });
