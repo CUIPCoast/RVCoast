@@ -9,6 +9,8 @@ import { LightService, FanService, WaterService } from "../API/RVControlServices
 import MasterLightControl from "../components/MasterLightControl.jsx";
 import { Feather as Icon } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import FanButton from "../components/FanButton";
+
 
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -664,48 +666,24 @@ const Devices = () => {
     } else if (selectedTab === TABS.BATHROOM) {
       return (
         <View className="">
-          {/* Modern Fan Controls */}
-          <View style={styles.fanControlsContainer}>
-            <TouchableOpacity
-              style={[
-                styles.modernFanButton,
-                isBayVentFanOn ? styles.fanButtonActive : styles.fanButtonInactive,
-                isLoading && styles.disabledButton
-              ]}
-              onPress={toggleBayVentFan}
-              disabled={isLoading}
-            >
-              <View style={styles.fanIconContainer}>
-                <View style={[styles.fanIconCircle, isBayVentFanOn ? styles.iconCircleActive : styles.iconCircleInactive]}>
-                  <Icon name="sun" size={24} color={isBayVentFanOn ? "#FFF" : "#888"} />
-                </View>
-              </View>
-              <Text style={styles.fanButtonLabel}>Bay Vent</Text>
-              <View style={[styles.statusIndicator, isBayVentFanOn ? styles.statusActive : styles.statusInactive]}>
-                <Text style={styles.statusText}>{isBayVentFanOn ? "ON" : "OFF"}</Text>
-              </View>
-            </TouchableOpacity>
-          
-            <TouchableOpacity
-              style={[
-                styles.modernFanButton,
-                isBathroomFanOn ? styles.fanButtonActive : styles.fanButtonInactive,
-                isLoading && styles.disabledButton
-              ]}
-              onPress={toggleBathroomFan}
-              disabled={isLoading}
-            >
-              <View style={styles.fanIconContainer}>
-                <View style={[styles.fanIconCircle, isBathroomFanOn ? styles.iconCircleActive : styles.iconCircleInactive]}>
-                  <Icon name="wind" size={24} color={isBathroomFanOn ? "#FFF" : "#888"} />
-                </View>
-              </View>
-              <Text style={styles.fanButtonLabel}>Bath Fan</Text>
-              <View style={[styles.statusIndicator, isBathroomFanOn ? styles.statusActive : styles.statusInactive]}>
-                <Text style={styles.statusText}>{isBathroomFanOn ? "ON" : "OFF"}</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
+          <View style={[styles.fanControlsContainer,{ flexDirection: 'row', justifyContent: 'center', gap: 30 } ]}>
+        <FanButton
+          size={130}
+          isOn={isBayVentFanOn}
+          onPress={toggleBayVentFan}
+          iconName="sun"
+          label="Bay Vent"
+          loading={isLoading}
+        />
+        <FanButton
+          size={130}
+          isOn={isBathroomFanOn}
+          onPress={toggleBathroomFan}
+          iconName="wind"
+          label="Bath Fan"
+          loading={isLoading}
+        />
+      </View>
     
           {/* Light Master Control */}
           <MasterLightControl 

@@ -9,7 +9,8 @@ import {
   SafeAreaView,
   StatusBar,
   Dimensions,
-  Platform 
+  Platform,
+  Modal
 } from "react-native";
 import {
   Color,
@@ -36,7 +37,13 @@ const Home = () => {
   const [humidity, setHumidity] = useState(36);
 
   const toggleAirCon = () => {
+    console.log('Toggle AirCon called, current state:', showAirCon);
     setShowAirCon(!showAirCon);
+  };
+
+  const closeAirCon = () => {
+    console.log('Closing AirCon modal');
+    setShowAirCon(false);
   };
 
   const renderWeatherItem = ({ item }) => {
@@ -177,18 +184,21 @@ const Home = () => {
             </TouchableOpacity>
           </View>
         </View>
-
-
       </View>
 
-      {/* Air Con Modal Overlay */}
-      {showAirCon && (
+      {/* Air Con Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showAirCon}
+        onRequestClose={closeAirCon}
+      >
         <View style={styles.airConOverlay}>
           <View style={styles.airConContainer}>
-            <AirCon onClose={toggleAirCon} />
+            <AirCon onClose={closeAirCon} />
           </View>
         </View>
-      )}
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -199,8 +209,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   
- 
-
   // Phone Layout Styles
   imageContainer: {
     position: 'absolute',
@@ -398,21 +406,16 @@ const styles = StyleSheet.create({
   
   // Air Con Modal
   airConOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 1000,
   },
   
   airConContainer: {
     width: width * 0.9,
     maxWidth: 400,
-    maxHeight: height * 0.8,
+    maxHeight: 200 * 0.8,
     borderRadius: Border.br_5xl,
     overflow: 'hidden',
     ...Platform.select({

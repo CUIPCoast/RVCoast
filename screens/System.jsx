@@ -26,7 +26,7 @@ const System = () => {
   const isTablet = useScreenSize();
   const [victronData, setVictronData] = useState(null);
   const [energyError, setEnergyError] = useState(null);
-  const [showDetailedView, setShowDetailedView] = useState(false);
+  
   const [batteryLevel, setBatteryLevel] = useState(12.5);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -65,10 +65,7 @@ const System = () => {
     setEnergyError(error);
   };
   
-  // Toggle between simple and detailed energy views
-  const toggleEnergyView = () => {
-    setShowDetailedView(!showDetailedView);
-  };
+ 
 
   // Get battery state of charge as percentage
   const getBatterySOC = () => {
@@ -233,191 +230,36 @@ const System = () => {
         decelerationRate={0.8}
       >
         {/* ————————————— MOBILE HEADER ————————————— */}
-        <View style={styles.mobileHeader}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.mobileHeaderTitle}>RV Energy System</Text>
-            <View style={styles.statusRow}>
-              <View style={[styles.statusDot, { backgroundColor: getSystemStatus(victronData).color }]} />
-              <Text style={styles.statusText}>{getSystemStatus(victronData).status}</Text>
-              {refreshing && <Text style={styles.refreshText}>Updating...</Text>}
-            </View>
-          </View>
-          <Image
-            source={require("../assets/images/icon.png")}
-            style={styles.mobileLogo}
-          />
-        </View>
+<View style={styles.mobileHeader}>
+  <View style={styles.headerLeft}>
+    <Text style={styles.mobileHeaderTitle}>RV Energy System</Text>
+    <View style={styles.statusRow}>
+      <View style={[styles.statusDot, { backgroundColor: getSystemStatus(victronData).color }]} />
+      <Text style={styles.statusText}>{getSystemStatus(victronData).status}</Text>
+      {refreshing && <Text style={styles.refreshText}>Updating...</Text>}
+    </View>
+  </View>
+  <Image
+    source={require("../assets/images/icon.png")}
+    style={styles.mobileLogo}
+  />
+</View>
 
-        {/* ————————————— MAIN ENERGY CARDS ————————————— */}
-        <View style={styles.energyCardsContainer}>
-          {/* Battery Card - Full Width */}
-          <GlowingCard glowColor="#2196F3" style={styles.batteryCardWrapper}>
-            <View style={styles.mobileBatteryCard}>
-              <View style={styles.batteryHeader}>
-                <Text style={styles.batteryHeaderText}>Battery System</Text>
-                <Text style={styles.batteryTime}>
-                  {victronData?.battery?.timeToGo || '--:--'}
-                </Text>
-              </View>
-              <View style={styles.batteryMainContent}>
-                <View style={styles.batteryLeft}>
-                  <Text style={styles.batterySOC}>{getBatterySOC(victronData)}%</Text>
-                  <Text style={styles.batterySOCLabel}>State of Charge</Text>
-                </View>
-                <View style={styles.batteryRight}>
-                  <View style={styles.batteryStats}>
-                    <Text style={styles.batteryStatValue}>{getBatteryVoltage(victronData)}V</Text>
-                    <Text style={styles.batteryStatLabel}>Voltage</Text>
-                  </View>
-                  <View style={styles.batteryStats}>
-                    <Text style={styles.batteryStatValue}>{getBatteryCurrent(victronData)}A</Text>
-                    <Text style={styles.batteryStatLabel}>Current</Text>
-                  </View>
-                  <View style={styles.batteryStats}>
-                    <Text style={[styles.batteryStatValue, { 
-                      color: getBatteryPower(victronData) > 0 ? '#4CAF50' : '#FF5722' 
-                    }]}>
-                      {getBatteryPower(victronData)}W
-                    </Text>
-                    <Text style={styles.batteryStatLabel}>
-                      {getBatteryPower(victronData) > 0 ? 'Charging' : 'Discharging'}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-          </GlowingCard>
+{/* ————————————— DETAILED VIEW ————————————— */}
+<VictronEnergyPanel 
+  onError={handleEnergyError} 
+  refreshInterval={10000} 
+/>
+<EnergyFlowDiagram energyData={victronData} />
 
-          {/* Top Row - Solar and Grid */}
-          <View style={styles.topRowCards}>
-            <GlowingCard glowColor="#FFBF00" style={styles.halfCardWrapper}>
-              <View style={styles.solarCard}>
-                <View style={styles.cardHeaderMobile}>
-                  <Text style={styles.cardHeaderTextMobile}>Solar</Text>
-                </View>
-                <Text style={styles.cardValueMobile}>
-                  {victronData ? `${victronData.pvCharger.power}W` : '--'}
-                </Text>
-                <Text style={styles.cardSubtitleMobile}>
-                  {victronData ? `${victronData.pvCharger.dailyYield}kWh today` : '--'}
-                </Text>
-              </View>
-            </GlowingCard>
+{/* ————————————— MAP SECTION ————————————— */}
+<View style={styles.mapSection}>
+  <Text style={styles.mapTitle}>Live Location</Text>
+  <View style={styles.mapContainer}>
+    <Map />
+  </View>
+</View>
 
-            <GlowingCard glowColor="#D32F2F" style={styles.halfCardWrapper}>
-              <View style={styles.gridCard}>
-                <View style={styles.cardHeaderMobile}>
-                  <Text style={styles.cardHeaderTextMobile}>Shore Power</Text>
-                </View>
-                <Text style={styles.cardValueMobile}>
-                  {victronData && victronData.grid && victronData.grid.isConnected ? 
-                    `${victronData.grid.power}W` : 'Disconnected'}
-                </Text>
-                {victronData && victronData.grid && victronData.grid.isConnected && (
-                  <Text style={styles.cardSubtitleMobile}>
-                    {victronData.grid.voltage}V • {victronData.grid.frequency}Hz
-                  </Text>
-                )}
-              </View>
-            </GlowingCard>
-          </View>
-
-          {/* Bottom Row - AC Loads and DC System */}
-          <View style={styles.bottomRowCards}>
-            <GlowingCard glowColor="#4CAF50" style={styles.halfCardWrapper}>
-              <View style={styles.acLoadsCard}>
-                <View style={styles.cardHeaderMobile}>
-                  <Text style={styles.cardHeaderTextMobile}>AC Loads</Text>
-                </View>
-                <Text style={styles.cardValueMobile}>
-                  {victronData ? `${victronData.acLoads.power}W` : '--'}
-                </Text>
-                <Text style={styles.cardSubtitleMobile}>
-                  Appliances & Outlets
-                </Text>
-              </View>
-            </GlowingCard>
-
-            <GlowingCard glowColor="#9C27B0" style={styles.halfCardWrapper}>
-              <View style={styles.dcSystemCard}>
-                <View style={styles.cardHeaderMobile}>
-                  <Text style={styles.cardHeaderTextMobile}>DC System</Text>
-                </View>
-                <Text style={styles.cardValueMobile}>
-                  {victronData ? `${victronData.dcSystem.power}W` : '--'}
-                </Text>
-                <Text style={styles.cardSubtitleMobile}>
-                  Lights & 12V Devices
-                </Text>
-              </View>
-            </GlowingCard>
-          </View>
-        </View>
-
-        {/* ————————————— SYSTEM OVERVIEW ————————————— */}
-        <GlowingCard glowColor="#607D8B" style={styles.overviewCardWrapper}>
-          <View style={styles.systemOverviewCard}>
-            <Text style={styles.overviewTitle}>System Overview</Text>
-            <View style={styles.overviewContent}>
-              <View style={styles.overviewRow}>
-                <Text style={styles.overviewLabel}>AC Input:</Text>
-                <Text style={styles.overviewValue}>
-                  {victronData?.systemOverview?.acInput || 'Unknown'}
-                </Text>
-              </View>
-              <View style={styles.overviewRow}>
-                <Text style={styles.overviewLabel}>System State:</Text>
-                <Text style={styles.overviewValue}>
-                  {victronData?.systemOverview?.state || 'Unknown'}
-                </Text>
-              </View>
-              <View style={styles.overviewRow}>
-                <Text style={styles.overviewLabel}>AC Mode:</Text>
-                <Text style={styles.overviewValue}>
-                  {victronData?.systemOverview?.mode || 'Unknown'}
-                </Text>
-              </View>
-              <View style={styles.overviewRow}>
-                <Text style={styles.overviewLabel}>Data Source:</Text>
-                <Text style={[styles.overviewValue, { 
-                  color: victronData?.apiStatus === 'connected' ? '#4CAF50' : '#FF9800' 
-                }]}>
-                  {victronData?.apiStatus === 'connected' ? 'Live Data' : 
-                   victronData?.apiStatus === 'simulation' ? 'Simulation' : 'Cached'}
-                </Text>
-              </View>
-            </View>
-          </View>
-        </GlowingCard>
-
-        {/* ————————————— DETAILED VIEW TOGGLE ————————————— */}
-        <TouchableOpacity 
-          style={styles.detailToggleButton} 
-          onPress={toggleEnergyView}
-        >
-          <Text style={styles.detailToggleText}>
-            {showDetailedView ? 'Hide Details' : 'View Detailed Analysis'}
-          </Text>
-        </TouchableOpacity>
-
-        {/* ————————————— DETAILED VIEW ————————————— */}
-        {showDetailedView && (
-          <>
-            <VictronEnergyPanel 
-              onError={handleEnergyError} 
-              refreshInterval={10000} 
-            />
-            <EnergyFlowDiagram energyData={victronData} />
-          </>
-        )}
-
-        {/* ————————————— MAP SECTION ————————————— */}
-        <View style={styles.mapSection}>
-          <Text style={styles.mapTitle}>Live Location</Text>
-          <View style={styles.mapContainer}>
-            <Map />
-          </View>
-        </View>
 
         {/* ————————————— ERROR STATE ————————————— */}
         {energyError && (
