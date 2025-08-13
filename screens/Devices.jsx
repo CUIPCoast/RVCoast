@@ -76,6 +76,7 @@ const lightGroups = {
   ]
 };
 
+
 const Devices = () => {
   const [isOn, setIsOn] = useState(false);
   const isTablet = useScreenSize();
@@ -1008,9 +1009,9 @@ const styles = StyleSheet.create({
     width: 140,
     height: 140,
     borderRadius: 16,
-    justifyContent: 'space-between',   // match fan
+    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 15,                        // match fan
+    padding: 15,
     marginHorizontal: 10,
     backgroundColor: '#8AB9F1',
     borderWidth: 2,
@@ -1022,11 +1023,11 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   waterControlButtonActive: {
-    backgroundColor: '#005BB5',         // slightly brighter when ON
+    backgroundColor: '#005BB5',
     borderColor: '#99CCFF',
   },
   waterControlButtonInactive: {
-    backgroundColor: '#002147',         // darker when OFF
+    backgroundColor: '#002147',
     borderColor: '#224E7A',
   },
   waterIconCircleActive: {

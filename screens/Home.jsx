@@ -22,7 +22,7 @@ import {
   isDarkMode
 } from "../GlobalStyles";
 import { useScreenSize, getWeatherIcon, fetchHourlyWeather, formatWeatherItem } from "../helper";
-import AirCon from "./AirCon.jsx";
+import AirCon from "./AirCon";
 import ToggleSwitch from "../components/ToggleSwitch.jsx";
 
 const { width, height } = Dimensions.get('window');
@@ -415,7 +415,8 @@ const styles = StyleSheet.create({
   airConContainer: {
     width: width * 0.9,
     maxWidth: 400,
-    maxHeight: 200 * 0.8,
+    height: height * 0.6,
+    maxHeight: 500,
     borderRadius: Border.br_5xl,
     overflow: 'hidden',
     ...Platform.select({
