@@ -54,16 +54,28 @@ const LoginScreen = ({ onSwitchToSignup }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <LinearGradient
-        colors={['#1a1a1a', '#2d2d2d', '#1a1a1a']}
+        colors={['#0D0D0D', '#1A1A1A', '#2D2D2D']}
         style={styles.background}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
       >
+        {/* Decorative Background Elements */}
+        <View style={styles.backgroundElements}>
+          <View style={[styles.floatingElement, styles.element1]} />
+          <View style={[styles.floatingElement, styles.element2]} />
+          <View style={[styles.floatingElement, styles.element3]} />
+        </View>
+
         <View style={[styles.card, cardStyle]}>
-          {/* Logo */}
+          {/* Logo Section */}
           <View style={styles.logoContainer}>
-            <Image
-              source={require('../assets/images/icon.png')}
-              style={[styles.logo, isTablet && styles.tabletLogo]}
-            />
+            <View style={[styles.logoWrapper, isTablet && styles.tabletLogoWrapper]}>
+              <Image
+                source={require('../assets/images/icon.png')}
+                style={[styles.logo, isTablet && styles.tabletLogo]}
+              />
+              <View style={styles.logoGlow} />
+            </View>
             <Text style={[styles.appTitle, isTablet && styles.tabletAppTitle]}>
               Coast RV
             </Text>
@@ -72,19 +84,27 @@ const LoginScreen = ({ onSwitchToSignup }) => {
             </Text>
           </View>
 
-          {/* Login Form */}
-          <View style={styles.formContainer}>
+          {/* Welcome Section */}
+          <View style={styles.welcomeSection}>
             <Text style={[styles.title, isTablet && styles.tabletTitle]}>
               Welcome Back
             </Text>
-            
+            <Text style={[styles.subtitle, isTablet && styles.tabletSubtitle]}>
+              Sign in to control your RV
+            </Text>
+          </View>
+
+          {/* Login Form */}
+          <View style={styles.formContainer}>
             {/* Username Input */}
-            <View style={styles.inputContainer}>
-              <Ionicons name="person-outline" size={20} color="#888" style={styles.inputIcon} />
+            <View style={[styles.inputContainer, isTablet && styles.tabletInputContainer]}>
+              <View style={styles.inputIconWrapper}>
+                <Ionicons name="person-outline" size={isTablet ? 24 : 20} color="#FFB267" />
+              </View>
               <TextInput
                 style={[styles.input, isTablet && styles.tabletInput]}
                 placeholder="Username"
-                placeholderTextColor="#888"
+                placeholderTextColor="#666"
                 value={username}
                 onChangeText={setUsername}
                 autoCapitalize="none"
@@ -93,12 +113,14 @@ const LoginScreen = ({ onSwitchToSignup }) => {
             </View>
 
             {/* Password Input */}
-            <View style={styles.inputContainer}>
-              <Ionicons name="lock-closed-outline" size={20} color="#888" style={styles.inputIcon} />
+            <View style={[styles.inputContainer, isTablet && styles.tabletInputContainer]}>
+              <View style={styles.inputIconWrapper}>
+                <Ionicons name="lock-closed-outline" size={isTablet ? 24 : 20} color="#FFB267" />
+              </View>
               <TextInput
                 style={[styles.input, isTablet && styles.tabletInput]}
                 placeholder="Password"
-                placeholderTextColor="#888"
+                placeholderTextColor="#666"
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
@@ -106,10 +128,11 @@ const LoginScreen = ({ onSwitchToSignup }) => {
               <TouchableOpacity
                 onPress={() => setShowPassword(!showPassword)}
                 style={styles.eyeIcon}
+                activeOpacity={0.7}
               >
                 <Ionicons
                   name={showPassword ? "eye-outline" : "eye-off-outline"}
-                  size={20}
+                  size={isTablet ? 24 : 20}
                   color="#888"
                 />
               </TouchableOpacity>
@@ -120,13 +143,16 @@ const LoginScreen = ({ onSwitchToSignup }) => {
               style={[styles.loginButton, isTablet && styles.tabletLoginButton]}
               onPress={handleLogin}
               disabled={isLoading}
+              activeOpacity={0.8}
             >
               <LinearGradient
-                colors={['#4FC3F7', '#29B6F6', '#0288D1']}
+                colors={['#FFB267', '#FF9A3D', '#E8751A']}
                 style={styles.loginGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
               >
                 {isLoading ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color="#000" size={isTablet ? "large" : "default"} />
                 ) : (
                   <Text style={[styles.loginButtonText, isTablet && styles.tabletLoginButtonText]}>
                     Sign In
@@ -135,23 +161,35 @@ const LoginScreen = ({ onSwitchToSignup }) => {
               </LinearGradient>
             </TouchableOpacity>
 
+            {/* Forgot Password */}
+            <TouchableOpacity style={styles.forgotPassword} activeOpacity={0.7}>
+              <Text style={[styles.forgotPasswordText, isTablet && styles.tabletForgotPasswordText]}>
+                Forgot Password?
+              </Text>
+            </TouchableOpacity>
+
             {/* Divider */}
             <View style={styles.divider}>
               <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or</Text>
+              <Text style={[styles.dividerText, isTablet && styles.tabletDividerText]}>or</Text>
               <View style={styles.dividerLine} />
             </View>
 
             {/* Sign Up Link */}
-            <TouchableOpacity
-              style={styles.signupLink}
-              onPress={onSwitchToSignup}
-            >
+            <View style={styles.signupSection}>
               <Text style={[styles.signupText, isTablet && styles.tabletSignupText]}>
-                Don't have an account?{' '}
-                <Text style={styles.signupLinkText}>Sign Up</Text>
+                Don't have an account?
               </Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                onPress={onSwitchToSignup}
+                activeOpacity={0.7}
+                style={styles.signupButton}
+              >
+                <Text style={[styles.signupLinkText, isTablet && styles.tabletSignupLinkText]}>
+                  Sign Up
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </LinearGradient>
@@ -174,148 +212,265 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
+  backgroundElements: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+  },
+  floatingElement: {
+    position: 'absolute',
+    borderRadius: 100,
+    opacity: 0.1,
+  },
+  element1: {
+    width: 200,
+    height: 200,
+    backgroundColor: '#FFB267',
+    top: '10%',
+    right: '-10%',
+  },
+  element2: {
+    width: 150,
+    height: 150,
+    backgroundColor: '#4F7BFA',
+    bottom: '20%',
+    left: '-10%',
+  },
+  element3: {
+    width: 100,
+    height: 100,
+    backgroundColor: '#FFB267',
+    top: '60%',
+    right: '20%',
+  },
   card: {
-    backgroundColor: 'rgba(40, 41, 43, 0.95)',
-    borderRadius: 20,
-    padding: 30,
+    backgroundColor: 'rgba(26, 26, 26, 0.95)',
+    borderRadius: 24,
+    padding: 32,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 178, 103, 0.1)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 12,
   },
   mobileCard: {
     marginVertical: 40,
   },
   tabletCard: {
-    maxWidth: 500,
+    maxWidth: 520,
     alignSelf: 'center',
-    padding: 40,
+    padding: 48,
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 32,
+  },
+  logoWrapper: {
+    position: 'relative',
+    marginBottom: 16,
+  },
+  tabletLogoWrapper: {
+    marginBottom: 20,
   },
   logo: {
-    width: 80,
-    height: 60,
-    backgroundColor: 'white',
-    borderRadius: 12,
-    marginBottom: 15,
-  },
-  tabletLogo: {
-    width: 100,
-    height: 75,
-  },
-  appTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 5,
-  },
-  tabletAppTitle: {
-    fontSize: 36,
-  },
-  appSubtitle: {
-    fontSize: 16,
-    color: '#888',
-  },
-  tabletAppSubtitle: {
-    fontSize: 18,
-  },
-  formContainer: {
-    width: '100%',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 30,
-    textAlign: 'center',
-  },
-  tabletTitle: {
-    fontSize: 32,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
-    marginBottom: 20,
-    paddingHorizontal: 15,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  inputIcon: {
-    marginRight: 10,
-  },
-  input: {
-    flex: 1,
-    height: 50,
-    color: '#fff',
-    fontSize: 16,
-  },
-  tabletInput: {
-    height: 60,
-    fontSize: 18,
-  },
-  eyeIcon: {
-    padding: 5,
-  },
-  loginButton: {
-    borderRadius: 12,
-    marginTop: 10,
-    shadowColor: '#000',
+    width: 88,
+    height: 66,
+    backgroundColor: '#FFB267',
+    borderRadius: 16,
+    shadowColor: '#FFB267',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
   },
+  tabletLogo: {
+    width: 110,
+    height: 82,
+    borderRadius: 20,
+  },
+  logoGlow: {
+    position: 'absolute',
+    top: -4,
+    left: -4,
+    right: -4,
+    bottom: -4,
+    backgroundColor: '#FFB267',
+    borderRadius: 20,
+    opacity: 0.2,
+    zIndex: -1,
+  },
+  appTitle: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginBottom: 6,
+    letterSpacing: -0.5,
+  },
+  tabletAppTitle: {
+    fontSize: 40,
+    marginBottom: 8,
+  },
+  appSubtitle: {
+    fontSize: 16,
+    color: '#FFB267',
+    fontWeight: '500',
+  },
+  tabletAppSubtitle: {
+    fontSize: 18,
+  },
+  welcomeSection: {
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 8,
+    letterSpacing: -0.3,
+  },
+  tabletTitle: {
+    fontSize: 36,
+    marginBottom: 12,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#888',
+    fontWeight: '400',
+  },
+  tabletSubtitle: {
+    fontSize: 18,
+  },
+  formContainer: {
+    width: '100%',
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 16,
+    marginBottom: 20,
+    paddingHorizontal: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 178, 103, 0.2)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  tabletInputContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  inputIconWrapper: {
+    marginRight: 12,
+    padding: 4,
+  },
+  input: {
+    flex: 1,
+    height: 56,
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  tabletInput: {
+    height: 64,
+    fontSize: 18,
+  },
+  eyeIcon: {
+    padding: 8,
+    marginLeft: 8,
+  },
+  loginButton: {
+    borderRadius: 16,
+    marginTop: 16,
+    shadowColor: '#FFB267',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 10,
+  },
   tabletLoginButton: {
-    marginTop: 20,
+    marginTop: 24,
+    borderRadius: 20,
   },
   loginGradient: {
-    borderRadius: 12,
-    height: 50,
+    borderRadius: 16,
+    height: 56,
     justifyContent: 'center',
     alignItems: 'center',
   },
   loginButtonText: {
-    color: '#fff',
+    color: '#000',
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   tabletLoginButtonText: {
     fontSize: 20,
   },
+  forgotPassword: {
+    alignItems: 'center',
+    marginTop: 16,
+    paddingVertical: 8,
+  },
+  forgotPasswordText: {
+    color: '#FFB267',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  tabletForgotPasswordText: {
+    fontSize: 16,
+  },
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 30,
+    marginVertical: 32,
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   dividerText: {
-    color: '#888',
-    marginHorizontal: 15,
+    color: '#666',
+    marginHorizontal: 16,
     fontSize: 14,
+    fontWeight: '500',
   },
-  signupLink: {
+  tabletDividerText: {
+    fontSize: 16,
+    marginHorizontal: 20,
+  },
+  signupSection: {
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
+    flexWrap: 'wrap',
   },
   signupText: {
     color: '#888',
     fontSize: 16,
+    fontWeight: '400',
+    marginRight: 4,
   },
   tabletSignupText: {
     fontSize: 18,
   },
+  signupButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
   signupLinkText: {
-    color: '#4FC3F7',
-    fontWeight: 'bold',
+    color: '#FFB267',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  tabletSignupLinkText: {
+    fontSize: 18,
   },
 });
 

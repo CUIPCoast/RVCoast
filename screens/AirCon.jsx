@@ -267,22 +267,29 @@ const AirCon = ({ onClose }) => {
 
         {/* Radial Slider for Temperature Control */}
         <RadialSlider
-          value={temp}
-          min={60}
-          max={85}
-          onChange={handleTempChange}
-          subTitle={'Degrees'}
-          subTitleStyle={{ color: isDarkMode ? 'white' : 'black'}}
-          unitStyle={{ color: isDarkMode ? 'white' : 'black' }}
-          valueStyle={{ color: isDarkMode ? 'white' : 'black' }}
-          style={{ backgroundColor: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
-            opacity: 0.85}}
-          leftIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginRight: 10, height: 40, width: 50, paddingLeft: 4 }}
-          rightIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginLeft: 10, height: 40, width: 50, paddingLeft: 5 }}
-          isHideTailText={true}
-          unit={'°F'}
-        />
-
+            value={temp}
+            min={60}
+            max={85}
+            thumbColor={"#FFFFFF"}
+            thumbBorderColor={"#848482"}
+            sliderTrackColor={"#E5E5E5"}
+            linearGradient={[ { offset: '0%', color:'#ffaca6' }, { offset: '100%', color: '#FF8200' }]}
+            onChange={handleTempChange}
+            subTitle={'Degrees'}
+            subTitleStyle={{ color: isDarkMode ? 'white' : 'black', paddingBottom: 25 }}
+            unitStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5 }}
+            valueStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5}}
+            style={{
+              backgroundColor: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
+            }}
+            buttonContainerStyle={{
+              color:"FFFFFF",
+            }}
+            leftIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginRight: 10, top:20, height: 40, width: 50, paddingLeft: 4 }}
+            rightIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginLeft: 10, top:20, height: 40, width: 50, paddingLeft: 5 }}
+            isHideTailText={true}
+            unit={'°F'}
+          />
         {/* Cooling and Toe Kick Switch Buttons */}
         <View style={styles.buttonsContainer}>
           <TouchableOpacity
