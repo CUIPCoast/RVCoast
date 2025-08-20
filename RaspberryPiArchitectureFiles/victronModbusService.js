@@ -7,7 +7,7 @@ const EventEmitter = require('events');
 
 // Configuration
 const DEFAULT_CONFIG = {
-  host: '192.168.8.242', // Updated to your Cerbo GX IP
+  host: '10.129.134.57', // Updated to your Cerbo GX IP
   port: 502,             // Standard ModbusTCP port
   timeout: 10000,        // Increased timeout (10 seconds)
   pollInterval: 5000,    // Data refresh interval in ms

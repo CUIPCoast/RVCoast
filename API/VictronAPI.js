@@ -16,8 +16,8 @@ const getBaseURL = () => {
   }
   
   // Fallback to the default IP
-  console.log('Using default baseURL: http://169.254.9.43:502');
-  return 'http://169.254.9.43:502';
+  console.log('Using default baseURL: http://10.129.134.57:3000');
+  return 'http://10.129.134.57:3000';
 };
 
 // Create a Victron-specific API instance with longer timeout

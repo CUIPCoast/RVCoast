@@ -137,7 +137,7 @@ export const SystemUtils = {
     // This is a placeholder for system configuration
     // In a real implementation, this might retrieve configuration from storage or the server
     return {
-      apiUrl: 'http://192.168.8.200:3000/api',
+      apiUrl: 'http://10.129.134.57:3000/api',
       supportsRawCommands: true,
       supportsDimming: false,
       debugMode: false,

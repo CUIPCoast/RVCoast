@@ -567,72 +567,102 @@ const Devices = () => {
       return (
         <>
         {/* ───── Water Controls (Bedroom Tab) ───── */}
-         <View style={styles.fanControlsContainer}>
-            <TouchableOpacity
-              style={[
-                styles.waterControlButton,
-                water.heaterOn
-                  ? styles.waterControlButtonActive
-                  : styles.waterControlButtonInactive,
-                isLoading && styles.disabledButton,
-              ]}
-              onPress={handleWaterHeaterToggle}
-              disabled={isLoading}
-            >
-             <View style={styles.fanIconContainer}>
-              <View
-                style={[
-                  styles.fanIconCircle,
-                  water.heaterOn
-                    ? styles.waterIconCircleActive
-                    : styles.waterIconCircleInactive,
-                ]}
-              >
-                <Ionicons
-                  name={water.heaterOn ? 'water' : 'water-outline'}
-                  size={24}
-                  color={water.heaterOn ? '#FFF' : '#888'}
-                />
-              </View>
-             </View>
+        <View style={styles.fanControlsContainer}>
+  <TouchableOpacity
+    style={[
+      styles.modernFanButton, // Use the same base style as fans
+      water.heaterOn
+        ? styles.waterButtonActive
+        : styles.waterButtonInactive,
+      isLoading && styles.disabledButton,
+    ]}
+    onPress={handleWaterHeaterToggle}
+    disabled={isLoading}
+  >
+    <View style={styles.fanIconContainer}>
+      <View
+        style={[
+          styles.fanIconCircle,
+          water.heaterOn
+            ? styles.waterIconCircleActive
+            : styles.waterIconCircleInactive,
+        ]}
+      >
+        <Ionicons
+          name={water.heaterOn ? 'water' : 'water-outline'}
+          size={24}
+          color={water.heaterOn ? '#FFF' : '#888'}
+        />
+      </View>
+    </View>
 
-             <Text style={styles.fanButtonLabel}>Water Heater</Text>
-             <View style={[styles.statusIndicator, water.heaterOn ? styles.statusActive : styles.statusInactive]}>
-               <Text style={styles.statusText}>{water.heaterOn ? 'ON' : 'OFF'}</Text>
-             </View>
-           </TouchableOpacity>
+    <Text style={[
+      styles.fanButtonLabel,
+      { color: water.heaterOn ? '#FFFFFF' : '#888888' }
+    ]}>
+      Water Heater
+    </Text>
+    
+    <View style={[
+      styles.statusIndicator, 
+      water.heaterOn ? styles.statusActive : styles.statusInactive
+    ]}>
+      <Text style={[
+        styles.statusText,
+        { color: water.heaterOn ? '#FFFFFF' : '#AAAAAA' }
+      ]}>
+        {water.heaterOn ? 'ON' : 'OFF'}
+      </Text>
+    </View>
+  </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={[
-                styles.waterControlButton,
-                water.pumpOn
-                  ? styles.waterControlButtonActive
-                  : styles.waterControlButtonInactive,
-                isLoading && styles.disabledButton,
-              ]}
-              onPress={handleWaterPumpToggle}
-              disabled={isLoading}
-            >
-             <View style={styles.fanIconContainer}>
-               <View style={[
-                 styles.fanIconCircle,
-                 water.pumpOn
-                   ? styles.waterIconCircleActive
-                   : styles.waterIconCircleInactive
-               ]}>
-                 <Ionicons
-                   name={water.pumpOn ? 'pie-chart' : 'pie-chart-outline'}
-                   size={24}
-                   color={water.pumpOn ? '#FFF' : '#888'}
-                 />
-               </View>
-             </View>
-             <Text style={styles.fanButtonLabel}>Water Pump</Text>
-             <View style={[styles.statusIndicator, water.pumpOn ? styles.statusActive : styles.statusInactive]}>
-               <Text style={styles.statusText}>{water.pumpOn ? 'ON' : 'OFF'}</Text>
-             </View>
-            </TouchableOpacity>
-         </View>
+  <TouchableOpacity 
+    style={[
+      styles.modernFanButton, // Use the same base style as fans
+      water.pumpOn
+        ? styles.waterButtonActive
+        : styles.waterButtonInactive,
+      isLoading && styles.disabledButton,
+    ]}
+    onPress={handleWaterPumpToggle}
+    disabled={isLoading}
+  >
+    <View style={styles.fanIconContainer}>
+      <View style={[
+        styles.fanIconCircle,
+        water.pumpOn
+          ? styles.waterIconCircleActive
+          : styles.waterIconCircleInactive
+      ]}>
+        <Ionicons
+          name={water.pumpOn ? 'pie-chart' : 'pie-chart-outline'}
+          size={24}
+          color={water.pumpOn ? '#FFF' : '#888'}
+        />
+      </View>
+    </View>
+    
+    <Text style={[
+      styles.fanButtonLabel,
+      { color: water.pumpOn ? '#FFFFFF' : '#888888' }
+    ]}>
+      Water Pump
+    </Text>
+    
+    <View style={[
+      styles.statusIndicator, 
+      water.pumpOn ? styles.statusActive : styles.statusInactive
+    ]}>
+      <Text style={[
+        styles.statusText,
+        { color: water.pumpOn ? '#FFFFFF' : '#AAAAAA' }
+      ]}>
+        {water.pumpOn ? 'ON' : 'OFF'}
+      </Text>
+    </View>
+  </TouchableOpacity>
+</View>
+
          
          <MasterLightControl 
             isOn={masterLightOn}
@@ -1022,22 +1052,25 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
-  waterControlButtonActive: {
-    backgroundColor: '#005BB5',
-    borderColor: '#99CCFF',
+  waterButtonActive: {
+    backgroundColor: '#005BB5', // Blue when active
+    borderColor: '#66B2FF',
+    shadowColor: '#66B2FF',
   },
-  waterControlButtonInactive: {
-    backgroundColor: '#002147',
-    borderColor: '#224E7A',
+  waterButtonInactive: {
+    backgroundColor: '#1E242E', // Dark when inactive (matches fan style)
+    borderColor: '#323845',
+    shadowColor: '#000',
   },
   waterIconCircleActive: {
-    backgroundColor: '#66B2FF',
+    backgroundColor: '#66B2FF', // Bright blue circle when active
   },
   waterIconCircleInactive: {
-    backgroundColor: '#003153',
+    backgroundColor: '#2D333F', // Dark circle when inactive (matches fan style)
     borderWidth: 1,
-    borderColor: '#224E7A',
+    borderColor: '#3D4452',
   },
+
   title: {
     fontSize: 18,
     fontWeight: 'bold',

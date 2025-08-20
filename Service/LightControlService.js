@@ -3,7 +3,7 @@ import { RVControlService } from '../API/rvAPI';
 
 // Make the API base URL accessible
 if (!RVControlService.baseURL) {
-  RVControlService.baseURL = 'http://192.168.8.200:3000/api';
+  RVControlService.baseURL = 'http://10.129.134.57:3000/api';
 }
 
 // Store active dimming operations to prevent conflicts

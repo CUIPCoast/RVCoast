@@ -423,7 +423,7 @@ class RVStateManager {
   setupSyncSocket() {
     try {
       // Use your existing server's WebSocket endpoint
-      const wsUrl = 'ws://192.168.8.200:3000'; // Match your server.js configuration
+      const wsUrl = 'ws://10.129.134.57:3000'; // Match your server.js configuration
       
       console.log(`RVStateManager: Connecting to WebSocket at ${wsUrl}`);
       this.syncSocket = new WebSocket(wsUrl);

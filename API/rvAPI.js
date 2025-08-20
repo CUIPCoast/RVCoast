@@ -1,8 +1,8 @@
 import axios from 'axios';
 
 // Set your Raspberry Pi's IP address and port
-// You'll need to change this to your Raspberry Pi's actual IP on your network
-const API_URL = 'http://192.168.8.200:3000/api';
+
+const API_URL = 'http://10.129.134.57:3000/api';
 
 // Create an instance of axios with the base URL
 const api = axios.create({

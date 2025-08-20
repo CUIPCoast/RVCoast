@@ -14,7 +14,7 @@ class AwningCANListener extends EventEmitter {
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 5;
     this.reconnectDelay = 2000;
-    this.baseUrl = 'http://192.168.8.200:3000'; // Match your server.js configuration
+    this.baseUrl = 'http://10.129.134.57:3000'; // Match your server.js configuration
     
     // Awning-specific state tracking
     this.awningState = {

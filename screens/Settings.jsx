@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, SectionList, Image, TouchableOpacity, Alert, ScrollView } from 'react-native';
-import GroupComponent from '../components/GroupComponent';
+
 import ToggleSwitch from '../components/ToggleSwitch.jsx';
 import RVConnectionModal from '../components/RVConnectionModal';
 import { Color, Gap, FontSize, FontFamily, isDarkMode } from '../GlobalStyles';
