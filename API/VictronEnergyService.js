@@ -4,13 +4,13 @@ import { VictronAPI } from './VictronAPI';
 // Configuration
 const CONFIG = {
   // Refresh interval in ms
-  REFRESH_INTERVAL: 5000
+  REFRESH_INTERVAL: 15000
 };
 
 // Data storage for simulated Victron data (for when API is unavailable)
 let simulatedData = {
   battery: {
-    soc: 80, // State of charge (percentage)
+    soc: .80, // State of charge (percentage)
     voltage: 13.2, // Battery voltage
     current: -2.5, // Negative value means discharging, positive means charging
     power: -30, // Power in watts (negative = discharge)
@@ -643,7 +643,7 @@ export const VictronEnergyService = {
       
       if (!apiAvailable) {
         console.log('API not available, cannot connect');
-        useSimulation = true;
+        useSimulation = false;
         startSimulation();
         return false;
       }

@@ -16,14 +16,14 @@ const getBaseURL = () => {
   }
   
   // Fallback to the default IP
-  console.log('Using default baseURL: http://10.129.134.57:3000');
-  return 'http://10.129.134.57:3000';
+  console.log('Using default baseURL: http://10.129.134.57:502');
+  return 'http://10.129.134.57:502';
 };
 
 // Create a Victron-specific API instance with longer timeout
 const api = axios.create({
   baseURL: `${getBaseURL()}/api/victron`,
-  timeout: 10000, // 10 second timeout for slower connections
+  timeout: 45000, // 10 second timeout for slower connections
 });
 
 // Log configuration on startup
