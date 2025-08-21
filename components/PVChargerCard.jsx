@@ -43,7 +43,7 @@ export default PVChargerCard;
 const styles = StyleSheet.create({
   frame: {
     width: 180,
-    height: 140,
+    height: 150,
     marginHorizontal: 8,
     position: 'relative',
   },

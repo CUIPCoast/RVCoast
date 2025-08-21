@@ -87,13 +87,13 @@ const AirCon = ({ onClose }) => {
         }
         
         // Update cooling and toe kick states if they changed externally
-        if (newState.climate.coolingOn !== undefined) {
+        if (newState.climate.coolingOn !== undefined && newState.climate.coolingOn !== climate.coolingOn) {
           setStatusMessage(`Cooling ${newState.climate.coolingOn ? 'turned on' : 'turned off'} remotely`);
           setShowStatus(true);
           setTimeout(() => setShowStatus(false), 3000);
         }
         
-        if (newState.climate.toeKickOn !== undefined) {
+        if (newState.climate.toeKickOn !== undefined && newState.climate.toeKickOn !== climate.toeKickOn) {
           setStatusMessage(`Toe Kick ${newState.climate.toeKickOn ? 'turned on' : 'turned off'} remotely`);
           setShowStatus(true);
           setTimeout(() => setShowStatus(false), 3000);
@@ -102,7 +102,7 @@ const AirCon = ({ onClose }) => {
     });
     
     return unsubscribe;
-  }, [temp]);
+  }, [temp, climate.coolingOn, climate.toeKickOn]);
 
   // Handle cooling toggle with state management
   const handleCoolingPress = async () => {
