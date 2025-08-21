@@ -347,9 +347,7 @@ const WaterTanks = ({ name, tankType, trackColor }) => {
                 <Text style={[styles.connectionDot, { color: connectionStatus.color }]}>
                   {connectionStatus.text}
                 </Text>
-                {heaterStatus && (
-                  <Ionicons name="flame" size={14} color="#FF6B35" style={styles.heaterIcon} />
-                )}
+                
               </View>
             </View>
             
@@ -421,8 +419,8 @@ const styles = {
   // Tablet styles
   tankContainer: {
     marginHorizontal: 2,
-    marginVertical: 2,
-    width: 120,
+    marginVertical: 15,
+    width: 140,
   },
   tankGradient: {
     borderRadius: 12,
@@ -448,7 +446,7 @@ const styles = {
   },
   tankIconContainer: {
     width: 28,
-    height: 28,
+    height: 68,
     borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',

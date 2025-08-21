@@ -824,17 +824,13 @@ const ClimateControlScreenTablet = () => {
             <Col
               style={{
                 width: "30%",
-                height: 380,
+                height:400,
                 backgroundColor: "#1B1B1B",
                 borderRadius: 10,
                 justifyContent: "flex-start",
                 padding: 20,
                 margin: 50,
-                shadowColor: "#FFF",
-                            shadowOffset: { width: 0, height: 6 },
-                            shadowOpacity: 1,
-                            shadowRadius: 4,
-                            elevation: 6,
+                
               }}
             >
               <Text
@@ -859,29 +855,29 @@ const ClimateControlScreenTablet = () => {
               />
               <View style={styles.container}>
                 <RadialSlider
-                  value={temp}
-                  min={60}
-                  max={85}
-                  thumbColor={"#FFFFFF"}
-                  thumbBorderColor={"#848482"}
-                  sliderTrackColor={"#E5E5E5"}
-                  linearGradient={[ { offset: '0%', color:'#ffaca6' }, { offset: '100%', color: '#FF8200' }]}
-                  onChange={handleTempChange}
-                  subTitle={'Degrees'}
-                  subTitleStyle={{ color: isDarkMode ? 'white' : 'black', paddingBottom: 25 }}
-                  unitStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5 }}
-                  valueStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5}}
-                  style={{
-                    backgroundColor: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
-                  }}
-                  buttonContainerStyle={{
-                    color:"FFFFFF",
-                  }}
-                  leftIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginRight: 10, top:20, height: 40, width: 50, paddingLeft: 4 }}
-                  rightIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginLeft: 10, top:20, height: 40, width: 50, paddingLeft: 5 }}
-                  isHideTailText={true}
-                  unit={'°F'}
-                />
+                            value={temp}
+                            min={60}
+                            max={85}
+                            thumbColor={"#FFFFFF"}
+                            thumbBorderColor={"#848482"}
+                            sliderTrackColor={"#E5E5E5"}
+                            linearGradient={[ { offset: '0%', color:'#ffaca6' }, { offset: '100%', color: '#FF8200' }]}
+                            onChange={handleTempChange}
+                            subTitle={'Degrees'}
+                            subTitleStyle={{ color: isDarkMode ? 'white' : 'black', paddingBottom: 25, fontSize: 20 }}
+                            unitStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5, fontSize: 20 }}
+                            valueStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5, fontSize: 28 }}
+                            style={{
+                              backgroundColor: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
+                            }}
+                            buttonContainerStyle={{
+                              color:"FFFFFF",
+                            }}
+                            leftIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginRight: 10, top:20, height: 40, width: 50, paddingLeft: 4 }}
+                            rightIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginLeft: 10, top:20, height: 40, width: 50, paddingLeft: 5 }}
+                            isHideTailText={true}
+                            unit={'°F'}
+                          />
               </View>
             </Col>
             <View

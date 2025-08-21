@@ -196,9 +196,9 @@ const AirCon = ({ onClose }) => {
             linearGradient={[ { offset: '0%', color:'#ffaca6' }, { offset: '100%', color: '#FF8200' }]}
             onChange={handleTempChange}
             subTitle={'Degrees'}
-            subTitleStyle={{ color: isDarkMode ? 'white' : 'black', paddingBottom: 25 }}
-            unitStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5 }}
-            valueStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5}}
+            subTitleStyle={{ color: isDarkMode ? 'white' : 'black', paddingBottom: 25, fontSize: 20 }}
+            unitStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5, fontSize: 20 }}
+            valueStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5, fontSize: 28 }}
             style={{
               backgroundColor: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
             }}
@@ -276,9 +276,9 @@ const AirCon = ({ onClose }) => {
             linearGradient={[ { offset: '0%', color:'#ffaca6' }, { offset: '100%', color: '#FF8200' }]}
             onChange={handleTempChange}
             subTitle={'Degrees'}
-            subTitleStyle={{ color: isDarkMode ? 'white' : 'black', paddingBottom: 25 }}
-            unitStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5 }}
-            valueStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5}}
+            subTitleStyle={{ color: isDarkMode ? 'white' : 'black', paddingBottom: 25, fontSize: 10 }}
+            unitStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5, fontSize: 10 }}
+            valueStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5, fontSize: 14 }}
             style={{
               backgroundColor: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
             }}
@@ -338,7 +338,7 @@ const tabletStyles = StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',
-    marginTop: 50,
+    marginTop: 120,
     backgroundColor: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
   },
   closeButton: {
@@ -383,7 +383,7 @@ const tabletStyles = StyleSheet.create({
     opacity: 0.6,
   },
   buttonText: {
-    fontSize: 16,
+    fontSize: 12,
   },
   statusContainer: {
     position: 'absolute',
@@ -463,7 +463,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   buttonText: {
-    fontSize: 16,
+    fontSize: 12,
   },
   statusContainer: {
     position: 'absolute',

@@ -174,7 +174,7 @@ const ImprovedLightScreenTablet = () => {
             borderRadius: 10,
             justifyContent: "center",
             padding: 20,
-            bottom: 220,
+            bottom: 300,
           }}
         >
           <View
@@ -279,14 +279,14 @@ const ImprovedLightScreenTablet = () => {
           <Col
             style={{
               width: "63%",
-              height: 310,
+              height: 410,
               backgroundColor: "#1B1B1B",
               borderRadius: 10,
               justifyContent: "flex-start",
               padding: 20,
-              marginLeft: -260,
+              marginLeft: -300,
               marginRight: 30,
-              bottom: 140,
+              bottom: 180,
               shadowColor: "#FFF",
               shadowOffset: { width: 0, height: 6 },
               shadowOpacity: 1,
@@ -335,13 +335,13 @@ const ImprovedLightScreenTablet = () => {
           <Col
             style={{
               width: "70%",
-              height: 310,
+              height: 410,
               backgroundColor: "#1B1B1B",
               borderRadius: 10,
               justifyContent: "flex-start",
               padding: 20,
               marginRight: 30,
-              bottom: 140,
+              bottom: 180,
               shadowColor: "#FFF",
               shadowOffset: { width: 0, height: 6 },
               shadowOpacity: 1,
@@ -390,12 +390,12 @@ const ImprovedLightScreenTablet = () => {
           <Col
             style={{
               width: "70%",
-              height: 310,
+              height: 410,
               backgroundColor: "#1B1B1B",
               borderRadius: 10,
               justifyContent: "flex-start",
               padding: 20,
-              bottom: 140,
+              bottom: 180,
               shadowColor: "#FFF",
               shadowOffset: { width: 0, height: 6 },
               shadowOpacity: 1,

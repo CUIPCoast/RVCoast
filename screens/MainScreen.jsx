@@ -295,13 +295,7 @@ const MainScreen = () => {
                         </View>
                     </Row>
                     <Row className="bg-brown rounded-xl m-3 mb-10 top-15" 
-                    style = {{
-                        shadowColor: "#FFFFFF",
-                        shadowOffset: { width: 100, height: 120, },
-                        shadowOpacity: 0.5,
-                        shadowRadius: 6,
-                        elevation: 6,
-                    }}
+                    
                     size={30}>
                         <View className="bg-brown rounded-xl m-3 mb-10 top-15">
                             {/* User Info Display */}
@@ -364,11 +358,7 @@ const MainScreen = () => {
                         padding: 15,
                         marginBottom: 20,
                         position: "relative",
-                        shadowColor: "#FFFFFF",
-                        shadowOffset: { width: 100, height: 120, },
-                        shadowOpacity: 0.5,
-                        shadowRadius: 6,
-                        elevation: 6,
+                    
                     }}
                 >
 
@@ -549,25 +539,21 @@ const MainScreen = () => {
                             justifyContent: "center",
                             padding: 10,
                             overflow: "visible",
-                            width: 220,
-                            height: 180,
+                            width: 270,
+                            height: 270,
                             position: "relative",
-                            shadowColor: "#FFF",
-                            shadowOffset: { width: 0, height: 6 },
-                            shadowOpacity: 1,
-                            shadowRadius: 4,
-                            elevation: 6,
+                            
                         }}
                     >
                         
-<SmallBatteryCard  x={-20} y={-35} scale={1.05} percentageStyle={{
-    left: -28,     // Move percentage text left/right
+<SmallBatteryCard  x={7} y={-15} scale={1.25} percentageStyle={{
+    left: -23,     // Move percentage text left/right
     top: -20,       // Move percentage text up/down
     fontSize: 20, // Custom font size
   }}
   subtitleStyle={{
-    left: -35,      // Move subtitle left/right
-    top: -7,      // Move subtitle up/down
+    left: -24,      // Move subtitle left/right
+    top: -17,      // Move subtitle up/down
     fontSize: 10, // Custom font size
     marginTop: 2, // Spacing from percentage
   }}>
@@ -598,14 +584,10 @@ const MainScreen = () => {
                             justifyContent: "center",
                             padding: 10,
                             overflow: "visible",
-                            width: 220,
-                            height: 180,
+                            width: 270,
+                            height: 270,
                             position: "relative",
-                            shadowColor: "#FFF",
-                            shadowOffset: { width: 0, height: 6 },
-                            shadowOpacity: 1,
-                            shadowRadius: 4,
-                            elevation: 6,
+                            
                         }}
                     >
                         <Text
@@ -623,8 +605,8 @@ const MainScreen = () => {
                             <Image
                                 source={require("../assets/abpost61724photoroom-3.png")}
                                 style={{
-                                    width: 120,
-                                    height: 120,
+                                    width: 180,
+                                    height: 180,
                                     resizeMode: "contain",
                                 }}
                             />
@@ -636,13 +618,7 @@ const MainScreen = () => {
 
                 </Col>
 
-                <Col className="bg-brown p-2 rounded-xl m-3 mb-10" size={15} style={{
-                    shadowColor: "#FFF",
-                    shadowOffset: { width: 0, height: 12 },
-                    shadowOpacity: 1,
-                    shadowRadius: 6,
-                    elevation: 6,
-                }} >
+                <Col className="bg-brown p-2 rounded-xl m-3 mb-10" size={15} >
                     <Text className="text-white">Air Conditioning</Text>
                     <AirCon />
                 </Col>
@@ -666,20 +642,21 @@ const styles = {
         shadowOpacity: 0.3,
         shadowRadius: 8,
         elevation: 8,
-        marginVertical: 4,
+        marginVertical: 40,
     },
     modernGradientButton: {
         borderRadius: 16,
         padding: 2,
     },
     buttonContent: {
+        
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: 'rgba(0,0,0,0.1)',
         borderRadius: 14,
         paddingVertical: 8,
         paddingHorizontal: 12,
-        minWidth: 150,
+        minWidth: 210,
         position: 'relative',
     },
     iconContainer: {
@@ -722,10 +699,11 @@ const styles = {
     temperatureContainer: {
         flex: 1,
         padding: 8,
+        top:35,
     },
     temperatureDisplay: {
         backgroundColor: 'rgb(40, 41, 43)', // Brown with transparency
-        height:160,
+        height:180,
         borderRadius: 12,
         borderWidth: 1,
         borderColor: '#FFFFFF20',
@@ -738,7 +716,8 @@ const styles = {
     
     // New system status styles
     systemStatus: {
-        marginTop: 12,
+        marginTop: 8,
+        right: 250,
         padding: 8,
         backgroundColor: 'rgba(0, 0, 0, 0.3)',
         borderRadius: 8,
@@ -872,6 +851,7 @@ const styles = {
         alignItems: 'center',
         justifyContent: 'center',
         width: '100%',
+        top: 40,
     },
     welcomeText: {
         color: '#E0E0E0',
