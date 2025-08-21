@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { LinearGradient } from 'expo-linear-gradient';
-import Ionicons from 'react-native-vector-icons/Ionicons';
 import { StyleSheet, View, Text, Image, TouchableOpacity, TouchableWithoutFeedback, Keyboard, ScrollView } from "react-native";
 import { Border, Color, Gap, FontSize, FontFamily, isDarkMode } from "../GlobalStyles";
-import { useScreenSize, dismissKeyboard, setLowFanSpeed, setAutoMode, getImageForLabel } from "../helper";
+import useScreenSize from "../helper/useScreenSize.jsx";
 import { Col, Row, Grid } from "react-native-easy-grid";
 import { RadialSlider } from 'react-native-radial-slider';
 import moment from 'moment';
@@ -275,6 +273,10 @@ const ClimateControlScreenTablet = () => {
     return () => clearTimeout(timeoutId);
   }, [temp, lastTemp, isCoolToggled, isToekickToggled, isFurnaceToggled]);
 
+  // Dismiss keyboard when tapping anywhere - Added from AirCon
+  const dismissKeyboard = () => {
+    Keyboard.dismiss();
+  };
 
   // Night Setting Toggle - Using service with RV state management
   const handleNightPress = async () => {
@@ -599,6 +601,66 @@ const ClimateControlScreenTablet = () => {
     }
   };
   
+  // Direct implementation of low fan speed using raw commands
+  const setLowFanSpeed = async () => {
+    try {
+      // Attempt to execute the individual commands instead of the command group
+      // This is a workaround for the 400 error issue
+      const commands = [
+        '19FED99F#FF96AA0F3200D1FF', // low_fan_speed_1
+        '195FCE98#AA00320000000000', // low_fan_speed_2
+        '19FEF998#A110198A24AE19FF'  // low_fan_speed_3
+      ];
+      
+      // Send each command individually using the raw command API
+      for (const command of commands) {
+        await RVControlService.executeRawCommand(command);
+        // Short delay to avoid overwhelming the CAN bus
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to set low fan speed:', error);
+      
+      // Provide a more detailed error message for debugging
+      return { 
+        success: false, 
+        error: error.message,
+        details: 'Error sending raw fan speed commands. Check server logs for details.'
+      };
+    }
+  };
+  
+  // Direct implementation of auto mode using raw commands
+  const setAutoMode = async () => {
+    try {
+      // Auto setting commands from server.js
+      const commands = [
+        '19FEF99F#01C0FFFFFFFFFFFF', // auto_setting_on_1
+        '19FED99F#FF96AA0F0000D1FF', // auto_setting_on_2
+        '19FFE198#010064A924A92400'  // auto_setting_on_3
+      ];
+      
+      // Send each command individually using the raw command API
+      for (const command of commands) {
+        await RVControlService.executeRawCommand(command);
+        // Short delay to avoid overwhelming the CAN bus
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to set auto mode:', error);
+      
+      // Provide a more detailed error message for debugging
+      return { 
+        success: false, 
+        error: error.message,
+        details: 'Error sending raw auto mode commands. Check server logs for details.'
+      };
+    }
+  };
 
   // Load saved states on component mount - updated with RV state management
   useEffect(() => {
@@ -768,7 +830,7 @@ const ClimateControlScreenTablet = () => {
                     width: 70,
                     height: 45,
                     right: 0,
-                    paddingTop: 10,
+                    
                     backgroundColor: "white"
                   }}
                 />
@@ -824,13 +886,17 @@ const ClimateControlScreenTablet = () => {
             <Col
               style={{
                 width: "30%",
-                height:400,
+                height: 450,
                 backgroundColor: "#1B1B1B",
                 borderRadius: 10,
                 justifyContent: "flex-start",
                 padding: 20,
                 margin: 50,
-                
+                shadowColor: "#FFF",
+                            
+                            shadowOpacity: 1,
+                            shadowRadius: 4,
+                            elevation: 6,
               }}
             >
               <Text
@@ -855,29 +921,60 @@ const ClimateControlScreenTablet = () => {
               />
               <View style={styles.container}>
                 <RadialSlider
-                            value={temp}
-                            min={60}
-                            max={85}
-                            thumbColor={"#FFFFFF"}
-                            thumbBorderColor={"#848482"}
-                            sliderTrackColor={"#E5E5E5"}
-                            linearGradient={[ { offset: '0%', color:'#ffaca6' }, { offset: '100%', color: '#FF8200' }]}
-                            onChange={handleTempChange}
-                            subTitle={'Degrees'}
-                            subTitleStyle={{ color: isDarkMode ? 'white' : 'black', paddingBottom: 25, fontSize: 20 }}
-                            unitStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5, fontSize: 20 }}
-                            valueStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5, fontSize: 28 }}
-                            style={{
-                              backgroundColor: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
-                            }}
-                            buttonContainerStyle={{
-                              color:"FFFFFF",
-                            }}
-                            leftIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginRight: 10, top:20, height: 40, width: 50, paddingLeft: 4 }}
-                            rightIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginLeft: 10, top:20, height: 40, width: 50, paddingLeft: 5 }}
-                            isHideTailText={true}
-                            unit={'°F'}
-                          />
+  value={temp}
+  min={60}
+  max={85}
+  thumbColor={"#FFFFFF"}
+  thumbBorderColor={"#848482"}
+  sliderTrackColor={"#E5E5E5"}
+  linearGradient={[
+    { offset: '0%', color: '#ffaca6' },
+    { offset: '100%', color: '#FF8200' },
+  ]}
+  onChange={handleTempChange}
+  subTitle={'Degrees'}
+  subTitleStyle={{
+    color: isDarkMode ? 'white' : 'black',
+    paddingBottom: 15,
+    fontSize: 20, // Smaller subtitle
+  }}
+  unitStyle={{
+    color: isDarkMode ? 'white' : 'black',
+    paddingTop: 5,
+  }}
+  valueStyle={{
+    color: isDarkMode ? 'white' : 'black',
+    paddingTop: 5,
+    fontSize: 48, // Smaller value number
+  }}
+  style={{
+    backgroundColor: '#1B1B1B', 
+  }}
+  buttonContainerStyle={{
+    color: "FFFFFF",
+  }}
+  leftIconStyle={{
+    backgroundColor: 'white',
+    borderRadius: 10,
+    marginRight: 10,
+    top: 40,
+    height: 40,
+    width: 50,
+    paddingLeft: 4,
+  }}
+  rightIconStyle={{
+    backgroundColor: 'white',
+    borderRadius: 10,
+    marginLeft: 10,
+    top: 40,
+    height: 40,
+    width: 50,
+    paddingLeft: 5,
+  }}
+  isHideTailText={true}
+  unit={'°F'}
+/>
+
               </View>
             </Col>
             <View
@@ -894,24 +991,24 @@ const ClimateControlScreenTablet = () => {
                 <Image
                   source={require("../assets/truma-logo-333-100.png")}
                   className="h-30 w-30 left-3"
-                  style={{ resizeMode: "contain", marginBottom: 20 }}
+                  style={{ resizeMode: "contain", marginBottom: 220 }}
                 />
 
                 <View style={{ flexDirection: "row", alignItems: "flex-start", marginTop: 10 }}>
                   {/* Auxiliary Box */}
                   <Col
                     style={{
-                      width: 380,
-                      height: 270,
+                      width: 420,
+                      height: 330,
                       backgroundColor: "#1B1B1B",
                       borderRadius: 10,
                       justifyContent: "flex-start",
                       padding: 20,
-                      margin: 25,
+                      marginB: 25,
                       right: 80,
-                      bottom: 10,
+                      bottom: 100,
                       shadowColor: "#FFF",
-                            shadowOffset: { width: 0, height: 6 },
+                            
                             shadowOpacity: 1,
                             shadowRadius: 4,
                             elevation: 6,
@@ -942,98 +1039,40 @@ const ClimateControlScreenTablet = () => {
   flexDirection: "row", 
   marginTop: 10
 }}>
-  {/* Left column: Feature buttons - Made scrollable */}
+  {/* Left column: Feature buttons */}
   <View style={{ 
     flex: 0.75, 
-    justifyContent: "flex-start",
-    maxHeight: 180 // Limit height to prevent overflow
+    justifyContent: "flex-start"
   }}>
-    <ScrollView 
-      style={styles.buttonsScrollView}
-      contentContainerStyle={styles.buttonsScrollContent}
-      showsVerticalScrollIndicator={false}
-    >
-      {features.map((feature, index) => {
-        const isActive = (feature.label === "Cool" && isCoolToggled) || 
-                        (feature.label === "Toe Kick" && isToekickToggled) || 
-                        (feature.label === "Furnace" && isFurnaceToggled);
-        
-        const getColors = (label) => {
-          if (label === "Cool") {
-            return isActive 
-              ? ["#4FC3F7", "#29B6F6", "#0288D1"] 
-              : ["#2C2C34", "#3A3A42", "#2C2C34"];
-          } else if (label === "Furnace") {
-            return isActive 
-              ? ["#FF6B6B", "#FF8E53", "#FF6B35"] 
-              : ["#2C2C34", "#3A3A42", "#2C2C34"];
-          } else { // Toe Kick
-            return isActive 
-              ? ["#10B981", "#059669", "#047857"] 
-              : ["#2C2C34", "#3A3A42", "#2C2C34"];
-          }
-        };
-        
-        const getIcon = (label) => {
-          if (label === "Cool") return "snow-outline";
-          if (label === "Furnace") return "flame-outline";
-          if (label === "Toe Kick") return "thermometer-outline";
-          return "settings-outline";
-        };
-        
-        return (
-          <TouchableOpacity
-            key={index}
-            onPress={() => handleButtonPress(feature.label)}
-            disabled={isLoading}
-            activeOpacity={0.8}
-            style={[
-              styles.modernButton,
-              { marginBottom: 8, width: 200 }, // Reduced width and margin
-              isLoading && styles.buttonDisabled
-            ]}
-          >
-            <LinearGradient
-              colors={getColors(feature.label)}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={[styles.modernGradientButton, { width: '100%' }]}
-            >
-              <View style={styles.buttonContent}>
-                <View style={[
-                  styles.iconContainer,
-                  { backgroundColor: isActive ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)' }
-                ]}>
-                  <Ionicons
-                    name={getIcon(feature.label)}
-                    size={18} // Slightly smaller icon
-                    color={isActive ? "#FFF" : "#B0B0B0"}
-                  />
-                </View>
-                <View style={styles.textContainer}>
-                  <Text style={[
-                    styles.buttonTitle,
-                    { color: isActive ? "#FFF" : "#E0E0E0" }
-                  ]}>
-                    {feature.label}
-                  </Text>
-                  <Text style={[
-                    styles.buttonSubtitle,
-                    { color: isActive ? "rgba(255,255,255,0.8)" : "#888" }
-                  ]}>
-                    {isActive ? "Active" : "Off"}
-                  </Text>
-                </View>
-                <View style={[
-                  styles.statusIndicator,
-                  { backgroundColor: isActive ? "#4CAF50" : "#666" }
-                ]} />
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
-        );
-      })}
-    </ScrollView>
+    {features.map((feature, index) => (
+      <TouchableOpacity
+        key={index}
+        onPress={() => handleButtonPress(feature.label)}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          backgroundColor: activeButtons.includes(feature.label) ? "#444" : "#1B1B1B",
+          borderRadius: 5,
+          paddingVertical: 10,
+          paddingHorizontal: 15,
+          marginVertical: 15,
+          width: 220,
+        }}
+      >
+        <Image
+          source={getImageForLabel(feature.label)}
+          style={{ width: 30, height: 30, marginRight: 5 }}
+        />
+        <Text
+          style={{
+            color: "white",
+            fontSize: 16,
+          }}
+        >
+          {feature.label}
+        </Text>
+      </TouchableOpacity>
+    ))}
   </View>
   
   {/* Right column: Fan Speed container */}
@@ -1094,61 +1133,41 @@ const ClimateControlScreenTablet = () => {
 
 
                   </Col>
-                  {/* Night/Dehumid Buttons */}
-                  <View
-                  style={{
-                    flex: 1,
-                    justifyContent: "space-evenly",
-                    alignItems: "center",
-                    right: -10,
-                    top: 100,
-                  }}
-                >
-                  {/* Day/Night Toggle */}
-<TouchableOpacity
-  onPress={handleNightPress}
-  disabled={isLoading}
-  style={[
-    styles.toggleBase,
-    isNightToggled ? styles.toggleActiveDay : styles.toggleInactive
-  ]}
-  activeOpacity={0.7}
->
-  <Image
-    source={isNightToggled ? moonImage : sunImage}
-    style={styles.toggleIcon}
-  />
-  <Text style={[
-    styles.toggleText,
-    isNightToggled && styles.toggleTextActive
-  ]}>
-    {isNightToggled ? 'Night Mode' : 'Day Mode'}
-  </Text>
-</TouchableOpacity>
+                  <View style={styles.fixedToggleContainer}>
+  {/* Day/Night Toggle */}
+  <TouchableOpacity
+    onPress={handleNightPress}
+    disabled={isLoading}
+    style={[
+      styles.toggleBase,
+      isNightToggled && styles.toggleActiveDay
+    ]}
+    activeOpacity={0.8}
+  >
+    <Image source={isNightToggled ? moonImage : sunImage} style={styles.toggleIcon} />
+    <Text style={styles.toggleText}>
+      {isNightToggled ? 'Night Mode' : 'Day Mode'}
+    </Text>
+  </TouchableOpacity>
 
-{/* Dehumidify Toggle */}
-<TouchableOpacity
-  onPress={handleDehumidPress}
-  disabled={isLoading}
-  style={[
-    styles.toggleBase,
-    isDehumidToggled ? styles.toggleActiveDehumid : styles.toggleInactive
-  ]}
-  activeOpacity={0.7}
->
-  <Image
-    source={require("../assets/drop.png")}
-    style={styles.toggleIcon}
-  />
-  <Text style={[
-    styles.toggleText,
-    isDehumidToggled && styles.toggleTextActive
-  ]}>
-    {isDehumidToggled ? 'Dehumidify On' : 'Dehumidify Off'}
-  </Text>
-</TouchableOpacity>
+  {/* Dehumidify Toggle */}
+  <TouchableOpacity
+    onPress={handleDehumidPress}
+    disabled={isLoading}
+    style={[
+      styles.toggleBase,
+      isDehumidToggled && styles.toggleActiveDehumid
+    ]}
+    activeOpacity={0.8}
+  >
+    <Image source={require("../assets/drop.png")} style={styles.toggleIcon} />
+    <Text style={styles.toggleText}>
+      Dehumidify
+    </Text>
+  </TouchableOpacity>
+</View>
 
-                </View>
+
                 </View>
               </View>
             </View>
@@ -1160,6 +1179,14 @@ const ClimateControlScreenTablet = () => {
   return null; // Return null if not tablet
 }
 
+const getImageForLabel = (label) => {
+  const images = {
+    "Cool": require("../assets/snowflake.png"),
+    "Toe Kick": require("../assets/toekick.png"),
+    "Furnace": require("../assets/furnace.png"),
+  };
+  return images[label] || require("../assets/questionmark.png");
+};
 
 // Update the FanSpeedButton component to handle active state:
 const FanSpeedButton = ({ speed, onPress, isLoading, isActive }) => {
@@ -1216,74 +1243,6 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
   },
-  
-  // Modern button styles (copied from MainScreen)
-  modernButton: {
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-    marginVertical: 4,
-  },
-  modernGradientButton: {
-    borderRadius: 16,
-    padding: 2,
-  },
-  buttonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.1)',
-    borderRadius: 14,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    minWidth: 150,
-    position: 'relative',
-  },
-  iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  textContainer: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  buttonTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  buttonSubtitle: {
-    fontSize: 11,
-    fontWeight: '500',
-    marginTop: 2,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  statusIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    position: 'absolute',
-    top: 12,
-    right: 12,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  
-  // ScrollView styles for buttons
-  buttonsScrollView: {
-    flex: 1,
-  },
-  buttonsScrollContent: {
-    paddingVertical: 4,
-  },
   errorContainer: {
     backgroundColor: "rgba(255, 0, 0, 0.1)",
     padding: 15,
@@ -1325,6 +1284,15 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
   },
+
+  fixedToggleContainer: {
+  position: 'absolute',
+  top: 20, // adjust Y-position
+  left: 400, // adjust X-position
+  zIndex: 1000,
+  alignItems: 'center',
+},
+
   // Added status container style from AirCon
   statusContainer: {
     position: "absolute",
@@ -1371,7 +1339,8 @@ const styles = StyleSheet.create({
   },
   fanSpeedContainer: {
     width: 80,
-    height: 150, // Height limit for the container
+    height: 195, // Height limit for the container
+    marginTop:5,
     backgroundColor: 'rgba(0,0,0,0.2)',
     borderRadius: 5,
     overflow: 'hidden',
@@ -1379,6 +1348,7 @@ const styles = StyleSheet.create({
   fanSpeedScrollContent: {
     alignItems: 'center',
     paddingVertical: 2,
+    
   },
   fanSpeedButton: {
     padding: 10,
@@ -1395,15 +1365,22 @@ const styles = StyleSheet.create({
   },
 
   toggleBase: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 150,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 25,
-    marginVertical: 8,
-  },
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'flex-start',
+  width: 180,
+  paddingVertical: 12,
+  paddingHorizontal: 16,
+  borderRadius: 30,
+  marginVertical: 10,
+  backgroundColor: '#2C2C2E',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.3,
+  shadowRadius: 4,
+  elevation: 4,
+},
+
   toggleActiveDay: {
     backgroundColor: '#FFBA00',   // gold for Day/Night
   },
@@ -1414,15 +1391,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#333',      // dark gray when off
   },
   toggleIcon: {
-    width: 24,
-    height: 24,
-    marginRight: 8,
-    tintColor: 'white',
-  },
+  width: 26,
+  height: 26,
+  marginRight: 12,
+  tintColor: 'white',
+},
+
   toggleText: {
-    color: 'white',
-    fontSize: 16,
-  },
+  color: 'white',
+  fontSize: 17,
+  fontWeight: '600',
+},
+
   toggleTextActive: {
     fontWeight: '600',
   },
