@@ -248,8 +248,8 @@ const System = () => {
                     : '0.00W'
                 }
                 imageSource={require('../assets/smartsolar.png')}   
-                cardOffset={{ top: 10, left: 0 }}     // tweak these anytime
-                imageOffset={{ top: 60, left: -74 }}   //   ″      ″
+                cardOffset={{ top: 110, left: -60 }}     // tweak these anytime
+                imageOffset={{ top: 160, left: -154 }}   //   ″      ″
               />
             </GlowingCard>
           </View>

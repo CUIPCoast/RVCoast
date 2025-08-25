@@ -1,4 +1,4 @@
-// API/VictronEnergyService.js - Fixed version
+// API/VictronEnergyService.js - Fixed version with SOC range correction
 import { VictronAPI } from './VictronAPI';
 
 // Configuration
@@ -10,7 +10,7 @@ const CONFIG = {
 // Data storage for simulated Victron data (for when API is unavailable)
 let simulatedData = {
   battery: {
-    soc: 80, // State of charge (percentage)
+    soc: 55, // State of charge (percentage) - FIXED: Initialize with proper percentage
     voltage: 13.2, // Battery voltage
     current: -2.5, // Negative value means discharging, positive means charging
     power: -30, // Power in watts (negative = discharge)
@@ -69,8 +69,35 @@ let dataRefreshInterval = null;
 // Flag to use simulation when API is unavailable
 let useSimulation = true;
 
+// FIXED: Helper function to ensure SOC is always in percentage range
+const normalizeSoc = (soc) => {
+  // If SOC appears to be in a different range (like 7000-8000), convert it
+  if (soc > 100) {
+    // If it's in the thousands, it might be in different units
+    // Common cases: 
+    // - Some systems report as 0-10000 (divide by 100)
+    // - Some systems report in raw values that need scaling
+    if (soc > 1000) {
+      return Math.min(100, Math.max(0, (soc / 100) % 100));
+    }
+    // If it's just above 100, clamp it
+    return 100;
+  }
+  
+  // If it's negative or way too low, set to a reasonable minimum
+  if (soc < 0) {
+    return 5; // Minimum reasonable battery level
+  }
+  
+  // Return the value as-is if it's in the expected 0-100 range
+  return Math.min(100, Math.max(0, soc));
+};
+
 // Randomly simulate changing values to make the UI more realistic
 const simulateChangingData = () => {
+  // FIXED: Ensure SOC stays in proper range throughout simulation
+  simulatedData.battery.soc = normalizeSoc(simulatedData.battery.soc);
+  
   // Randomly determine if PV is active
   const isPVActive = Math.random() > 0.3; // 70% chance of solar being active
   
@@ -90,27 +117,32 @@ const simulateChangingData = () => {
   simulatedData.grid.voltage = isGridActive ? 115 + (Math.random() * 5) : 0;
   simulatedData.grid.frequency = isGridActive ? 60 + (Math.random() * 0.2) : 0;
   
-  // Simulate battery changes based on PV and grid status
+  // FIXED: Simulate battery changes based on PV and grid status with proper percentage increments
   if ((isPVActive || isGridActive) && simulatedData.battery.soc < 100) {
     // When PV or grid is active and battery is not full, simulate charging
-    simulatedData.battery.soc = Math.min(100, simulatedData.battery.soc + 0.1);
+    // Use smaller increments for realistic charging simulation
+    const chargeIncrement = 0.05 + (Math.random() * 0.1); // 0.05-0.15% per update
+    simulatedData.battery.soc = Math.min(1, simulatedData.battery.soc + chargeIncrement);
     simulatedData.battery.current = 2 + (Math.random() * 1);
     simulatedData.battery.power = 25 + Math.floor(Math.random() * 10);
     simulatedData.battery.state = 'charging';
-  } else {
-    // Otherwise simulate discharging
-    simulatedData.battery.soc = Math.max(5, simulatedData.battery.soc - 0.1);
+  } else if (simulatedData.battery.soc > 5) {
+    // Otherwise simulate discharging, but don't go below 5%
+    const dischargeIncrement = 0.02 + (Math.random() * 0.05); // 0.02-0.07% per update
+    simulatedData.battery.soc = Math.max(5, simulatedData.battery.soc - dischargeIncrement);
     simulatedData.battery.current = -(2 + Math.random() * 1);
     simulatedData.battery.power = -(25 + Math.floor(Math.random() * 10));
     simulatedData.battery.state = 'discharging';
   }
+  
+  // FIXED: Ensure SOC is properly normalized after any changes
+  simulatedData.battery.soc = normalizeSoc(simulatedData.battery.soc);
   
   // Update voltage based on SoC (simplified model)
   simulatedData.battery.voltage = 12.2 + (simulatedData.battery.soc / 100) * 1.6;
   
   // Simulate AC load changes
   simulatedData.acLoads.power = 100 + Math.floor(Math.random() * 50);
-  
   
   // Update DC system power - set to around 52W to match expectations
   simulatedData.dcSystem.power = 52 + Math.floor(Math.random() * 5);
@@ -130,8 +162,10 @@ const simulateChangingData = () => {
     simulatedData.battery.timeToGo = `${timeToFull}:${Math.floor(Math.random() * 60).toString().padStart(2, '0')}`;
   }
   
-  // Make simulation data more realistic with non-zero values
-  if (simulatedData.battery.soc < 5) simulatedData.battery.soc = 25 + Math.floor(Math.random() * 50);
+  // REMOVED: The problematic reset logic that could cause issues
+  // Old code: if (simulatedData.battery.soc < 5) simulatedData.battery.soc = 25 + Math.floor(Math.random() * 50);
+  // This was potentially setting SOC to unexpected values
+  
   if (simulatedData.battery.voltage < 11) simulatedData.battery.voltage = 12.5 + (Math.random() * 1);
   
   // Ensure daily yield increases over time
@@ -150,6 +184,8 @@ let simulationInterval = null;
 const startSimulation = () => {
   if (!simulationInterval) {
     console.log('Starting Victron data simulation');
+    // FIXED: Ensure initial SOC is normalized
+    simulatedData.battery.soc = normalizeSoc(simulatedData.battery.soc);
     simulationInterval = setInterval(simulateChangingData, CONFIG.REFRESH_INTERVAL);
     useSimulation = true;
   }
@@ -199,6 +235,11 @@ const fetchVictronData = async () => {
     
     // Get all data from the API
     const data = await VictronAPI.getAllData();
+    
+    // FIXED: Normalize SOC from API data before storing
+    if (data && data.battery && typeof data.battery.soc !== 'undefined') {
+      data.battery.soc = normalizeSoc(data.battery.soc);
+    }
     
     // Update the cached data
     victronData = data;
@@ -253,6 +294,9 @@ export const VictronEnergyService = {
     try {
       console.log('Initializing VictronEnergyService');
       
+      // FIXED: Ensure initial SOC is normalized
+      simulatedData.battery.soc = normalizeSoc(simulatedData.battery.soc);
+      
       // Check if the API is available
       const apiAvailable = await checkApiAvailability();
       
@@ -293,12 +337,20 @@ export const VictronEnergyService = {
    */
   getBatteryStatus: async () => {
     if (useSimulation) {
+      // FIXED: Always normalize SOC before returning
+      simulatedData.battery.soc = normalizeSoc(simulatedData.battery.soc);
       return simulatedData.battery;
     }
     
     try {
       // Try to get fresh data
       const data = await VictronAPI.getBatteryStatus();
+      
+      // FIXED: Normalize SOC from API
+      if (data && typeof data.soc !== 'undefined') {
+        data.soc = normalizeSoc(data.soc);
+      }
+      
       // Update cached data
       if (victronData) victronData.battery = data;
       return data;
@@ -307,8 +359,11 @@ export const VictronEnergyService = {
       
       // Fall back to cached or simulated data
       if (victronData && victronData.battery) {
+        // FIXED: Normalize cached data SOC
+        victronData.battery.soc = normalizeSoc(victronData.battery.soc);
         return victronData.battery;
       }
+      simulatedData.battery.soc = normalizeSoc(simulatedData.battery.soc);
       return simulatedData.battery;
     }
   },
@@ -481,6 +536,12 @@ export const VictronEnergyService = {
       // Otherwise try to fetch from API
       if (connectionStatus.apiAvailable) {
         const data = await VictronAPI.getAllData();
+        
+        // FIXED: Normalize SOC from API data
+        if (data && data.battery && typeof data.battery.soc !== 'undefined') {
+          data.battery.soc = normalizeSoc(data.battery.soc);
+        }
+        
         victronData = data;
         
         // Ensure grid property exists - important!
@@ -512,6 +573,11 @@ export const VictronEnergyService = {
       
       // If we have cached data, return it
       if (victronData) {
+        // FIXED: Normalize cached battery SOC
+        if (victronData.battery && typeof victronData.battery.soc !== 'undefined') {
+          victronData.battery.soc = normalizeSoc(victronData.battery.soc);
+        }
+        
         // Ensure grid property exists in cached data
         if (!victronData.grid) {
           victronData.grid = {

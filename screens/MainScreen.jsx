@@ -546,7 +546,7 @@ const MainScreen = () => {
                         }}
                     >
                         
-<SmallBatteryCard  x={7} y={-15} scale={1.25} percentageStyle={{
+<SmallBatteryCard  x={7} y={55} scale={1.25} percentageStyle={{
     left: -23,     // Move percentage text left/right
     top: -20,       // Move percentage text up/down
     fontSize: 20, // Custom font size

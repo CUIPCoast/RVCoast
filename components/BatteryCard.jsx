@@ -17,13 +17,38 @@ import {
   height = 180,
   children,
   subtitleStyle = {},
-  percentageStyle = {}, containerStyle = {},
+  percentageStyle = {}, 
+  containerStyle = {},
  }) => {
   // State to track parsed values
   const [batteryLevel, setBatteryLevel] = useState(0);
   const [batteryPower, setBatteryPower] = useState("0W");
   const [isLoading, setIsLoading] = useState(true);
   
+  // Helper function to normalize SOC values (same as in VictronEnergyService)
+  const normalizeSoc = (soc) => {
+    // If SOC appears to be in a different range (like 7000-8000), convert it
+    if (soc > 100) {
+      // If it's in the thousands, it might be in different units
+      // Common cases: 
+      // - Some systems report as 0-10000 (divide by 100)
+      // - Some systems report in raw values that need scaling
+      if (soc > 1000) {
+        return Math.min(100, Math.max(0, (soc / 100) % 100));
+      }
+      // If it's just above 100, clamp it
+      return 100;
+    }
+    
+    // If it's negative or way too low, set to a reasonable minimum
+    if (soc < 0) {
+      return 5; // Minimum reasonable battery level
+    }
+    
+    // Return the value as-is if it's in the expected 0-100 range
+    return Math.min(100, Math.max(0, soc));
+  };
+
   // Parse children when they change
   useEffect(() => {
     let foundLevel = 0;
@@ -48,7 +73,8 @@ import {
         if (childText.includes('%')) {
           const match = childText.match(/(\d+(?:\.\d+)?)%/);
           if (match && match[1]) {
-            foundLevel = parseFloat(match[1]);
+            const rawLevel = parseFloat(match[1]);
+            foundLevel = normalizeSoc(rawLevel); // FIXED: Normalize the SOC value
             stillLoading = false;
           }
         } 
@@ -258,8 +284,6 @@ import {
           Battery
         </SvgText>
         
-        
-        
         {/* Battery terminals */}
         <Rect 
           x={width - 22} 
@@ -289,7 +313,7 @@ import {
   );
 };
 
-// NEW: Custom SmallBatteryCard component for positioning and scaling
+// FIXED: Custom SmallBatteryCard component for positioning and scaling
 const SmallBatteryCard = ({ 
   x = 20, 
   y = 20, 
@@ -299,21 +323,36 @@ const SmallBatteryCard = ({
   height = 120, // Smaller default height
   ...props 
 }) => {
+  // Calculate scaled dimensions
+  const scaledWidth = width * scale;
+  const scaledHeight = height * scale;
+
   return (
     <View style={{
       position: 'absolute',
       top: y,
       left: x,
-      transform: [{ scale }],
+      width: scaledWidth,
+      height: scaledHeight,
       zIndex: 10 // Ensure it appears above other elements
     }}>
-      <BatteryCard 
-        width={width}
-        height={height}
-        {...props}
-      >
-        {children}
-      </BatteryCard>
+      <View style={{
+        transform: [{ scaleX: scale }, { scaleY: scale }],
+        transformOrigin: 'top left', // This might not work in RN, but we handle it with positioning
+      }}>
+        <BatteryCard 
+          width={width}
+          height={height}
+          containerStyle={{
+            position: 'relative',
+            top: 0,
+            left: 0,
+          }}
+          {...props}
+        >
+          {children}
+        </BatteryCard>
+      </View>
     </View>
   );
 };
