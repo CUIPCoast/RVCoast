@@ -130,20 +130,20 @@ const ImprovedLightScreenTablet = () => {
             <Text className="text-lg text-white">{currentDate}</Text>
           </Col>
         </Row>
-        <Row className="bg-black" size={1}>
-          <View className="pt-3 pl-3">
-            <Image
-              source={require("../assets/images/icon.png")}
-              style={{
-                width: 70,
-                height: 45,
-                right: 0,
-                paddingTop: 10,
-                backgroundColor: "white",
-              }}
-            />
-          </View>
-        </Row>
+       <Row className="bg-black" size={1}>
+                           <View className="pt-3 pl-3">
+                               <Image
+                                   source={require("../assets/images/icon.png")}
+                                   style={{
+                                       width: 90,
+                                       height: 55,
+                                       right: 0,
+                                       paddingTop: 0,
+                                       backgroundColor: "white"
+                                   }}
+                               />
+                           </View>
+                       </Row>
       </Row>
       
       {/* Status message overlay */}
@@ -287,11 +287,11 @@ const ImprovedLightScreenTablet = () => {
               marginLeft: -300,
               marginRight: 30,
               bottom: 180,
-              shadowColor: "#FFF",
-              shadowOffset: { width: 0, height: 6 },
-              shadowOpacity: 1,
-              shadowRadius: 4,
-              elevation: 6,
+               shadowColor: "#FFFFFF",
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.5,
+                        shadowRadius: 6,
+                        elevation: 6,
             }}
           >
             <Text
@@ -342,11 +342,11 @@ const ImprovedLightScreenTablet = () => {
               padding: 20,
               marginRight: 30,
               bottom: 180,
-              shadowColor: "#FFF",
-              shadowOffset: { width: 0, height: 6 },
-              shadowOpacity: 1,
-              shadowRadius: 4,
-              elevation: 6,
+               shadowColor: "#FFFFFF",
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.5,
+                        shadowRadius: 6,
+                        elevation: 6,
             }}
           >
             <Text
@@ -396,11 +396,11 @@ const ImprovedLightScreenTablet = () => {
               justifyContent: "flex-start",
               padding: 20,
               bottom: 180,
-              shadowColor: "#FFF",
-              shadowOffset: { width: 0, height: 6 },
-              shadowOpacity: 1,
-              shadowRadius: 4,
-              elevation: 6,
+               shadowColor: "#FFFFFF",
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.5,
+                        shadowRadius: 6,
+                        elevation: 6,
             }}
           >
             <Text

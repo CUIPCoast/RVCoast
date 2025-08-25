@@ -825,19 +825,19 @@ const ClimateControlScreenTablet = () => {
               </Col>
             </Row>
             <Row className="bg-black" size={1}>
-              <View className="pt-3 pl-3">
-                <Image
-                  source={require("../assets/images/icon.png")}
-                  style={{
-                    width: 70,
-                    height: 45,
-                    right: 0,
-                    
-                    backgroundColor: "white"
-                  }}
-                />
-              </View>
-            </Row>
+                                <View className="pt-3 pl-3">
+                                    <Image
+                                        source={require("../assets/images/icon.png")}
+                                        style={{
+                                            width: 90,
+                                            height: 55,
+                                            right: 0,
+                                            paddingTop: 0,
+                                            backgroundColor: "white"
+                                        }}
+                                    />
+                                </View>
+                            </Row>
           </Row>
 
           {/* Weather error indicator */}
@@ -894,11 +894,11 @@ const ClimateControlScreenTablet = () => {
                 justifyContent: "flex-start",
                 padding: 20,
                 margin: 50,
-                shadowColor: "#FFF",
-                            
-                            shadowOpacity: 1,
-                            shadowRadius: 4,
-                            elevation: 6,
+                 shadowColor: "#FFFFFF",
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.5,
+                        shadowRadius: 6,
+                        elevation: 6,
               }}
             >
               <Text
@@ -1009,11 +1009,11 @@ const ClimateControlScreenTablet = () => {
                       marginB: 25,
                       right: 80,
                       bottom: 100,
-                      shadowColor: "#FFF",
-                            
-                            shadowOpacity: 1,
-                            shadowRadius: 4,
-                            elevation: 6,
+                       shadowColor: "#FFFFFF",
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.5,
+                        shadowRadius: 6,
+                        elevation: 6,
                     }}
                   >
                     <Text

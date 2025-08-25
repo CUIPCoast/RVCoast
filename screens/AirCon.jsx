@@ -198,7 +198,7 @@ const AirCon = ({ onClose }) => {
             subTitle={'Degrees'}
             subTitleStyle={{ color: isDarkMode ? 'white' : 'black', paddingBottom: 25, fontSize: 20 }}
             unitStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5, fontSize: 20 }}
-            valueStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5, fontSize: 28 }}
+            valueStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5, fontSize: 44 }}
             style={{
               backgroundColor: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
             }}
@@ -369,8 +369,8 @@ const tabletStyles = StyleSheet.create({
     marginTop: 30,
   },
   button: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingHorizontal: 30,
+    paddingVertical: 15,
     borderRadius: 5,
     marginHorizontal: 5,
     backgroundColor: 'white',

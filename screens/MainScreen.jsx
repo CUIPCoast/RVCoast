@@ -228,10 +228,10 @@ const MainScreen = () => {
                         <Image
                             source={require("../assets/images/icon.png")}
                             style={{
-                                width: 70,
-                                height: 45,
+                                width: 90,
+                                height: 55,
                                 right: 0,
-                                paddingTop: 10,
+                                paddingTop: 0,
                                 backgroundColor: "white"
                             }}
                         />
@@ -295,7 +295,11 @@ const MainScreen = () => {
                         </View>
                     </Row>
                     <Row className="bg-brown rounded-xl m-3 mb-10 top-15" 
-                    
+                    style={{  shadowColor: "#FFFFFF",
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.5,
+                        shadowRadius: 6,
+                        elevation: 6,}}
                     size={30}>
                         <View className="bg-brown rounded-xl m-3 mb-10 top-15">
                             {/* User Info Display */}
@@ -358,13 +362,18 @@ const MainScreen = () => {
                         padding: 15,
                         marginBottom: 20,
                         position: "relative",
+                        shadowColor: "#FFFFFF",
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.5,
+                        shadowRadius: 6,
+                        elevation: 6,
                     
                     }}
                 >
 
                 <View className="flex-row justify-between items-start w-full mt-[-5] pb-2">
                 <View>
-                    <Text className="text-white mb-1">Heaters</Text>
+                    <Text className="text-white mb-1">RV Tanks</Text>
                     
                     <View className="mt-5 space-y-2 mb-5">
                     
@@ -542,6 +551,11 @@ const MainScreen = () => {
                             width: 270,
                             height: 270,
                             position: "relative",
+                             shadowColor: "#FFFFFF",
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.5,
+                        shadowRadius: 6,
+                        elevation: 6,
                             
                         }}
                     >
@@ -587,6 +601,11 @@ const MainScreen = () => {
                             width: 270,
                             height: 270,
                             position: "relative",
+                             shadowColor: "#FFFFFF",
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.5,
+                        shadowRadius: 3,
+                        elevation: 6,
                             
                         }}
                     >
@@ -603,10 +622,10 @@ const MainScreen = () => {
                         </Text>
                         <Pressable onPress={() => setModalVisible(true)}>
                             <Image
-                                source={require("../assets/abpost61724photoroom-3.png")}
+                                source={require("../assets/trailer.png")}
                                 style={{
-                                    width: 180,
-                                    height: 180,
+                                    width: 220,
+                                    height: 220,
                                     resizeMode: "contain",
                                 }}
                             />
@@ -618,7 +637,11 @@ const MainScreen = () => {
 
                 </Col>
 
-                <Col className="bg-brown p-2 rounded-xl m-3 mb-10" size={15} >
+                <Col className="bg-brown p-2 rounded-xl m-3 mb-10" size={15} style={{ shadowColor: "#FFFFFF",
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.5,
+                        shadowRadius: 6,
+                        elevation: 6,}} >
                     <Text className="text-white">Air Conditioning</Text>
                     <AirCon />
                 </Col>
@@ -723,6 +746,7 @@ const styles = {
         borderRadius: 8,
         borderWidth: 1,
         borderColor: '#FFFFFF20',
+        
     },
     statusRow: {
         flexDirection: 'row',
@@ -772,8 +796,8 @@ const styles = {
     },
     warningToast: {
         position: 'absolute',
-        top: 80,
-        right: 15,
+        top: 180,
+        right: 75,
         zIndex: 999,
         elevation: 999,
     },
