@@ -30,32 +30,40 @@ const TabletNavigator = () => {
         setShowSplash(true); // Set to false if you only want splash on first launch
       }
     } catch (error) {
-       console.error('Error checking first launch:', error);
-     setIsFirstLaunch(true);
-     setShowSplash(true);
-   }
- };
+      console.error('Error checking first launch:', error);
+      setIsFirstLaunch(true);
+      setShowSplash(true);
+    }
+  };
 
- const handleSplashComplete = async () => {
-   try {
-     // Mark that the app has been launched
-     await AsyncStorage.setItem('hasLaunched', 'true');
-     setShowSplash(false);
-   } catch (error) {
-     console.error('Error saving launch status:', error);
-     setShowSplash(false);
-   }
- };
+  const handleSplashComplete = async () => {
+    try {
+      // Mark that the app has been launched
+      await AsyncStorage.setItem('hasLaunched', 'true');
+      setShowSplash(false);
+    } catch (error) {
+      console.error('Error saving launch status:', error);
+      setShowSplash(false);
+    }
+  };
 
- if (showSplash) {
-   return <TabletSplashScreen onSplashComplete={handleSplashComplete} />;
- }
+  // Main app content component
+  const MainAppContent = () => (
+    <NavigationContainer independent={true}>
+      <TabletTabs />
+    </NavigationContainer>
+  );
 
- return (
-   <NavigationContainer independent={true}>
-     <TabletTabs />
-   </NavigationContainer>
- );
+  if (showSplash) {
+    return (
+      <TabletSplashScreen onSplashComplete={handleSplashComplete}>
+        <MainAppContent />
+      </TabletSplashScreen>
+    );
+  }
+
+  // Once splash is complete, show only the main app
+  return <MainAppContent />;
 };
 
 export default TabletNavigator;
