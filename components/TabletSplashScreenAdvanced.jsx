@@ -1,0 +1,344 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { 
+  View, 
+  Text, 
+  Image, 
+  StyleSheet, 
+  Animated, 
+  Dimensions,
+  StatusBar,
+  TouchableOpacity,
+  PanResponder
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+
+const { width, height } = Dimensions.get('window');
+
+const TabletSplashScreen = ({ onSplashComplete }) => {
+  const [showSwipeHint, setShowSwipeHint] = useState(true);
+  const translateX = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const hintOpacity = useRef(new Animated.Value(1)).current;
+
+  // Animate hint text
+  useEffect(() => {
+    const pulseAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(hintOpacity, {
+          toValue: 0.3,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(hintOpacity, {
+          toValue: 1,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulseAnimation.start();
+
+    return () => pulseAnimation.stop();
+  }, []);
+
+  // Create PanResponder for swipe gesture
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        return Math.abs(gestureState.dx) > 20 && Math.abs(gestureState.dy) < 100;
+      },
+      onPanResponderGrant: (evt, gestureState) => {
+        // Gesture started
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        // Update position during swipe
+        if (gestureState.dx > 0) {
+          translateX.setValue(gestureState.dx);
+          const progress = gestureState.dx / width;
+          scaleAnim.setValue(1 - progress * 0.2);
+          fadeAnim.setValue(1 - progress * 0.5);
+        }
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        const { dx, vx } = gestureState;
+        
+        // If swiped right with enough velocity or distance
+        if (dx > 150 || vx > 0.5) {
+          // Complete the swipe animation
+          Animated.parallel([
+            Animated.timing(translateX, {
+              toValue: width,
+              duration: 300,
+              useNativeDriver: true,
+            }),
+            Animated.timing(fadeAnim, {
+              toValue: 0,
+              duration: 300,
+              useNativeDriver: true,
+            }),
+            Animated.timing(scaleAnim, {
+              toValue: 0.8,
+              duration: 300,
+              useNativeDriver: true,
+            }),
+          ]).start(() => {
+            onSplashComplete();
+          });
+        } else {
+          // Spring back to original position
+          Animated.parallel([
+            Animated.spring(translateX, {
+              toValue: 0,
+              useNativeDriver: true,
+              tension: 100,
+              friction: 8,
+            }),
+            Animated.spring(scaleAnim, {
+              toValue: 1,
+              useNativeDriver: true,
+              tension: 100,
+              friction: 8,
+            }),
+            Animated.spring(fadeAnim, {
+              toValue: 1,
+              useNativeDriver: true,
+              tension: 100,
+              friction: 8,
+            }),
+          ]).start();
+        }
+      },
+    })
+  ).current;
+
+  const handleSkip = () => {
+    onSplashComplete();
+  };
+
+  return (
+    <View style={styles.container}>
+      <StatusBar hidden />
+      
+      <LinearGradient
+        colors={['#000000', '#1a1a1a', '#2d2d2d']}
+        style={styles.gradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        {/* Skip Button */}
+        <TouchableOpacity 
+          style={styles.skipButton} 
+          onPress={handleSkip}
+        >
+          <Text style={styles.skipButtonText}>Skip</Text>
+        </TouchableOpacity>
+
+        <Animated.View 
+          style={[
+            styles.content,
+            {
+              transform: [
+                { translateX },
+                { scale: scaleAnim }
+              ],
+              opacity: fadeAnim,
+            }
+          ]}
+          {...panResponder.panHandlers}
+        >
+          
+          {/* Main Logo and Branding */}
+          <View style={styles.logoSection}>
+            <Animated.View style={[
+              styles.logoContainer,
+              {
+                transform: [{
+                  scale: scaleAnim.interpolate({
+                    inputRange: [0.8, 1],
+                    outputRange: [0.8, 1],
+                    extrapolate: 'clamp',
+                  })
+                }]
+              }
+            ]}>
+              <Image
+                source={require("../assets/trailer.png")}
+                style={[styles.logo]}
+              />
+            </Animated.View>
+            
+            <Text style={styles.title}>RV Control System</Text>
+            <Text style={styles.subtitle}>Next Generation Smart RV Management</Text>
+            
+            {/* Feature highlights */}
+            <View style={styles.featuresContainer}>
+              <FeatureItem icon="bulb" text="Smart Lighting Control" />
+              <FeatureItem icon="thermometer" text="Climate Management" />
+              <FeatureItem icon="water" text="Water System Monitoring" />
+              <FeatureItem icon="battery-charging" text="Power Management" />
+            </View>
+          </View>
+
+          {/* Swipe Indicator */}
+          <Animated.View style={[
+            styles.swipeSection,
+            { opacity: hintOpacity }
+          ]}>
+            <View style={styles.swipeIndicator}>
+              <Ionicons name="chevron-forward" size={30} color="#FFB267" />
+              <Ionicons name="chevron-forward" size={30} color="#FFB267" style={styles.chevron2} />
+              <Ionicons name="chevron-forward" size={30} color="#FFB267" style={styles.chevron3} />
+            </View>
+            <Text style={styles.swipeText}>Swipe right to enter</Text>
+          </Animated.View>
+
+          {/* Bottom branding */}
+          <View style={styles.bottomSection}>
+            <Text style={styles.versionText}>v2.0.1</Text>
+            <Text style={styles.copyrightText}>© 2024 RV Control Systems</Text>
+          </View>
+        </Animated.View>
+      </LinearGradient>
+    </View>
+  );
+};
+
+const FeatureItem = ({ icon, text }) => (
+  <View style={styles.featureItem}>
+    <Ionicons name={icon} size={20} color="#FF8C00" />
+    <Text style={styles.featureText}>{text}</Text>
+  </View>
+);
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  gradient: {
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingVertical: 60,
+  },
+  skipButton: {
+    position: 'absolute',
+    top: 50,
+    right: 30,
+    zIndex: 1000,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  skipButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  logoSection: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  logoContainer: {
+    width: 200,
+    height: 120,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 40,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  logo: {
+    width: 160,
+    height: 160,
+    resizeMode: 'contain',
+    tintColor: '#FFFFFF', 
+  },
+  title: {
+    fontSize: 42,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 10,
+    letterSpacing: 1,
+  },
+  subtitle: {
+    fontSize: 18,
+    color: '#CCCCCC',
+    textAlign: 'center',
+    marginBottom: 40,
+    fontWeight: '300',
+    letterSpacing: 0.5,
+  },
+  featuresContainer: {
+    gap: 15,
+    marginTop: 20,
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    minWidth: 250,
+  },
+  featureText: {
+    color: '#E0E0E0',
+    fontSize: 16,
+    marginLeft: 12,
+    fontWeight: '500',
+  },
+  swipeSection: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  swipeIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  chevron2: {
+    marginLeft: -10,
+    opacity: 0.7,
+  },
+  chevron3: {
+    marginLeft: -10,
+    opacity: 0.4,
+  },
+  swipeText: {
+    color: '#FFB267',
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
+    letterSpacing: 1,
+  },
+  bottomSection: {
+    alignItems: 'center',
+    gap: 5,
+  },
+  versionText: {
+    color: '#888888',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  copyrightText: {
+    color: '#666666',
+    fontSize: 12,
+    fontWeight: '400',
+  },
+});
+
+export default TabletSplashScreen;

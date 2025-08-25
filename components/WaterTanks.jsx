@@ -288,17 +288,26 @@ const WaterTanks = ({ name, tankType, trackColor }) => {
     }
   };
   
-  // Get tank colors based on type and level
-  const getTankColors = () => {
-    const baseColors = {
-      fresh: ['#4FC3F7', '#29B6F6', '#0288D1'],
-      gray: ['#9E9E9E', '#757575', '#424242'],
-      black: ['#424242', '#212121', '#000000']
+  // Get tank colors based on type and level - now returns gradient colors for the fill
+  const getTankFillGradient = () => {
+    const gradients = {
+      fresh: {
+        colors: ['#00BFFF', '#0080FF', '#0060FF'], // Light blue to deep blue
+        locations: [0, 0.5, 1]
+      },
+      gray: {
+        colors: ['#B0B0B0', '#808080', '#606060'], // Light gray to dark gray
+        locations: [0, 0.5, 1]
+      },
+      black: {
+        colors: ['#4A4A4A', '#2A2A2A', '#1A1A1A'], // Dark gray to black
+        locations: [0, 0.5, 1]
+      }
     };
-    return baseColors[tankType] || baseColors.fresh;
+    return gradients[tankType] || gradients.fresh;
   };
   
-  // Get level color based on percentage
+  // Get level color based on percentage for status text
   const getLevelColor = () => {
     if (percentage >= 75) return '#FF6B6B'; // Red for high
     if (percentage >= 50) return '#FFB267'; // Orange for medium
@@ -316,101 +325,120 @@ const WaterTanks = ({ name, tankType, trackColor }) => {
   };
 
   const connectionStatus = getConnectionStatus();
+  const fillGradient = getTankFillGradient();
 
-  // Modern tank display design
+  // Modern vertical tank display design
   if (isTablet) {
     return (
       <View style={styles.tankContainer}>
-        <LinearGradient
-          colors={getTankColors()}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.tankGradient}
-        >
-          <View style={styles.tankContent}>
-            {/* Tank Header */}
-            <View style={styles.tankHeader}>
-              <View style={styles.tankIconContainer}>
-                <Ionicons
-                  name={getTankIcon()}
-                  size={18}
-                  color="#FFF"
-                />
-              </View>
-              <View style={styles.tankInfo}>
-                <Text style={styles.tankName}>{name}</Text>
-                <Text style={[styles.tankPercentage, { color: getLevelColor() }]}>
-                  {percentage}%
-                </Text>
-              </View>
-              <View style={styles.statusIndicators}>
-                <Text style={[styles.connectionDot, { color: connectionStatus.color }]}>
-                  {connectionStatus.text}
-                </Text>
-                
-              </View>
+        <View style={styles.tankWrapper}>
+          {/* Tank Header */}
+          <View style={styles.tankHeader}>
+            <View style={styles.tankIconContainer}>
+              <Ionicons
+                name={getTankIcon()}
+                size={16}
+                color="#FFF"
+              />
             </View>
-            
-            {/* Tank Level Bar */}
-            <View style={styles.tankLevelContainer}>
-              <View style={styles.tankLevelBackground}>
-                <View 
-                  style={[
-                    styles.tankLevelFill,
-                    { 
-                      width: `${percentage}%`,
-                      backgroundColor: getLevelColor()
-                    }
-                  ]} 
-                />
-              </View>
-              <Text style={styles.tankLevelText}>
-                {percentage < 10 ? 'Low' : percentage < 50 ? 'OK' : percentage < 75 ? 'Good' : 'Full'}
+            <View style={styles.tankInfo}>
+              <Text style={styles.tankName}>{name}</Text>
+              <Text style={[styles.tankPercentage, { color: getLevelColor() }]}>
+                {percentage}%
               </Text>
             </View>
-            
-            {/* Connection Status */}
-            {isConnected && lastUpdate && (
-              <Text style={styles.lastUpdateText}>
-                Updated: {lastUpdate.toLocaleTimeString()}
+            <View style={styles.statusIndicators}>
+              <Text style={[styles.connectionDot, { color: connectionStatus.color }]}>
+                {connectionStatus.text}
               </Text>
-            )}
+            </View>
           </View>
-        </LinearGradient>
+          
+          {/* Vertical Tank Visual */}
+          <View style={styles.verticalTankContainer}>
+            <View style={styles.tankOutline}>
+              <View style={styles.tankFillContainer}>
+                <LinearGradient
+                  colors={fillGradient.colors}
+                  locations={fillGradient.locations}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 0, y: 1 }}
+                  style={[
+                    styles.tankFill,
+                    { 
+                      height: `${percentage}%`,
+                    }
+                  ]}
+                />
+              </View>
+              
+              {/* Tank level markers */}
+              <View style={styles.levelMarkers}>
+                <View style={styles.levelMarker} />
+                <View style={styles.levelMarker} />
+                <View style={styles.levelMarker} />
+                <View style={styles.levelMarker} />
+              </View>
+            </View>
+            
+            {/* Level labels */}
+            <View style={styles.levelLabels}>
+              <Text style={styles.levelLabel}>100</Text>
+              <Text style={styles.levelLabel}>75</Text>
+              <Text style={styles.levelLabel}>50</Text>
+              <Text style={styles.levelLabel}>25</Text>
+              <Text style={styles.levelLabel}>0</Text>
+            </View>
+          </View>
+          
+          {/* Status Text */}
+          <Text style={styles.tankStatusText}>
+            {percentage < 10 ? 'Low' : percentage < 50 ? 'OK' : percentage < 75 ? 'Good' : 'Full'}
+          </Text>
+          
+          {/* Connection Status */}
+          {isConnected && lastUpdate && (
+            <Text style={styles.lastUpdateText}>
+              {lastUpdate.toLocaleTimeString()}
+            </Text>
+          )}
+        </View>
       </View>
     );
   }
 
-  // Mobile layout (simplified)
+  // Mobile vertical tank layout
   return (
     <View style={styles.mobileTankContainer}>
-      <LinearGradient
-        colors={getTankColors()}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.mobileTankGradient}
-      >
-        <View style={styles.mobileTankContent}>
-          <View style={styles.mobileTankHeader}>
-            <Ionicons name={getTankIcon()} size={16} color="#FFF" />
-            <Text style={styles.mobileTankName}>{name}</Text>
-          </View>
-          <Text style={[styles.mobileTankPercentage, { color: getLevelColor() }]}>
-            {percentage}%
-          </Text>
-          <View style={styles.mobileLevelBar}>
-            <View 
-              style={[
-                styles.mobileLevelFill,
-                { 
-                  height: `${percentage}%`,
-                  backgroundColor: getLevelColor()
-                }
-              ]} 
-            />
+      <View style={styles.mobileTankWrapper}>
+        <View style={styles.mobileTankHeader}>
+          <Ionicons name={getTankIcon()} size={14} color="#FFF" />
+          <Text style={styles.mobileTankName}>{name}</Text>
+        </View>
+        
+        <View style={styles.mobileVerticalTankContainer}>
+          <View style={styles.mobileTankOutline}>
+            <View style={styles.mobileTankFillContainer}>
+              <LinearGradient
+                colors={fillGradient.colors}
+                locations={fillGradient.locations}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0, y: 1 }}
+                style={[
+                  styles.mobileTankFill,
+                  { 
+                    height: `${percentage}%`,
+                  }
+                ]}
+              />
+            </View>
           </View>
         </View>
-      </LinearGradient>
+        
+        <Text style={[styles.mobileTankPercentage, { color: getLevelColor() }]}>
+          {percentage}%
+        </Text>
+      </View>
     </View>
   );
 };
@@ -418,51 +446,48 @@ const WaterTanks = ({ name, tankType, trackColor }) => {
 const styles = {
   // Tablet styles
   tankContainer: {
-    marginHorizontal: 2,
-    marginVertical: 15,
+    marginHorizontal: 8,
+    marginVertical: 8,
     width: 140,
   },
-  tankGradient: {
+  tankWrapper: {
+    backgroundColor: 'rgba(53,56,57,0.3)',
     borderRadius: 12,
-    padding: 2,
+    padding: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 4,
-  },
-  tankContent: {
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    borderRadius: 8,
-    padding: 8,
-    minHeight: 85,
-    justifyContent: 'space-between',
+    elevation: 3,
+    alignItems: 'center',
   },
   tankHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    width: '100%',
+    marginBottom: 12,
   },
   tankIconContainer: {
-    width: 28,
-    height: 68,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#4FC3F7',
     justifyContent: 'center',
     alignItems: 'center',
   },
   tankInfo: {
     flex: 1,
     marginLeft: 8,
+    alignItems: 'flex-start',
   },
   tankName: {
-    color: '#FFF',
+    color: '#FFF',  // Changed from '#333' to '#FFF' for white text
     fontSize: 12,
     fontWeight: '600',
   },
   tankPercentage: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     marginTop: 1,
   },
@@ -471,37 +496,72 @@ const styles = {
     alignItems: 'center',
   },
   connectionDot: {
-    fontSize: 16,
-    marginRight: 4,
+    fontSize: 12,
   },
-  heaterIcon: {
-    marginLeft: 4,
+  verticalTankContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    height: 120,
+    marginBottom: 8,
   },
-  tankLevelContainer: {
-    marginTop: 8,
-  },
-  tankLevelBackground: {
-    height: 6,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 3,
+  tankOutline: {
+    width: 40,
+    height: 120,
+    borderWidth: 2,
+    borderColor: '#DDD',
+    borderRadius: 8,
+    backgroundColor: 'rgba(240,240,240,0.5)',
+    position: 'relative',
     overflow: 'hidden',
   },
-  tankLevelFill: {
+  tankFillContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     height: '100%',
-    borderRadius: 3,
-    transition: 'width 0.3s ease',
+    justifyContent: 'flex-end',
   },
-  tankLevelText: {
-    color: 'rgba(255,255,255,0.8)',
+  tankFill: {
+    width: '100%',
+    borderRadius: 6,
+    minHeight: 2,
+  },
+  levelMarkers: {
+    position: 'absolute',
+    right: -8,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  levelMarker: {
+    width: 6,
+    height: 1,
+    backgroundColor: '#BBB',
+  },
+  levelLabels: {
+    marginLeft: 8,
+    height: 120,
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  levelLabel: {
     fontSize: 10,
+    color: '#666',
+    lineHeight: 10,
+  },
+  tankStatusText: {
+    color: '#666',
+    fontSize: 11,
     textAlign: 'center',
-    marginTop: 4,
+    marginBottom: 4,
   },
   lastUpdateText: {
-    color: 'rgba(255,255,255,0.6)',
+    color: '#999',
     fontSize: 9,
     textAlign: 'center',
-    marginTop: 4,
   },
   
   // Mobile styles
@@ -509,46 +569,58 @@ const styles = {
     width: 80,
     marginHorizontal: 4,
   },
-  mobileTankGradient: {
+  mobileTankWrapper: {
+    backgroundColor: 'rgba(255,255,255,0.95)',
     borderRadius: 8,
-    padding: 1,
-  },
-  mobileTankContent: {
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    borderRadius: 7,
     padding: 8,
-    minHeight: 100,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   mobileTankHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   mobileTankName: {
-    color: '#FFF',
-    fontSize: 12,
+    color: '#FFF',  // Changed from '#333' to '#FFF' for white text
+    fontSize: 11,
     fontWeight: '600',
     marginLeft: 4,
   },
-  mobileTankPercentage: {
-    fontSize: 16,
-    fontWeight: '700',
+  mobileVerticalTankContainer: {
+    alignItems: 'center',
     marginBottom: 8,
   },
-  mobileLevelBar: {
-    width: 20,
-    height: 40,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 10,
-    overflow: 'hidden',
+  mobileTankOutline: {
+    width: 24,
+    height: 60,
+    borderWidth: 1.5,
+    borderColor: '#DDD',
+    borderRadius: 4,
+    backgroundColor: 'rgba(240,240,240,0.5)',
     position: 'relative',
+    overflow: 'hidden',
+  },
+  mobileTankFillContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '100%',
     justifyContent: 'flex-end',
   },
-  mobileLevelFill: {
+  mobileTankFill: {
     width: '100%',
-    borderRadius: 10,
-    minHeight: 2,
+    borderRadius: 2,
+    minHeight: 1,
+  },
+  mobileTankPercentage: {
+    fontSize: 12,
+    fontWeight: '700',
   },
 };
 

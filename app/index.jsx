@@ -28,11 +28,9 @@ const AppContent = () => {
     return <AuthScreen />;
   }
 
-  return (
-    <NavigationContainer>
-      {isTablet ? <TabletNavigator /> : <RootNavigator />}
-    </NavigationContainer>
-  );
+  // Return tablet or mobile navigator without additional NavigationContainer
+  // since TabletNavigator and RootNavigator handle their own containers
+  return isTablet ? <TabletNavigator /> : <RootNavigator />;
 };
 
 export default function App() {
