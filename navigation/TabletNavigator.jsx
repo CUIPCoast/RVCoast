@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { View } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -6,12 +7,15 @@ import MainScreen from "../screens/MainScreen";
 import LightScreenTablet from "../screens/LightScreenTablet";
 import TabletTabs from "./TabletTabs";
 import TabletSplashScreen from "../components/TabletSplashScreenAdvanced";
+import AnimatedSplashScreen from "../components/AnimatedSplashScreen";
 
 const Stack = createStackNavigator();
 
 const TabletNavigator = () => {
-  const [showSplash, setShowSplash] = useState(true);
+  const [showAnimatedSplash, setShowAnimatedSplash] = useState(true);
+  const [showCustomSplash, setShowCustomSplash] = useState(false);
   const [isFirstLaunch, setIsFirstLaunch] = useState(true);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     checkFirstLaunch();
@@ -23,47 +27,74 @@ const TabletNavigator = () => {
       if (hasLaunched === null) {
         // First launch
         setIsFirstLaunch(true);
-        setShowSplash(true);
+        setShowAnimatedSplash(true);
       } else {
         // Not first launch - you can choose to still show splash or skip it
         setIsFirstLaunch(false);
-        setShowSplash(true); // Set to false if you only want splash on first launch
+        setShowAnimatedSplash(true); // Set to false if you only want splash on first launch
       }
     } catch (error) {
       console.error('Error checking first launch:', error);
       setIsFirstLaunch(true);
-      setShowSplash(true);
+      setShowAnimatedSplash(true);
     }
   };
 
-  const handleSplashComplete = async () => {
+  const handleAnimatedSplashComplete = () => {
+    setShowAnimatedSplash(false);
+    setShowCustomSplash(true);
+  };
+
+  const handleCustomSplashComplete = async () => {
     try {
       // Mark that the app has been launched
       await AsyncStorage.setItem('hasLaunched', 'true');
-      setShowSplash(false);
+      setShowCustomSplash(false);
+      setIsReady(true);
     } catch (error) {
       console.error('Error saving launch status:', error);
-      setShowSplash(false);
+      setShowCustomSplash(false);
+      setIsReady(true);
     }
   };
 
-  // Main app content component
+  // Main app content component - only create when needed
   const MainAppContent = () => (
     <NavigationContainer independent={true}>
       <TabletTabs />
     </NavigationContainer>
   );
 
-  if (showSplash) {
+  // Show animated splash screen first
+  if (showAnimatedSplash) {
     return (
-      <TabletSplashScreen onSplashComplete={handleSplashComplete}>
-        <MainAppContent />
-      </TabletSplashScreen>
+      <View style={{ flex: 1, backgroundColor: '#000000' }}>
+        <AnimatedSplashScreen onComplete={handleAnimatedSplashComplete}>
+          {/* Don't render MainAppContent until splash is done */}
+        </AnimatedSplashScreen>
+      </View>
     );
   }
 
-  // Once splash is complete, show only the main app
-  return <MainAppContent />;
+  // Show custom splash screen second
+  if (showCustomSplash) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#000000' }}>
+        <TabletSplashScreen onSplashComplete={handleCustomSplashComplete}>
+          <MainAppContent />
+        </TabletSplashScreen>
+      </View>
+    );
+  }
+
+  // Once both splashes are complete, show only the main app
+  return isReady ? (
+    <View style={{ flex: 1, backgroundColor: '#000000' }}>
+      <MainAppContent />
+    </View>
+  ) : (
+    <View style={{ flex: 1, backgroundColor: '#000000' }} />
+  );
 };
 
 export default TabletNavigator;

@@ -37,6 +37,9 @@ const TabletSplashScreen = ({ onSplashComplete, children }) => {
   // Logo float animation
   const logoFloat = useRef(new Animated.Value(0)).current;
   
+  // Logo glow animation (matching AnimatedSplashScreen)
+  const logoGlowOpacity = useRef(new Animated.Value(0.6)).current;
+  
   // Feature items stagger animation
   const featureAnimations = useRef([
     new Animated.Value(0),
@@ -65,6 +68,25 @@ const TabletSplashScreen = ({ onSplashComplete, children }) => {
       ])
     );
     floatAnimation.start();
+
+    // Logo glow pulsing animation (matching AnimatedSplashScreen)
+    const glowAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(logoGlowOpacity, {
+          toValue: 0.3,
+          duration: 1500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(logoGlowOpacity, {
+          toValue: 0.8,
+          duration: 1500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    glowAnimation.start();
 
     // Stagger feature items animation
     const featureStagger = Animated.stagger(200, 
@@ -99,6 +121,7 @@ const TabletSplashScreen = ({ onSplashComplete, children }) => {
 
     return () => {
       floatAnimation.stop();
+      glowAnimation.stop();
       pulseAnimation.stop();
     };
   }, []);
@@ -244,7 +267,7 @@ const TabletSplashScreen = ({ onSplashComplete, children }) => {
         }
       ]}>
         <LinearGradient
-          colors={['#000000', '#1a1a1a', '#2d2d2d']}
+          colors={['#000000', '#111111', '#000000']}
           style={styles.gradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -291,11 +314,7 @@ const TabletSplashScreen = ({ onSplashComplete, children }) => {
                 <Animated.View style={[
                   styles.logoGlow,
                   {
-                    opacity: hintOpacity.interpolate({
-                      inputRange: [0.3, 1],
-                      outputRange: [0.2, 0.6],
-                      extrapolate: 'clamp',
-                    })
+                    opacity: logoGlowOpacity
                   }
                 ]} />
               </Animated.View>
@@ -492,34 +511,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logoContainer: {
-    width: 200,
-    height: 120,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 40,
-    shadowColor: '#FF8C00',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 10,
     position: 'relative',
+    marginBottom: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logo: {
+    width: 120,
+    height: 120,
+    resizeMode: 'contain',
+    tintColor: '#FFFFFF',
   },
   logoGlow: {
     position: 'absolute',
-    width: 220,
+    top: -10,
+    left: -10,
+    width: 140,
     height: 140,
-    backgroundColor: '#FF8C00',
-    borderRadius: 25,
-    opacity: 0.3,
+    backgroundColor: '',
+    borderRadius: 70,
     zIndex: -1,
-  },
-  logo: {
-    width: 160,
-    height: 160,
-    resizeMode: 'contain',
-    tintColor: '#FFFFFF', 
   },
   title: {
     fontSize: 42,

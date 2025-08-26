@@ -740,7 +740,8 @@ const styles = {
     // New system status styles
     systemStatus: {
         marginTop: 8,
-        right: 250,
+        right: 254,
+        bottom: 20,
         padding: 8,
         backgroundColor: 'rgba(0, 0, 0, 0.3)',
         borderRadius: 8,
