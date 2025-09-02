@@ -67,7 +67,7 @@ let connectionStatus = {
 let dataRefreshInterval = null;
 
 // Flag to use simulation when API is unavailable
-let useSimulation = true;
+let useSimulation = false;
 
 // FIXED: Helper function to ensure SOC is always in percentage range
 const normalizeSoc = (soc) => {

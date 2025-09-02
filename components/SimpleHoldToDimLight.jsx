@@ -1,4 +1,4 @@
-// components/SimpleHoldToDimLight.jsx - COMBINED TOGGLE/DIM VERSION
+// components/SimpleHoldToDimLight.jsx - FIXED VERSION
 // Single button: Tap to toggle, Hold to cycle brightness
 import React, { useState, useEffect, useRef } from "react";
 import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
@@ -29,10 +29,12 @@ const SimpleHoldToDimLight = ({
   const pressTypeRef = useRef(null); // 'tap' or 'hold'
   const touchActiveRef = useRef(false); // Track if touch is still active
   const keepAliveIntervalRef = useRef(null); // Keep dimming alive
+  const lastBrightnessRef = useRef(value); // Track last known brightness
 
-  // Constants for timing
+  // Constants for timing - IMPROVED VALUES
   const HOLD_DELAY = 500; // 500ms to distinguish between tap and hold
-  const KEEP_ALIVE_INTERVAL = 2000; // Send keep-alive every 2 seconds
+  const KEEP_ALIVE_INTERVAL = 1500; // Send keep-alive every 1.5 seconds (more frequent)
+  const MONITORING_INTERVAL = 80; // Check brightness every 80ms (more frequent)
 
   // Light ID to hex prefix mapping
   const lightPrefixMap = {
@@ -88,6 +90,7 @@ const SimpleHoldToDimLight = ({
         if (lightState) {
           setLocalIsOn(lightState.isOn);
           setLocalBrightness(lightState.brightness || 0);
+          lastBrightnessRef.current = lightState.brightness || 0;
         }
       }
     });
@@ -97,6 +100,7 @@ const SimpleHoldToDimLight = ({
     if (currentState) {
       setLocalIsOn(currentState.isOn);
       setLocalBrightness(currentState.brightness || 0);
+      lastBrightnessRef.current = currentState.brightness || 0;
     }
 
     return unsubscribe;
@@ -149,6 +153,7 @@ const SimpleHoldToDimLight = ({
         rvStateManager.updateLightState(lightId, false, 0);
         setLocalIsOn(false);
         setLocalBrightness(0);
+        lastBrightnessRef.current = 0;
         
       } else {
         // Turn ON to 100% brightness
@@ -169,6 +174,7 @@ const SimpleHoldToDimLight = ({
         rvStateManager.updateLightState(lightId, true, targetBrightness);
         setLocalIsOn(true);
         setLocalBrightness(targetBrightness);
+        lastBrightnessRef.current = targetBrightness;
       }
       
     } catch (error) {
@@ -179,7 +185,7 @@ const SimpleHoldToDimLight = ({
     }
   };
 
-  // Start cycle dimming for hold action
+  // Start cycle dimming for hold action - IMPROVED VERSION
   const startCycleDimming = async () => {
     if (!supportsDimming || !localIsOn || isDimming) return;
 
@@ -188,6 +194,7 @@ const SimpleHoldToDimLight = ({
       setIsDimming(true);
       rampingRef.current = true;
       pressStartTimeRef.current = Date.now();
+      lastBrightnessRef.current = localBrightness;
 
       const prefix = lightPrefixMap[lightId];
       if (!prefix) {
@@ -209,10 +216,10 @@ const SimpleHoldToDimLight = ({
       const rampCommand = `19FEDB9F#${prefix}FF00150000FFFF`;
       await executeCommandWithRetry(rampCommand, 1, 50);
 
-      // Start monitoring
+      // Start monitoring with improved intervals
       startMonitoring();
 
-      // Start keep-alive mechanism to ensure continuous dimming
+      // Start more aggressive keep-alive mechanism
       startKeepAlive(prefix);
 
     } catch (error) {
@@ -254,9 +261,8 @@ const SimpleHoldToDimLight = ({
     }
   };
 
-  // Monitoring function for dimming
+  // IMPROVED monitoring function with better thresholds
   const startMonitoring = () => {
-    let lastBrightness = localBrightness;
     let unchangedCount = 0;
     let checkCount = 0;
     const pressStartTime = pressStartTimeRef.current;
@@ -267,50 +273,50 @@ const SimpleHoldToDimLight = ({
       try {
         checkCount++;
         const currentBrightness = localBrightness;
+        const lastBrightness = lastBrightnessRef.current;
         const timeSinceStart = Date.now() - pressStartTime;
 
-        // Auto-stop at limits with better thresholds
-        if (currentBrightness <= 5) {
-          console.log("📉 Reached minimum brightness, stopping");
+        // FIXED: Lower thresholds for better dimming range (0% to 100%)
+        if (currentBrightness <= 1) {
+          console.log("📉 Reached minimum brightness (1%), stopping");
           stopDimming();
           return;
         }
         
-        if (currentBrightness >= 95) {
-          console.log("📈 Reached maximum brightness, stopping");
+        if (currentBrightness >= 99) {
+          console.log("📈 Reached maximum brightness (99%), stopping");
           stopDimming();
           return;
         }
 
-        // More sensitive stuck detection - especially at higher brightness levels
+        // IMPROVED: More sensitive change detection
         const brightnessChange = Math.abs(currentBrightness - lastBrightness);
         
-        // Use different sensitivity based on brightness level
-        let changeThreshold = 1;
-        if (currentBrightness > 80) {
-          changeThreshold = 0.5; // More sensitive at high brightness
-        } else if (currentBrightness > 50) {
-          changeThreshold = 0.8; // Moderately sensitive at medium brightness
+        // More aggressive change threshold - should detect smaller changes
+        let changeThreshold = 0.3; // Much lower threshold
+        if (currentBrightness > 90 || currentBrightness < 10) {
+          changeThreshold = 0.2; // Even more sensitive at extremes
         }
         
         if (brightnessChange < changeThreshold) {
           unchangedCount++;
-          // More aggressive timeout at high brightness levels
-          const maxUnchangedCount = currentBrightness > 70 ? 8 : 12;
+          // FIXED: More lenient stuck detection (allow more time for changes)
+          const maxUnchangedCount = 15; // Increased from 8-12 to 15
           
           if (unchangedCount >= maxUnchangedCount) {
-            console.log(`⏸️ Brightness stuck at ${currentBrightness}%, stopping`);
+            console.log(`⏸️ Brightness stuck at ${currentBrightness}% (change: ${brightnessChange}), stopping`);
             stopDimming();
             return;
           }
         } else {
           unchangedCount = 0;
-          lastBrightness = currentBrightness;
+          lastBrightnessRef.current = currentBrightness;
+          console.log(`📊 Brightness changing: ${lastBrightness}% → ${currentBrightness}% (Δ${brightnessChange.toFixed(1)}%)`);
         }
 
-        // Safety timeout
-        if (timeSinceStart >= 15000) {
-          console.log("⏰ Dimming timeout, stopping");
+        // Increased safety timeout
+        if (timeSinceStart >= 20000) {
+          console.log("⏰ Dimming timeout (20s), stopping");
           stopDimming();
           return;
         }
@@ -319,25 +325,31 @@ const SimpleHoldToDimLight = ({
         console.error("❌ Error monitoring dimming:", error);
         stopDimming();
       }
-    }, 100);
+    }, MONITORING_INTERVAL);
   };
 
-  // Keep-alive mechanism to ensure continuous dimming
+  // IMPROVED keep-alive mechanism
   const startKeepAlive = (prefix) => {
     if (keepAliveIntervalRef.current) {
       clearInterval(keepAliveIntervalRef.current);
     }
 
     keepAliveIntervalRef.current = setInterval(async () => {
-      // Only send keep-alive if we're still actively dimming and touch is active
-      if (rampingRef.current && touchActiveRef.current && isDimming) {
+      // FIXED: More robust keep-alive conditions
+      if (rampingRef.current && isDimming) {
         try {
-          console.log(`🔄 Keep-alive: Refreshing ramp command for ${lightId}`);
+          console.log(`🔄 Keep-alive: Refreshing ramp command for ${lightId} (brightness: ${localBrightness}%)`);
           const rampCommand = `19FEDB9F#${prefix}FF00150000FFFF`;
-          await executeCommandWithRetry(rampCommand, 1, 50);
+          await executeCommandWithRetry(rampCommand, 0, 30); // No retries, faster execution
         } catch (error) {
           console.error("❌ Keep-alive ramp command failed:", error);
-          // Don't stop dimming on keep-alive failure, just log it
+          // Continue dimming even if keep-alive fails occasionally
+        }
+      } else {
+        // If we're not dimming anymore, stop keep-alive
+        if (keepAliveIntervalRef.current) {
+          clearInterval(keepAliveIntervalRef.current);
+          keepAliveIntervalRef.current = null;
         }
       }
     }, KEEP_ALIVE_INTERVAL);
@@ -395,16 +407,18 @@ const SimpleHoldToDimLight = ({
 
   // Handle touch cancel events (when finger moves off button)
   const handleTouchCancel = () => {
-    console.log("❌ Touch cancelled - treating as release");
+    console.log("❌ Touch cancelled - stopping dimming and treating as release");
+    touchActiveRef.current = false;
+    if (isDimming) {
+      stopDimming();
+    }
     handleButtonPressOut();
   };
 
-  // Handle touch move events to maintain active state if still on button
+  // IMPROVED touch move handler to maintain dimming
   const handleTouchMove = (event) => {
-    // This is a simplified check - in a real app you'd check if touch is still within button bounds
-    // For now, we'll keep the touch active to prevent accidental cancellation
-    if (!touchActiveRef.current && isDimming) {
-      console.log("🔄 Touch moved but still dimming - keeping active");
+    // Keep touch active during dimming to prevent interruption
+    if (isDimming && rampingRef.current) {
       touchActiveRef.current = true;
     }
   };
@@ -423,12 +437,6 @@ const SimpleHoldToDimLight = ({
       return `${Math.round(localBrightness)}% ⟲`;
     }
     return localIsOn ? `${Math.round(localBrightness)}%` : "";
-  };
-
-  const getButtonText = () => {
-    if (isDimming) return '⟲';
-    if (isToggling) return '';
-    return ''; // Remove the circle symbols
   };
 
   return (
@@ -452,14 +460,14 @@ const SimpleHoldToDimLight = ({
         <Text style={{ 
           color: getDisplayColor(), 
           fontSize: 12,
-          marginRight: 10,
+          marginRight: 15, // Increased margin to push button left
           minWidth: 80,
           textAlign: 'center'
         }}>
           {getBrightnessText()}
         </Text>
         
-        {/* Combined toggle/dim button */}
+        {/* Combined toggle/dim button - MOVED LEFT */}
         <TouchableOpacity
           style={{
             backgroundColor: localIsOn ? "#FFB267" : "#666",
@@ -475,6 +483,8 @@ const SimpleHoldToDimLight = ({
             elevation: localIsOn ? 8 : 0,
             borderWidth: isDimming ? 2 : 0,
             borderColor: isDimming ? "#FF8C00" : "transparent",
+            marginRight: 10,
+            marginTop: 15,
           }}
           onPressIn={handleButtonPressIn}
           onPressOut={handleButtonPressOut}
@@ -521,7 +531,7 @@ const SimpleHoldToDimLight = ({
             textAlign: 'center',
             fontStyle: 'italic'
           }}>
-            Cycling {dimmingDirection.toUpperCase()}
+            Cycling {dimmingDirection.toUpperCase()} • Hold to continue
           </Text>
         </View>
       )}

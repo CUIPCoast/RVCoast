@@ -17,6 +17,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { VictronEnergyService } from "../API/VictronEnergyService";
 
+
 const MainScreen = () => {
     const { user } = useAuth();
     const isTablet = useScreenSize();
@@ -486,7 +487,7 @@ const MainScreen = () => {
 
                 {/* Enhanced TankHeaterControls with real-time CAN data - Reorganized Layout */}
                 <View style={styles.tanksSection}>
-                  <Text style={styles.tanksSectionTitle}>Tank Levels</Text>
+                  
                   <View style={styles.tanksContainer}>
                     <WaterTanks
                         name="Fresh"
@@ -739,7 +740,7 @@ const styles = {
     
     // New system status styles
     systemStatus: {
-        marginTop: 8,
+        marginTop: 20,
         right: 254,
         bottom: 20,
         padding: 8,

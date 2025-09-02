@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from "../components/AuthContext";
 import AuthScreen from "../components/AuthScreen";
 import { useScreenSize } from "../helper";
 
+
 LogBox.ignoreAllLogs();
 
 const AppContent = () => {
@@ -35,9 +36,11 @@ const AppContent = () => {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <StatusBar hidden />
-      <AppContent />
-    </AuthProvider>
+    
+      <AuthProvider>
+        <StatusBar hidden />
+        <AppContent />
+      </AuthProvider>
+    
   );
 }
