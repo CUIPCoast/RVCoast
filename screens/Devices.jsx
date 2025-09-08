@@ -243,32 +243,12 @@ const Devices = () => {
           setLightStates(prev => ({ ...prev, ...updatedLightStates }));
           setLocalLightBrightness(prev => ({ ...prev, ...updatedLightBrightness }));
           
-          // Show notification of external change
-          const changedLights = Object.keys(updatedLightStates);
-          if (changedLights.length === 1) {
-            const lightName = lightDisplayNames[changedLights[0]] || changedLights[0];
-            setStatusMessage(`${lightName} ${updatedLightStates[changedLights[0]] ? 'turned on' : 'turned off'} remotely`);
-          } else if (changedLights.length > 1) {
-            setStatusMessage(`${changedLights.length} lights changed remotely`);
-          }
-          setShowStatus(true);
-          setTimeout(() => setShowStatus(false), 3000);
+          // External light changes handled silently
         }
       }
       
       if (newState.water) {
-        // Update water system states from external changes
-        if (newState.water.pumpOn !== undefined) {
-          setStatusMessage(`Water pump ${newState.water.pumpOn ? 'turned on' : 'turned off'} remotely`);
-          setShowStatus(true);
-          setTimeout(() => setShowStatus(false), 3000);
-        }
-        
-        if (newState.water.heaterOn !== undefined) {
-          setStatusMessage(`Water heater ${newState.water.heaterOn ? 'turned on' : 'turned off'} remotely`);
-          setShowStatus(true);
-          setTimeout(() => setShowStatus(false), 3000);
-        }
+        // External water system changes handled silently
       }
     });
     
@@ -384,78 +364,76 @@ const Devices = () => {
   };
   
   // Water heater toggle with RV state management
-  const handleWaterHeaterToggle = async () => {
-    setIsLoading(true);
-    const newState = !water.heaterOn;
+  // Water heater toggle with improved state management
+const handleWaterHeaterToggle = async () => {
+  setIsLoading(true);
+  
+  try {
+    // Get current state directly from the hook
+    const currentState = water.heaterOn;
+    const newState = !currentState;
     
-    try {
-      // Update RV state first for immediate UI feedback
+    console.log(`Water heater toggle: ${currentState} -> ${newState}`);
+    
+    // Call the API first
+    const result = await WaterService.toggleWaterHeater();
+    
+    if (result.success) {
+      // Update RV state after successful API call
       rvStateManager.updateWaterState({ 
         heaterOn: newState,
         lastUpdated: new Date().toISOString()
       });
       
-      const result = await WaterService.toggleWaterHeater();
-      if (result.success) {
-        setStatusMessage(`Water heater ${newState ? 'turned on' : 'turned off'}`);
-      } else {
-        // Revert state on error
-        rvStateManager.updateWaterState({ 
-          heaterOn: !newState,
-          lastUpdated: new Date().toISOString()
-        });
-        setStatusMessage('Failed to toggle water heater');
-      }
-    } catch (e) {
-      // Revert state on error
-      rvStateManager.updateWaterState({ 
-        heaterOn: !newState,
-        lastUpdated: new Date().toISOString()
-      });
-      setStatusMessage(`Error: ${e.message}`);
-    } finally {
-      setShowStatus(true);
-      setTimeout(() => setShowStatus(false), 3000);
-      setIsLoading(false);
+      setStatusMessage(`Water heater ${newState ? 'turned on' : 'turned off'}`);
+    } else {
+      console.error('Failed to toggle water heater:', result.error);
+      setStatusMessage('Failed to toggle water heater');
     }
-  };
+  } catch (e) {
+    console.error('Error toggling water heater:', e);
+    setStatusMessage(`Error: ${e.message}`);
+  } finally {
+    setShowStatus(true);
+    setTimeout(() => setShowStatus(false), 3000);
+    setIsLoading(false);
+  }
+};
 
-  // Water pump toggle with RV state management
   const handleWaterPumpToggle = async () => {
-    setIsLoading(true);
-    const newState = !water.pumpOn;
+  setIsLoading(true);
+  
+  try {
+    // Get current state directly from the hook
+    const currentState = water.pumpOn;
+    const newState = !currentState;
     
-    try {
-      // Update RV state first for immediate UI feedback
+    console.log(`Water pump toggle: ${currentState} -> ${newState}`);
+    
+    // Call the API first
+    const result = await WaterService.toggleWaterPump();
+    
+    if (result.success) {
+      // Update RV state after successful API call
       rvStateManager.updateWaterState({ 
         pumpOn: newState,
         lastUpdated: new Date().toISOString()
       });
       
-      const result = await WaterService.toggleWaterPump();
-      if (result.success) {
-        setStatusMessage(`Water pump ${newState ? 'turned on' : 'turned off'}`);
-      } else {
-        // Revert state on error
-        rvStateManager.updateWaterState({ 
-          pumpOn: !newState,
-          lastUpdated: new Date().toISOString()
-        });
-        setStatusMessage('Failed to toggle water pump');
-      }
-    } catch (e) {
-      // Revert state on error
-      rvStateManager.updateWaterState({ 
-        pumpOn: !newState,
-        lastUpdated: new Date().toISOString()
-      });
-      setStatusMessage(`Error: ${e.message}`);
-    } finally {
-      setShowStatus(true);
-      setTimeout(() => setShowStatus(false), 3000);
-      setIsLoading(false);
+      setStatusMessage(`Water pump ${newState ? 'turned on' : 'turned off'}`);
+    } else {
+      console.error('Failed to toggle water pump:', result.error);
+      setStatusMessage('Failed to toggle water pump');
     }
-  };
+  } catch (e) {
+    console.error('Error toggling water pump:', e);
+    setStatusMessage(`Error: ${e.message}`);
+  } finally {
+    setShowStatus(true);
+    setTimeout(() => setShowStatus(false), 3000);
+    setIsLoading(false);
+  }
+};
 
   // Master light toggle handler - updated to use LightControlService like LightScreenTablet
   const handleMasterLightToggle = async (isOn) => {
@@ -510,7 +488,7 @@ const Devices = () => {
             <View className="items-center bg-brown-300 ">
               <Pressable onPress={() => setModalVisible(true)}>
                 <Image
-                  source={require("../assets/abpost61724photoroom-3.png")}
+                  source={require("../assets/trailer.png")}
                   className="h-20 w-24 mb-1"
                 />
               </Pressable>
@@ -570,66 +548,80 @@ const Devices = () => {
          <View style={styles.fanControlsContainer}>
             <TouchableOpacity
               style={[
-                styles.waterControlButton,
+                styles.modernWaterButton,
                 water.heaterOn
-                  ? styles.waterControlButtonActive
-                  : styles.waterControlButtonInactive,
+                  ? styles.waterButtonActive
+                  : styles.waterButtonInactive,
                 isLoading && styles.disabledButton,
               ]}
               onPress={handleWaterHeaterToggle}
               disabled={isLoading}
             >
-             <View style={styles.fanIconContainer}>
+             <View style={styles.waterIconContainer}>
               <View
                 style={[
-                  styles.fanIconCircle,
+                  styles.waterIconCircle,
                   water.heaterOn
                     ? styles.waterIconCircleActive
                     : styles.waterIconCircleInactive,
                 ]}
               >
                 <Ionicons
-                  name={water.heaterOn ? 'water' : 'water-outline'}
-                  size={24}
-                  color={water.heaterOn ? '#FFF' : '#888'}
+                  name="water"
+                  size={28}
+                  color={water.heaterOn ? '#FFF' : '#666'}
                 />
               </View>
              </View>
 
-             <Text style={styles.fanButtonLabel}>Water Heater</Text>
-             <View style={[styles.statusIndicator, water.heaterOn ? styles.statusActive : styles.statusInactive]}>
-               <Text style={styles.statusText}>{water.heaterOn ? 'ON' : 'OFF'}</Text>
+             <Text style={[styles.waterButtonLabel, { color: water.heaterOn ? '#FFF' : '#CCC' }]}>
+               Water Heater
+             </Text>
+             <View style={[
+               styles.waterStatusIndicator, 
+               water.heaterOn ? styles.waterStatusActive : styles.waterStatusInactive
+             ]}>
+               <Text style={[styles.waterStatusText, { color: water.heaterOn ? '#FFF' : '#888' }]}>
+                 {water.heaterOn ? 'ON' : 'OFF'}
+               </Text>
              </View>
            </TouchableOpacity>
 
             <TouchableOpacity 
               style={[
-                styles.waterControlButton,
+                styles.modernWaterButton,
                 water.pumpOn
-                  ? styles.waterControlButtonActive
-                  : styles.waterControlButtonInactive,
+                  ? styles.waterButtonActive
+                  : styles.waterButtonInactive,
                 isLoading && styles.disabledButton,
               ]}
               onPress={handleWaterPumpToggle}
               disabled={isLoading}
             >
-             <View style={styles.fanIconContainer}>
+             <View style={styles.waterIconContainer}>
                <View style={[
-                 styles.fanIconCircle,
+                 styles.waterIconCircle,
                  water.pumpOn
                    ? styles.waterIconCircleActive
                    : styles.waterIconCircleInactive
                ]}>
                  <Ionicons
-                   name={water.pumpOn ? 'pie-chart' : 'pie-chart-outline'}
-                   size={24}
-                   color={water.pumpOn ? '#FFF' : '#888'}
+                   name="sync"
+                   size={28}
+                   color={water.pumpOn ? '#FFF' : '#666'}
                  />
                </View>
              </View>
-             <Text style={styles.fanButtonLabel}>Water Pump</Text>
-             <View style={[styles.statusIndicator, water.pumpOn ? styles.statusActive : styles.statusInactive]}>
-               <Text style={styles.statusText}>{water.pumpOn ? 'ON' : 'OFF'}</Text>
+             <Text style={[styles.waterButtonLabel, { color: water.pumpOn ? '#FFF' : '#CCC' }]}>
+               Water Pump
+             </Text>
+             <View style={[
+               styles.waterStatusIndicator, 
+               water.pumpOn ? styles.waterStatusActive : styles.waterStatusInactive
+             ]}>
+               <Text style={[styles.waterStatusText, { color: water.pumpOn ? '#FFF' : '#888' }]}>
+                 {water.pumpOn ? 'ON' : 'OFF'}
+               </Text>
              </View>
             </TouchableOpacity>
          </View>
@@ -1141,6 +1133,77 @@ statusText: {
 },
 disabledButton: {
   opacity: 0.6,
+},
+
+// Modern Water Button Styles
+modernWaterButton: {
+  width: 140,
+  height: 140,
+  borderRadius: 16,
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  padding: 15,
+  marginHorizontal: 10,
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.3,
+  shadowRadius: 8,
+  elevation: 6,
+  borderWidth: 2,
+},
+waterButtonActive: {
+  backgroundColor: '#1E88E5', // Bright blue when active
+  borderColor: '#42A5F5',
+  shadowColor: '#1E88E5',
+},
+waterButtonInactive: {
+  backgroundColor: '#263238', // Dark gray when inactive
+  borderColor: '#37474F',
+  shadowColor: '#000',
+},
+waterIconContainer: {
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginBottom: 12,
+},
+waterIconCircle: {
+  width: 60,
+  height: 60,
+  borderRadius: 30,
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+waterIconCircleActive: {
+  backgroundColor: '#42A5F5', // Light blue circle when active
+},
+waterIconCircleInactive: {
+  backgroundColor: '#37474F', // Dark gray circle when inactive
+  borderWidth: 1,
+  borderColor: '#455A64',
+},
+waterButtonLabel: {
+  fontSize: 14,
+  fontWeight: '600',
+  marginBottom: 8,
+  textAlign: 'center',
+},
+waterStatusIndicator: {
+  paddingHorizontal: 12,
+  paddingVertical: 4,
+  borderRadius: 12,
+  minWidth: 46,
+  alignItems: 'center',
+},
+waterStatusActive: {
+  backgroundColor: '#42A5F5', // Blue status when active
+},
+waterStatusInactive: {
+  backgroundColor: '#37474F', // Gray status when inactive
+  borderWidth: 1,
+  borderColor: '#455A64',
+},
+waterStatusText: {
+  fontSize: 12,
+  fontWeight: '700',
 },
 
 });
