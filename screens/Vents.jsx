@@ -58,23 +58,17 @@ const Vents = () => {
       if (!isInitializedRef.current) return; // Don't process until initialized
       
       if (newState.fans) {
-        // Only update if the values actually changed and it's not from our own update
+        // External fan control changes handled silently
         if (newState.fans.bathroomFan?.isOn !== undefined && 
             newState.fans.bathroomFan.isOn !== prevBathroomFanRef.current) {
           setBathroomFanOn(newState.fans.bathroomFan.isOn);
           prevBathroomFanRef.current = newState.fans.bathroomFan.isOn;
-          setStatusMessage(`Bathroom fan ${newState.fans.bathroomFan.isOn ? 'turned on' : 'turned off'} remotely`);
-          setShowStatus(true);
-          setTimeout(() => setShowStatus(false), 3000);
         }
         
         if (newState.fans.bayVentFan?.isOn !== undefined && 
             newState.fans.bayVentFan.isOn !== prevBayVentFanRef.current) {
           setBayVentFanOn(newState.fans.bayVentFan.isOn);
           prevBayVentFanRef.current = newState.fans.bayVentFan.isOn;
-          setStatusMessage(`Bay vent fan ${newState.fans.bayVentFan.isOn ? 'turned on' : 'turned off'} remotely`);
-          setShowStatus(true);
-          setTimeout(() => setShowStatus(false), 3000);
         }
       }
     });

@@ -127,32 +127,19 @@ const ClimateControlScreenTablet = () => {
           setTemp(newState.climate.temperature);
           setLastTemp(newState.climate.temperature);
           
-          // Show notification of external change
-          setStatusMessage(`Temperature updated remotely to ${newState.climate.temperature}°F`);
-          setShowStatus(true);
-          setTimeout(() => setShowStatus(false), 3000);
         }
         
-        // Update other climate states if they changed externally
+        // External climate control changes handled silently
         if (newState.climate.coolingOn !== undefined && newState.climate.coolingOn !== isCoolToggled) {
           setIsCoolToggled(newState.climate.coolingOn);
-          setStatusMessage(`Cooling ${newState.climate.coolingOn ? 'turned on' : 'turned off'} remotely`);
-          setShowStatus(true);
-          setTimeout(() => setShowStatus(false), 3000);
         }
         
         if (newState.climate.toeKickOn !== undefined && newState.climate.toeKickOn !== isToekickToggled) {
           setIsToekickToggled(newState.climate.toeKickOn);
-          setStatusMessage(`Toe Kick ${newState.climate.toeKickOn ? 'turned on' : 'turned off'} remotely`);
-          setShowStatus(true);
-          setTimeout(() => setShowStatus(false), 3000);
         }
         
         if (newState.climate.heatingOn !== undefined && newState.climate.heatingOn !== isFurnaceToggled) {
           setIsFurnaceToggled(newState.climate.heatingOn);
-          setStatusMessage(`Furnace ${newState.climate.heatingOn ? 'turned on' : 'turned off'} remotely`);
-          setShowStatus(true);
-          setTimeout(() => setShowStatus(false), 3000);
         }
       }
     });
