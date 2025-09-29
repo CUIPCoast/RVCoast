@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native'
 import { SplashScreen, Stack } from 'expo-router'
-import { Header } from 'react-native/Libraries/NewAppScreen'
+
 import { useFonts } from "expo-font"
 import { useEffect } from 'react'
 

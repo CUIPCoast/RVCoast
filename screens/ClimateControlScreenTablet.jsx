@@ -9,7 +9,7 @@ import { ClimateService } from '../API/RVControlServices.js';
 import { RVControlService } from "../API/rvAPI";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+import { Ionicons } from '@expo/vector-icons';
 
 // Import RV State Management hooks
 import { useRVClimate } from "../API/RVStateManager/RVStateHooks";

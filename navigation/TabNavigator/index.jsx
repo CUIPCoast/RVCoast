@@ -5,7 +5,7 @@ import Home from "../../screens/Home";
 import Devices from "../../screens/Devices";
 import Settings from "../../screens/Settings";
 import System from "../../screens/System";
-import Icon from "react-native-vector-icons/AntDesign";
+import { AntDesign as Icon } from "@expo/vector-icons";
 import useScreenSize from "../../helper/useScreenSize";
 import MainScreen from "../../screens/MainScreen";
 

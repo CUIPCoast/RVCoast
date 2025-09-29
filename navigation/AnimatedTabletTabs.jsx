@@ -9,7 +9,7 @@ import {
   Animated,
   Easing,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { Ionicons } from '@expo/vector-icons';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -150,7 +150,7 @@ const indicatorCenterOffset = useMemo(
                     { transform: [{ scale: isActive ? 1.1 : 1 }] },
                   ]}
                 >
-                  <Icon
+                  <Ionicons
                     name={tab.icon}
                     color={isActive ? '#FFB267' : '#FFFFFF'}
                     size={24}

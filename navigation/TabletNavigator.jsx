@@ -1,7 +1,6 @@
 // navigation/TabletNavigator.jsx
 import React, { useState, useEffect } from "react";
 import { View } from "react-native";
-import { NavigationContainer } from "@react-navigation/native";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import AnimatedTabletTabs from "./AnimatedTabletTabs";
@@ -67,13 +66,11 @@ const TabletNavigator = () => {
   ];
 
   const MainAppContent = () => (
-    <NavigationContainer independent={true}>
-      <AnimatedTabletTabs
-        tabs={ROUTES}
-        initialTab="Home"
-        // onTabChange={(name) => console.log('Active tab:', name)}
-      />
-    </NavigationContainer>
+    <AnimatedTabletTabs
+      tabs={ROUTES}
+      initialTab="Home"
+      // onTabChange={(name) => console.log('Active tab:', name)}
+    />
   );
 
   if (showAnimatedSplash) {

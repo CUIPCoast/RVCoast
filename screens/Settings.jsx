@@ -8,7 +8,7 @@ import { useScreenSize, handleSettingsToggle, handleSettingsItemPress } from '..
 import { useAuth } from '../components/AuthContext';
 import moment from 'moment';
 import { router } from 'expo-router';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+import { Ionicons } from '@expo/vector-icons';
 
 
 const Settings = () => {

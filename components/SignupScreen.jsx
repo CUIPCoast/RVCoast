@@ -15,7 +15,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from './AuthContext';
 import { useScreenSize } from '../helper';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+import { Ionicons } from '@expo/vector-icons';
 
 const SignupScreen = ({ onSwitchToLogin }) => {
   const [formData, setFormData] = useState({

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { View, Text } from "react-native";
 import { LinearGradient } from 'expo-linear-gradient';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+import { Ionicons } from '@expo/vector-icons';
 import useScreenSize from "../helper/useScreenSize.jsx";
 import { createCANBusListener } from "../Service/CANBusListener.js";
 

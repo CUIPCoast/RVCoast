@@ -8,7 +8,7 @@ import Devices from '../screens/Devices';
 import Home from '../screens/Home';
 import GroupComponent from './GroupComponent';
 import Wifi from './Wifi';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+import { Ionicons } from '@expo/vector-icons';
 
 const ModalComponent = ({ nameComponent }) => {
   const [modalVisible, setModalVisible] = useState(false);

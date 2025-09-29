@@ -13,7 +13,7 @@ import { WaterService } from '../API/RVControlServices.js';
 import { useAuth } from '../components/AuthContext';
 import { useScreenSize } from '../helper';
 import RVConnectionModal from '../components/RVConnectionModal';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { VictronEnergyService } from "../API/VictronEnergyService";
 

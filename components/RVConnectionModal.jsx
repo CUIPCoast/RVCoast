@@ -12,7 +12,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from './AuthContext';
 import { useScreenSize } from '../helper';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+import { Ionicons } from '@expo/vector-icons';
 
 const RVConnectionModal = ({ visible, onClose }) => {
   const [rvData, setRvData] = useState({

@@ -12,7 +12,7 @@ import {
   Easing
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { Ionicons as Icon } from '@expo/vector-icons';
 const { width, height } = Dimensions.get('window');
 
 const TabletSplashScreen = ({ onSplashComplete, children }) => {
