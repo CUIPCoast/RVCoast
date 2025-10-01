@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+// screens/ClimateControlScreenTablet.jsx - Fixed temperature synchronization and persistence
+import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, Text, Image, TouchableOpacity, TouchableWithoutFeedback, Keyboard, ScrollView } from "react-native";
-import { Border, Color, Gap, FontSize, FontFamily, isDarkMode } from "../GlobalStyles";
+import { Color, isDarkMode } from "../GlobalStyles";
 import useScreenSize from "../helper/useScreenSize.jsx";
 import { Col, Row, Grid } from "react-native-easy-grid";
 import { RadialSlider } from 'react-native-radial-slider';
@@ -19,7 +20,7 @@ const ClimateControlScreenTablet = () => {
   // Use RV state management hook for climate data
   const { climate, setTemperature, toggleCooling, toggleHeating } = useRVClimate();
   
-  const [activeButtons, setActiveButtons] = useState([]); // State for active buttons
+  const [activeButtons, setActiveButtons] = useState([]); 
   const [speed, setSpeed] = useState(0);
   const [isNightToggled, setIsNightToggled] = useState(false);
   const [isDehumidToggled, setIsDehumidToggled] = useState(false);
@@ -31,59 +32,98 @@ const ClimateControlScreenTablet = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
   
-  // Status message for user feedback - added from AirCon
   const [statusMessage, setStatusMessage] = useState('');
   const [showStatus, setShowStatus] = useState(false);
   
-  // Weather data state and error handling
   const [weatherData, setWeatherData] = useState(null);
   const [weatherError, setWeatherError] = useState(false);
 
-  // Temperature state with loading from RV state manager
-  const [temp, setTemp] = useState(72);
-  const [lastTemp, setLastTemp] = useState(72);
+  // Get initial temperature from RV state BEFORE rendering to prevent flash
+  const getInitialTemp = () => {
+    try {
+      const currentClimateState = rvStateManager.getCategoryState('climate');
+      if (currentClimateState.temperature !== undefined && currentClimateState.temperature !== null) {
+        return Math.round(currentClimateState.temperature);
+      }
+    } catch (error) {
+      console.error('Error getting initial temp:', error);
+    }
+    return 72; // Only use default if no state exists
+  };
+  
+  const initialTemp = getInitialTemp();
+
+  // Temperature state with refs for better control - initialized with RV state value
+  const [temp, setTemp] = useState(initialTemp);
+  const [lastTemp, setLastTemp] = useState(initialTemp);
+  
+  // Use refs to prevent interference with slider
+  const isSlidingRef = useRef(false);
+  const tempChangeTimeoutRef = useRef(null);
+  const lastSentTempRef = useRef(initialTemp);
   
   var now = moment().format();
   var currentDate = moment().format("MMMM Do, YYYY");
   var DayOfTheWeek = moment().format("dddd");
 
-  // Preload images
   const moonImage = require("../assets/moon.png");
   const sunImage = require("../assets/sun.png");
   
-  // Features with their corresponding fan speeds
   const features = [
     { label: "Cool", fanSpeed: "High" },
     { label: "Toe Kick", fanSpeed: "Med" },
     { label: "Furnace", fanSpeed: "Low" }
   ];
 
-  const isTablet = useScreenSize(); // Check if the screen is large enough to be considered a tablet
+  const isTablet = useScreenSize();
 
-  // Initialize state from RV state manager
+  // Initialize state from RV state manager - FIXED to always use RV state as source of truth
   useEffect(() => {
     const initializeState = async () => {
       try {
-        // Get current climate state from RV state manager
+        // ALWAYS get current climate state from RV state manager first
         const currentClimateState = rvStateManager.getCategoryState('climate');
         
-        // Set temperature from state
-        if (currentClimateState.temperature) {
-          setTemp(currentClimateState.temperature);
-          setLastTemp(currentClimateState.temperature);
+        console.log('ClimateControl: Initializing with climate state:', currentClimateState);
+        
+        // Priority 1: Use temperature from RV state manager (most recent/accurate)
+        if (currentClimateState.temperature !== undefined && currentClimateState.temperature !== null) {
+          const roundedTemp = Math.round(currentClimateState.temperature);
+          console.log('ClimateControl: Loading temperature from RV state:', roundedTemp);
+          setTemp(roundedTemp);
+          setLastTemp(roundedTemp);
+          lastSentTempRef.current = roundedTemp;
+          
+          // Also update AsyncStorage to match
+          await AsyncStorage.setItem('temperature', roundedTemp.toString());
         } else {
-          // Fall back to AsyncStorage for backwards compatibility
+          // Priority 2: Fall back to AsyncStorage only if RV state has no temperature
           const savedTemp = await AsyncStorage.getItem('temperature');
           if (savedTemp) {
             const tempValue = parseInt(savedTemp, 10);
+            console.log('ClimateControl: Loading temperature from AsyncStorage:', tempValue);
             setTemp(tempValue);
             setLastTemp(tempValue);
-            // Update RV state with loaded temperature
-            rvStateManager.updateClimateState({ temperature: tempValue });
+            lastSentTempRef.current = tempValue;
+            
+            // Update RV state to match what we loaded
+            rvStateManager.updateClimateState({ 
+              temperature: tempValue,
+              lastUpdated: new Date().toISOString()
+            });
           } else {
+            // Priority 3: Default value if nothing is found
+            console.log('ClimateControl: No saved temperature found, using default 72°F');
             setTemp(72);
             setLastTemp(72);
-            rvStateManager.updateClimateState({ temperature: 70 });
+            lastSentTempRef.current = 72;
+            
+            // Save default to both storage locations
+            await AsyncStorage.setItem('temperature', '72');
+            rvStateManager.updateClimateState({ 
+              temperature: 72,
+              lastUpdated: new Date().toISOString()
+            });
           }
         }
         
@@ -112,21 +152,26 @@ const ClimateControlScreenTablet = () => {
         
       } catch (error) {
         console.error('Error initializing ClimateControlScreenTablet state:', error);
+        setTemp(72);
+        setLastTemp(72);
+        lastSentTempRef.current = 72;
       }
     };
     
     initializeState();
-  }, []);
+  }, []); // Empty dependency array - only run once on mount
 
   // Subscribe to external state changes (from other devices/screens)
   useEffect(() => {
     const unsubscribe = rvStateManager.subscribeToExternalChanges((newState) => {
       if (newState.climate) {
-        // Update local state when external changes occur
-        if (newState.climate.temperature && newState.climate.temperature !== temp) {
-          setTemp(newState.climate.temperature);
-          setLastTemp(newState.climate.temperature);
-          
+        // Update temperature when external changes occur - but only if not sliding
+        if (newState.climate.temperature !== undefined && !isSlidingRef.current && newState.climate.temperature !== temp) {
+          const roundedTemp = Math.round(newState.climate.temperature);
+          console.log('ClimateControl: External temperature change detected:', roundedTemp);
+          setTemp(roundedTemp);
+          setLastTemp(roundedTemp);
+          lastSentTempRef.current = roundedTemp;
         }
         
         // External climate control changes handled silently
@@ -147,105 +192,108 @@ const ClimateControlScreenTablet = () => {
     return unsubscribe;
   }, [temp, isCoolToggled, isToekickToggled, isFurnaceToggled]);
 
-  // Handle temperature change from RadialSlider
+  // Handle temperature change from RadialSlider with improved responsiveness
   const handleTempChange = (newTemp) => {
+    console.log('ClimateControl: Slider changed to:', newTemp);
+    
+    // Mark that we're actively sliding
+    isSlidingRef.current = true;
+    
+    // Update local state immediately for smooth UI
     setTemp(newTemp);
     
-    // Update RV state immediately for UI responsiveness
-    rvStateManager.updateClimateState({ 
-      temperature: newTemp,
-      lastUpdated: new Date().toISOString()
-    });
+    // Clear any pending timeout
+    if (tempChangeTimeoutRef.current) {
+      clearTimeout(tempChangeTimeoutRef.current);
+    }
+    
+    // Set a timeout to mark sliding as complete
+    tempChangeTimeoutRef.current = setTimeout(() => {
+      isSlidingRef.current = false;
+      console.log('ClimateControl: Slider interaction complete');
+    }, 500);
   };
   
-  // Temperature change implementation from AirCon.jsx
+  // Temperature change implementation - FIXED to always save to RV state
   useEffect(() => {
     const sendTempChange = async () => {
-      if (temp === lastTemp || (!isCoolToggled && !isToekickToggled && !isFurnaceToggled)) return;
+      // Skip if temperature hasn't actually changed
+      if (temp === lastSentTempRef.current) {
+        return;
+      }
+      
+      // ALWAYS update RV state immediately, even if no climate control is active
+      // This ensures the temperature persists when navigating between screens
+      rvStateManager.updateClimateState({
+        temperature: temp,
+        lastUpdated: new Date().toISOString()
+      });
+      
+      // Also save to AsyncStorage immediately for backup
+      try {
+        await AsyncStorage.setItem('temperature', temp.toString());
+        console.log('ClimateControl: Temperature saved to storage:', temp);
+      } catch (storageError) {
+        console.error('ClimateControl: Failed to save to AsyncStorage:', storageError);
+      }
+      
+      // Skip API call if no climate control is active
+      if (!isCoolToggled && !isToekickToggled && !isFurnaceToggled) {
+        console.log('ClimateControl: Temperature updated in state but not sent to API (no climate control active)');
+        lastSentTempRef.current = temp;
+        setLastTemp(temp);
+        return;
+      }
       
       try {
         setIsLoading(true);
         
         // Determine if we need to increase or decrease temperature
-        if (temp > lastTemp) {
-          // Send temperature increase command based on the difference
-          const steps = temp - lastTemp;
+        if (temp > lastSentTempRef.current) {
+          const steps = temp - lastSentTempRef.current;
           for (let i = 0; i < steps; i++) {
             await RVControlService.executeCommand('temp_increase');
-            // Short delay to avoid overwhelming the CAN bus
             await new Promise(resolve => setTimeout(resolve, 100));
           }
           console.log(`Temperature increased to ${temp}°F`);
           
-          // Show status message
           setStatusMessage(`Temperature set to ${temp}°F`);
           setShowStatus(true);
           setTimeout(() => setShowStatus(false), 2000);
         } else {
-          // Send temperature decrease command based on the difference
-          const steps = lastTemp - temp;
+          const steps = lastSentTempRef.current - temp;
           for (let i = 0; i < steps; i++) {
             await RVControlService.executeCommand('temp_decrease');
-            // Short delay to avoid overwhelming the CAN bus
             await new Promise(resolve => setTimeout(resolve, 100));
           }
           console.log(`Temperature decreased to ${temp}°F`);
           
-          // Show status message
           setStatusMessage(`Temperature set to ${temp}°F`);
           setShowStatus(true);
           setTimeout(() => setShowStatus(false), 2000);
         }
         
+        lastSentTempRef.current = temp;
         setLastTemp(temp);
         
-        // Update AsyncStorage for backwards compatibility
-        await AsyncStorage.setItem('temperature', temp.toString());
-        
-        // Update RV state with confirmed temperature
-        rvStateManager.updateClimateState({ 
-          temperature: temp,
-          lastUpdated: new Date().toISOString()
-        });
-        
-        // Clear any error messages
         setErrorMessage(null);
       } catch (error) {
         console.error('Failed to change temperature:', error);
-        // Revert to last successful temperature
-        setTemp(lastTemp);
+        // Don't revert - the state is already saved, just the API call failed
+        lastSentTempRef.current = temp;
+        setLastTemp(temp);
         
-        // Revert RV state
-        rvStateManager.updateClimateState({ 
-          temperature: lastTemp,
-          lastUpdated: new Date().toISOString()
-        });
-        
-        // Check if it's a network error
         const isNetworkError = error.message.includes('Network') || 
                               error.name === 'AxiosError' || 
                               !navigator.onLine;
                               
         if (isNetworkError) {
-          // Show specific network error message
           setStatusMessage('Network error: Temperature change stored locally');
           setShowStatus(true);
           setTimeout(() => setShowStatus(false), 3000);
           
-          // Store the intended temperature change in AsyncStorage to sync later
-          try {
-            AsyncStorage.setItem('pendingTempChange', JSON.stringify({
-              targetTemp: temp,
-              timestamp: Date.now()
-            }));
-            
-            // Let the user know we've saved their preference
-            setErrorMessage('Network unavailable. Your temperature preference has been saved and will be applied when connection is restored.');
-          } catch (storageError) {
-            console.error('Failed to store pending temperature change:', storageError);
-          }
+          setErrorMessage('Network unavailable. Your temperature preference has been saved and will be applied when connection is restored.');
         } else {
-          // Show generic error message for non-network errors
           setStatusMessage('Failed to change temperature');
           setShowStatus(true);
           setTimeout(() => setShowStatus(false), 3000);
@@ -258,22 +306,21 @@ const ClimateControlScreenTablet = () => {
     };
     
     // Debounce the temperature change to avoid too many API calls
-    const timeoutId = setTimeout(sendTempChange, 800);
+    const timeoutId = setTimeout(sendTempChange, 1000);
     return () => clearTimeout(timeoutId);
-  }, [temp, lastTemp, isCoolToggled, isToekickToggled, isFurnaceToggled]);
+  }, [temp, isCoolToggled, isToekickToggled, isFurnaceToggled]);
 
-  // Dismiss keyboard when tapping anywhere - Added from AirCon
+  // Dismiss keyboard when tapping anywhere
   const dismissKeyboard = () => {
     Keyboard.dismiss();
   };
 
-  // Night Setting Toggle - Using service with RV state management
+  // Night Setting Toggle
   const handleNightPress = async () => {
     setIsLoading(true);
     const newNightState = !isNightToggled;
     
     try {
-      // Update RV state first for immediate UI feedback
       rvStateManager.updateClimateState({ 
         nightMode: newNightState,
         lastUpdated: new Date().toISOString()
@@ -282,17 +329,14 @@ const ClimateControlScreenTablet = () => {
       
       const result = await ClimateService.setNightMode();
       if (result.success) {
-        // Save to AsyncStorage for backwards compatibility
         await AsyncStorage.setItem('nightMode', JSON.stringify(newNightState));
         
-        // Add status message
         setStatusMessage(`Night mode ${newNightState ? 'enabled' : 'disabled'}`);
         setShowStatus(true);
         setTimeout(() => setShowStatus(false), 3000);
         
         setErrorMessage(null);
       } else {
-        // Revert state on error
         rvStateManager.updateClimateState({ 
           nightMode: !newNightState,
           lastUpdated: new Date().toISOString()
@@ -305,7 +349,6 @@ const ClimateControlScreenTablet = () => {
         setTimeout(() => setShowStatus(false), 3000);
       }
     } catch (error) {
-      // Revert state on error
       rvStateManager.updateClimateState({ 
         nightMode: !newNightState,
         lastUpdated: new Date().toISOString()
@@ -321,13 +364,12 @@ const ClimateControlScreenTablet = () => {
     }
   };
 
-  // Dehumid Setting Toggle - Using service with RV state management
+  // Dehumid Setting Toggle
   const handleDehumidPress = async () => {
     setIsLoading(true);
     const newDehumidState = !isDehumidToggled;
     
     try {
-      // Update RV state first for immediate UI feedback
       rvStateManager.updateClimateState({ 
         dehumidifyMode: newDehumidState,
         lastUpdated: new Date().toISOString()
@@ -336,17 +378,14 @@ const ClimateControlScreenTablet = () => {
       
       const result = await ClimateService.setDehumidifyMode();
       if (result.success) {
-        // Save to AsyncStorage for backwards compatibility
         await AsyncStorage.setItem('dehumidMode', JSON.stringify(newDehumidState));
         
-        // Add status message
         setStatusMessage(`Dehumidify mode ${newDehumidState ? 'enabled' : 'disabled'}`);
         setShowStatus(true);
         setTimeout(() => setShowStatus(false), 3000);
         
         setErrorMessage(null);
       } else {
-        // Revert state on error
         rvStateManager.updateClimateState({ 
           dehumidifyMode: !newDehumidState,
           lastUpdated: new Date().toISOString()
@@ -359,7 +398,6 @@ const ClimateControlScreenTablet = () => {
         setTimeout(() => setShowStatus(false), 3000);
       }
     } catch (error) {
-      // Revert state on error
       rvStateManager.updateClimateState({ 
         dehumidifyMode: !newDehumidState,
         lastUpdated: new Date().toISOString()
@@ -375,22 +413,19 @@ const ClimateControlScreenTablet = () => {
     }
   };
 
-  // Handle feature button press (Cool, Toe Kick, Furnace) with improved implementation from AirCon
+  // Handle feature button press (Cool, Toe Kick, Furnace)
   const handleButtonPress = async (label) => {
     setIsLoading(true);
     
-    // Check if the button is already active
     const isActive = activeButtons.includes(label);
     
     try {
       let result;
       let newState;
       
-      // Execute corresponding service methods based on the button label
       switch (label) {
         case "Cool":
           newState = !isCoolToggled;
-          // Update RV state first for immediate UI feedback
           rvStateManager.updateClimateState({ 
             coolingOn: newState,
             lastUpdated: new Date().toISOString()
@@ -399,15 +434,12 @@ const ClimateControlScreenTablet = () => {
           
           result = await ClimateService.toggleCooling();
           if (result.success) {
-            // Update AsyncStorage to match AirCon implementation
             await AsyncStorage.setItem('coolingState', JSON.stringify(newState));
             
-            // Add status message
             setStatusMessage(`Cooling ${newState ? 'turned on' : 'turned off'}`);
             setShowStatus(true);
             setTimeout(() => setShowStatus(false), 3000);
           } else {
-            // Revert state on error
             rvStateManager.updateClimateState({ 
               coolingOn: !newState,
               lastUpdated: new Date().toISOString()
@@ -418,7 +450,6 @@ const ClimateControlScreenTablet = () => {
           
         case "Toe Kick":
           newState = !isToekickToggled;
-          // Update RV state first for immediate UI feedback
           rvStateManager.updateClimateState({ 
             toeKickOn: newState,
             lastUpdated: new Date().toISOString()
@@ -427,15 +458,12 @@ const ClimateControlScreenTablet = () => {
           
           result = await ClimateService.toggleToeKick();
           if (result.success) {
-            // Update AsyncStorage to match AirCon implementation
             await AsyncStorage.setItem('toeKickState', JSON.stringify(newState));
             
-            // Add status message
             setStatusMessage(`Toe Kick ${newState ? 'turned on' : 'turned off'}`);
             setShowStatus(true);
             setTimeout(() => setShowStatus(false), 3000);
           } else {
-            // Revert state on error
             rvStateManager.updateClimateState({ 
               toeKickOn: !newState,
               lastUpdated: new Date().toISOString()
@@ -446,7 +474,6 @@ const ClimateControlScreenTablet = () => {
           
         case "Furnace":
           newState = !isFurnaceToggled;
-          // Update RV state first for immediate UI feedback
           rvStateManager.updateClimateState({ 
             heatingOn: newState,
             lastUpdated: new Date().toISOString()
@@ -455,12 +482,10 @@ const ClimateControlScreenTablet = () => {
           
           result = await ClimateService.toggleFurnace();
           if (result.success) {
-            // Add status message
             setStatusMessage(`Furnace ${newState ? 'turned on' : 'turned off'}`);
             setShowStatus(true);
             setTimeout(() => setShowStatus(false), 3000);
           } else {
-            // Revert state on error
             rvStateManager.updateClimateState({ 
               heatingOn: !newState,
               lastUpdated: new Date().toISOString()
@@ -476,17 +501,15 @@ const ClimateControlScreenTablet = () => {
       }
       
       if (result && result.success) {
-        // Update active buttons state
         setActiveButtons((prev) =>
           isActive
-            ? prev.filter((item) => item !== label) // Remove if already active
-            : [...prev, label] // Add if not active
+            ? prev.filter((item) => item !== label)
+            : [...prev, label]
         );
         setErrorMessage(null);
       } else if (result) {
         setErrorMessage(`Error: ${result.error}`);
         
-        // Add status message
         setStatusMessage(`Failed to toggle ${label}`);
         setShowStatus(true);
         setTimeout(() => setShowStatus(false), 3000);
@@ -494,7 +517,6 @@ const ClimateControlScreenTablet = () => {
     } catch (error) {
       setErrorMessage(`Unexpected error: ${error.message}`);
       
-      // Add status message
       setStatusMessage(`Failed to toggle ${label}`);
       setShowStatus(true);
       setTimeout(() => setShowStatus(false), 3000);
@@ -503,13 +525,12 @@ const ClimateControlScreenTablet = () => {
     }
   };
 
-  // Handle fan speed button press with RV state management
+  // Handle fan speed button press
   const handleFanSpeedPress = async (speed) => {
     setIsLoading(true);
     const previousSpeed = speed;
     
     try {
-      // Update RV state first for immediate UI feedback
       rvStateManager.updateClimateState({ 
         fanSpeed: speed,
         autoMode: speed === "Auto",
@@ -526,7 +547,6 @@ const ClimateControlScreenTablet = () => {
       
       switch (speed) {
         case "Low":
-          // Use the direct raw command approach that's working
           result = await setLowFanSpeed();
           break;
         case "Med":
@@ -536,7 +556,6 @@ const ClimateControlScreenTablet = () => {
           result = await ClimateService.setHighFanSpeed();
           break;
         case "Auto":
-          // Use direct raw command approach for auto setting
           result = await setAutoMode();
           break;
         default:
@@ -546,18 +565,15 @@ const ClimateControlScreenTablet = () => {
       }
       
       if (result && result.success) {
-        // Store the selected fan speed and auto mode state
         await AsyncStorage.setItem('fanSpeed', speed);
         await AsyncStorage.setItem('autoModeState', JSON.stringify(speed === "Auto"));
         
         setErrorMessage(null);
         
-        // Add status message
         setStatusMessage(`Fan speed set to ${speed}`);
         setShowStatus(true);
         setTimeout(() => setShowStatus(false), 3000);
       } else if (result) {
-        // Revert state on error
         rvStateManager.updateClimateState({ 
           fanSpeed: previousSpeed,
           autoMode: previousSpeed === "Auto",
@@ -572,7 +588,6 @@ const ClimateControlScreenTablet = () => {
         setTimeout(() => setShowStatus(false), 3000);
       }
     } catch (error) {
-      // Revert state on error
       rvStateManager.updateClimateState({ 
         fanSpeed: previousSpeed,
         autoMode: previousSpeed === "Auto",
@@ -593,26 +608,20 @@ const ClimateControlScreenTablet = () => {
   // Direct implementation of low fan speed using raw commands
   const setLowFanSpeed = async () => {
     try {
-      // Attempt to execute the individual commands instead of the command group
-      // This is a workaround for the 400 error issue
       const commands = [
-        '19FED99F#FF96AA0F3200D1FF', // low_fan_speed_1
-        '195FCE98#AA00320000000000', // low_fan_speed_2
-        '19FEF998#A110198A24AE19FF'  // low_fan_speed_3
+        '19FED99F#FF96AA0F3200D1FF',
+        '195FCE98#AA00320000000000',
+        '19FEF998#A110198A24AE19FF'
       ];
       
-      // Send each command individually using the raw command API
       for (const command of commands) {
         await RVControlService.executeRawCommand(command);
-        // Short delay to avoid overwhelming the CAN bus
         await new Promise(resolve => setTimeout(resolve, 100));
       }
       
       return { success: true };
     } catch (error) {
       console.error('Failed to set low fan speed:', error);
-      
-      // Provide a more detailed error message for debugging
       return { 
         success: false, 
         error: error.message,
@@ -624,25 +633,20 @@ const ClimateControlScreenTablet = () => {
   // Direct implementation of auto mode using raw commands
   const setAutoMode = async () => {
     try {
-      // Auto setting commands from server.js
       const commands = [
-        '19FEF99F#01C0FFFFFFFFFFFF', // auto_setting_on_1
-        '19FED99F#FF96AA0F0000D1FF', // auto_setting_on_2
-        '19FFE198#010064A924A92400'  // auto_setting_on_3
+        '19FEF99F#01C0FFFFFFFFFFFF',
+        '19FED99F#FF96AA0F0000D1FF',
+        '19FFE198#010064A924A92400'
       ];
       
-      // Send each command individually using the raw command API
       for (const command of commands) {
         await RVControlService.executeRawCommand(command);
-        // Short delay to avoid overwhelming the CAN bus
         await new Promise(resolve => setTimeout(resolve, 100));
       }
       
       return { success: true };
     } catch (error) {
       console.error('Failed to set auto mode:', error);
-      
-      // Provide a more detailed error message for debugging
       return { 
         success: false, 
         error: error.message,
@@ -651,11 +655,10 @@ const ClimateControlScreenTablet = () => {
     }
   };
 
-  // Load saved states on component mount - updated with RV state management
+  // Load saved states on component mount
   useEffect(() => {
     const loadSavedStates = async () => {
       try {
-        // First, try to get states from RV state manager
         const currentClimateState = rvStateManager.getCategoryState('climate');
         
         // Load cooling state
@@ -665,7 +668,6 @@ const ClimateControlScreenTablet = () => {
             setActiveButtons(prev => [...prev, "Cool"]);
           }
         } else {
-          // Fall back to AsyncStorage
           const savedCoolingState = await AsyncStorage.getItem('coolingState');
           if (savedCoolingState !== null) {
             const coolingState = JSON.parse(savedCoolingState);
@@ -685,7 +687,6 @@ const ClimateControlScreenTablet = () => {
             setActiveButtons(prev => [...prev, "Toe Kick"]);
           }
         } else {
-          // Fall back to AsyncStorage
           const savedToeKickState = await AsyncStorage.getItem('toeKickState');
           if (savedToeKickState !== null) {
             const toeKickState = JSON.parse(savedToeKickState);
@@ -698,7 +699,7 @@ const ClimateControlScreenTablet = () => {
           }
         }
         
-        // Load other states with RV state manager fallback to AsyncStorage
+        // Load other states
         if (currentClimateState.nightMode !== undefined) {
           setIsNightToggled(currentClimateState.nightMode);
         } else {
@@ -749,56 +750,6 @@ const ClimateControlScreenTablet = () => {
     loadSavedStates();
   }, []);
 
-  // Add useEffect to check for and apply pending temperature changes
-  useEffect(() => {
-    const checkPendingChanges = async () => {
-      try {
-        // Skip if we're currently loading or if there's no active climate control
-        if (isLoading || (!isCoolToggled && !isToekickToggled && !isFurnaceToggled)) return;
-        
-        // Check for pending temperature changes
-        const pendingChangesString = await AsyncStorage.getItem('pendingTempChange');
-        
-        if (pendingChangesString) {
-          const pendingChanges = JSON.parse(pendingChangesString);
-          const pendingTemp = pendingChanges.targetTemp;
-          const timestamp = pendingChanges.timestamp;
-          
-          // Only apply changes that are less than 24 hours old
-          const isRecent = (Date.now() - timestamp) < 24 * 60 * 60 * 1000;
-          
-          if (isRecent && pendingTemp !== temp) {
-            // Show user we're applying their saved preference
-            setStatusMessage('Applying saved temperature setting...');
-            setShowStatus(true);
-            
-            // Update UI temperature immediately
-            setTemp(pendingTemp);
-            
-            // Update RV state
-            rvStateManager.updateClimateState({ 
-              temperature: pendingTemp,
-              lastUpdated: new Date().toISOString()
-            });
-            
-            // Clear the pending change since we're applying it now
-            await AsyncStorage.removeItem('pendingTempChange');
-            
-            setTimeout(() => setShowStatus(false), 3000);
-          } else if (!isRecent) {
-            // Clear old pending changes
-            await AsyncStorage.removeItem('pendingTempChange');
-          }
-        }
-      } catch (error) {
-        console.error('Error checking pending temperature changes:', error);
-      }
-    };
-    
-    // Run on mount and when climate control mode changes
-    checkPendingChanges();
-  }, [isCoolToggled, isToekickToggled, isFurnaceToggled, isLoading]);
-
   // If the screen is a tablet, render the climate control interface
   if (isTablet) {
     return (
@@ -812,19 +763,19 @@ const ClimateControlScreenTablet = () => {
               </Col>
             </Row>
             <Row className="bg-black" size={1}>
-                                <View className="pt-3 pl-3">
-                                    <Image
-                                        source={require("../assets/images/icon.png")}
-                                        style={{
-                                            width: 90,
-                                            height: 55,
-                                            right: 0,
-                                            paddingTop: 0,
-                                            backgroundColor: "white"
-                                        }}
-                                    />
-                                </View>
-                            </Row>
+              <View className="pt-3 pl-3">
+                <Image
+                  source={require("../assets/images/icon.png")}
+                  style={{
+                    width: 90,
+                    height: 55,
+                    right: 0,
+                    paddingTop: 0,
+                    backgroundColor: "white"
+                  }}
+                />
+              </View>
+            </Row>
           </Row>
 
           {/* Weather error indicator */}
@@ -838,7 +789,6 @@ const ClimateControlScreenTablet = () => {
           {errorMessage && (
             <View style={styles.errorContainer}>
               <Text style={styles.errorText}>{errorMessage}</Text>
-              {/* Add dismiss button for errors */}
               <TouchableOpacity 
                 style={styles.dismissButton}
                 onPress={() => setErrorMessage(null)}
@@ -855,7 +805,7 @@ const ClimateControlScreenTablet = () => {
             </View>
           )}
           
-          {/* Status message - Added from AirCon */}
+          {/* Status message */}
           {showStatus && (
             <View style={styles.statusContainer}>
               <Text style={styles.statusText}>{statusMessage}</Text>
@@ -881,11 +831,11 @@ const ClimateControlScreenTablet = () => {
                 justifyContent: "flex-start",
                 padding: 20,
                 margin: 50,
-                 shadowColor: "#FFFFFF",
-                        shadowOffset: { width: 0, height: 4 },
-                        shadowOpacity: 0.5,
-                        shadowRadius: 6,
-                        elevation: 6,
+                shadowColor: "#FFFFFF",
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.5,
+                shadowRadius: 6,
+                elevation: 6,
               }}
             >
               <Text
@@ -899,7 +849,6 @@ const ClimateControlScreenTablet = () => {
               >
                 Main (Front)
               </Text>
-              {/* Divider */}
               <View
                 style={{
                   height: 1,
@@ -910,62 +859,66 @@ const ClimateControlScreenTablet = () => {
               />
               <View style={styles.container}>
                 <RadialSlider
-  value={temp}
-  min={60}
-  max={85}
-  thumbColor={"#FFFFFF"}
-  thumbBorderColor={"#848482"}
-  sliderTrackColor={"#E5E5E5"}
-  linearGradient={[
-    { offset: '0%', color: '#ffaca6' },
-    { offset: '100%', color: '#FF8200' },
-  ]}
-  onChange={handleTempChange}
-  subTitle={'Degrees'}
-  subTitleStyle={{
-    color: isDarkMode ? 'white' : 'black',
-    paddingBottom: 15,
-    fontSize: 20, // Smaller subtitle
-  }}
-  unitStyle={{
-    color: isDarkMode ? 'white' : 'black',
-    paddingTop: 5,
-  }}
-  valueStyle={{
-    color: isDarkMode ? 'white' : 'black',
-    paddingTop: 5,
-    fontSize: 48, // Smaller value number
-  }}
-  style={{
-    backgroundColor: '#1B1B1B', 
-  }}
-  buttonContainerStyle={{
-    color: "FFFFFF",
-  }}
-  leftIconStyle={{
-    backgroundColor: 'white',
-    borderRadius: 10,
-    marginRight: 10,
-    top: 40,
-    height: 40,
-    width: 50,
-    paddingLeft: 4,
-  }}
-  rightIconStyle={{
-    backgroundColor: 'white',
-    borderRadius: 10,
-    marginLeft: 10,
-    top: 40,
-    height: 40,
-    width: 50,
-    paddingLeft: 5,
-  }}
-  isHideTailText={true}
-  unit={'°F'}
-/>
-
+                  value={temp}
+                  min={60}
+                  max={85}
+                  thumbColor={"#FFFFFF"}
+                  thumbBorderColor={"#848482"}
+                  sliderTrackColor={"#E5E5E5"}
+                  linearGradient={[
+                    { offset: '0%', color: '#ffaca6' },
+                    { offset: '100%', color: '#FF8200' },
+                  ]}
+                  onChange={handleTempChange}
+                  onComplete={() => {
+                    console.log('ClimateControl: Slider interaction complete');
+                    isSlidingRef.current = false;
+                  }}
+                  subTitle={'Degrees'}
+                  subTitleStyle={{
+                    color: isDarkMode ? 'white' : 'black',
+                    paddingBottom: 15,
+                    fontSize: 20,
+                  }}
+                  unitStyle={{
+                    color: isDarkMode ? 'white' : 'black',
+                    paddingTop: 5,
+                  }}
+                  valueStyle={{
+                    color: isDarkMode ? 'white' : 'black',
+                    paddingTop: 5,
+                    fontSize: 48,
+                  }}
+                  style={{
+                    backgroundColor: '#1B1B1B', 
+                  }}
+                  buttonContainerStyle={{
+                    color: "FFFFFF",
+                  }}
+                  leftIconStyle={{
+                    backgroundColor: 'white',
+                    borderRadius: 10,
+                    marginRight: 10,
+                    top: 40,
+                    height: 40,
+                    width: 50,
+                    paddingLeft: 4,
+                  }}
+                  rightIconStyle={{
+                    backgroundColor: 'white',
+                    borderRadius: 10,
+                    marginLeft: 10,
+                    top: 40,
+                    height: 40,
+                    width: 50,
+                    paddingLeft: 5,
+                  }}
+                  isHideTailText={true}
+                  unit={'°F'}
+                />
               </View>
             </Col>
+            
             <View
               style={{
                 flexDirection: "row",
@@ -996,11 +949,11 @@ const ClimateControlScreenTablet = () => {
                       marginB: 25,
                       right: 80,
                       bottom: 100,
-                       shadowColor: "#FFFFFF",
-                        shadowOffset: { width: 0, height: 4 },
-                        shadowOpacity: 0.5,
-                        shadowRadius: 6,
-                        elevation: 6,
+                      shadowColor: "#FFFFFF",
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.5,
+                      shadowRadius: 6,
+                      elevation: 6,
                     }}
                   >
                     <Text
@@ -1022,190 +975,184 @@ const ClimateControlScreenTablet = () => {
                         marginTop: 40,
                       }}
                     />
-     {/* Feature buttons and fan speed side by side layout */}
-<View style={{ 
-  flex: 1, 
-  flexDirection: "row", 
-  marginTop: 10
-}}>
-  {/* Left column: Feature buttons with modern styling */}
-  <View style={{ 
-    flex: 0.75, 
-    justifyContent: "flex-start"
-  }}>
-    {features.map((feature, index) => {
-      const isActive = (feature.label === "Cool" && isCoolToggled) ||
-                      (feature.label === "Toe Kick" && isToekickToggled) ||
-                      (feature.label === "Furnace" && isFurnaceToggled);
-      
-      const getGradientColors = (label, active) => {
-        if (!active) return ["#2C2C34", "#3A3A42", "#2C2C34"];
-        
-        switch (label) {
-          case "Cool":
-            return ["#4FC3F7", "#29B6F6", "#0288D1"];
-          case "Toe Kick":
-            return ["#FF9800", "#FFB74D", "#FF8F00"];
-          case "Furnace":
-            return ["#FF6B6B", "#FF8E53", "#FF6B35"];
-          default:
-            return ["#2C2C34", "#3A3A42", "#2C2C34"];
-        }
-      };
-      
-      const getIconName = (label, active) => {
-        switch (label) {
-          case "Cool":
-            return active ? "snow" : "snow-outline";
-          case "Toe Kick":
-            return active ? "flame" : "flame-outline";
-          case "Furnace":
-            return active ? "bonfire" : "bonfire-outline";
-          default:
-            return "help-outline";
-        }
-      };
-      
-      return (
-        <TouchableOpacity
-          key={index}
-          onPress={() => handleButtonPress(feature.label)}
-          disabled={isLoading}
-          activeOpacity={0.8}
-          style={[
-            styles.modernButton,
-            isLoading && { opacity: 0.6 }
-          ]}
-        >
-          <LinearGradient
-            colors={getGradientColors(feature.label, isActive)}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.modernGradientButton}
-          >
-            <View style={styles.modernButtonContent}>
-              <View style={[
-                styles.modernIconContainer,
-                { backgroundColor: isActive ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)' }
-              ]}>
-                <Ionicons
-                  name={getIconName(feature.label, isActive)}
-                  size={20}
-                  color={isActive ? "#FFF" : "#B0B0B0"}
-                />
-              </View>
-              <View style={styles.modernTextContainer}>
-                <Text style={[
-                  styles.modernButtonTitle,
-                  { color: isActive ? "#FFF" : "#E0E0E0" }
-                ]}>
-                  {feature.label}
-                </Text>
-              </View>
-              <View style={[
-                styles.modernStatusIndicator,
-                { backgroundColor: isActive ? "#4CAF50" : "#666" }
-              ]} />
-            </View>
-          </LinearGradient>
-        </TouchableOpacity>
-      );
-    })}
-  </View>
-  
-  {/* Right column: Fan Speed container */}
-  <View style={{ 
-    flex: 0.25, 
-    marginLeft: 10,
-    alignItems: "center"
-  }}>
-    <Text style={{ 
-      color: "white", 
-      fontSize: 14,
-      marginBottom: 5,
-      textAlign: "center"
-    }}>
-      Fan Speed
-    </Text>
-    <View style={styles.fanSpeedContainer}>
-      <ScrollView 
-        horizontal={false}
-        contentContainerStyle={styles.fanSpeedScrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* High Speed Button */}
-        <FanSpeedButton 
-          speed="High" 
-          onPress={() => handleFanSpeedPress("High")} 
-          isLoading={isLoading}
-          isActive={speed === "High"}
-        />
-        
-        {/* Med Speed Button */}
-        <FanSpeedButton 
-          speed="Med" 
-          onPress={() => handleFanSpeedPress("Med")} 
-          isLoading={isLoading}
-          isActive={speed === "Med"}
-        />
-        
-        {/* Low Speed Button */}
-        <FanSpeedButton 
-          speed="Low" 
-          onPress={() => handleFanSpeedPress("Low")} 
-          isLoading={isLoading}
-          isActive={speed === "Low"}
-        />
-        
-        {/* Auto Speed Button */}
-        <FanSpeedButton 
-          speed="Auto" 
-          onPress={() => handleFanSpeedPress("Auto")} 
-          isLoading={isLoading}
-          isActive={isAutoModeActive}
-        />
-      </ScrollView>
-    </View>
-  </View>
-</View>
-
-
+                    
+                    {/* Feature buttons and fan speed side by side layout */}
+                    <View style={{ 
+                      flex: 1, 
+                      flexDirection: "row", 
+                      marginTop: 10
+                    }}>
+                      {/* Left column: Feature buttons */}
+                      <View style={{ 
+                        flex: 0.75, 
+                        justifyContent: "flex-start"
+                      }}>
+                        {features.map((feature, index) => {
+                          const isActive = (feature.label === "Cool" && isCoolToggled) ||
+                                          (feature.label === "Toe Kick" && isToekickToggled) ||
+                                          (feature.label === "Furnace" && isFurnaceToggled);
+                          
+                          const getGradientColors = (label, active) => {
+                            if (!active) return ["#2C2C34", "#3A3A42", "#2C2C34"];
+                            
+                            switch (label) {
+                              case "Cool":
+                                return ["#4FC3F7", "#29B6F6", "#0288D1"];
+                              case "Toe Kick":
+                                return ["#FF9800", "#FFB74D", "#FF8F00"];
+                              case "Furnace":
+                                return ["#FF6B6B", "#FF8E53", "#FF6B35"];
+                              default:
+                                return ["#2C2C34", "#3A3A42", "#2C2C34"];
+                            }
+                          };
+                          
+                          const getIconName = (label, active) => {
+                            switch (label) {
+                              case "Cool":
+                                return active ? "snow" : "snow-outline";
+                              case "Toe Kick":
+                                return active ? "flame" : "flame-outline";
+                              case "Furnace":
+                                return active ? "bonfire" : "bonfire-outline";
+                              default:
+                                return "help-outline";
+                            }
+                          };
+                          
+                          return (
+                            <TouchableOpacity
+                              key={index}
+                              onPress={() => handleButtonPress(feature.label)}
+                              disabled={isLoading}
+                              activeOpacity={0.8}
+                              style={[
+                                styles.modernButton,
+                                isLoading && { opacity: 0.6 }
+                              ]}
+                            >
+                              <LinearGradient
+                                colors={getGradientColors(feature.label, isActive)}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={styles.modernGradientButton}
+                              >
+                                <View style={styles.modernButtonContent}>
+                                  <View style={[
+                                    styles.modernIconContainer,
+                                    { backgroundColor: isActive ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)' }
+                                  ]}>
+                                    <Ionicons
+                                      name={getIconName(feature.label, isActive)}
+                                      size={20}
+                                      color={isActive ? "#FFF" : "#B0B0B0"}
+                                    />
+                                  </View>
+                                  <View style={styles.modernTextContainer}>
+                                    <Text style={[
+                                      styles.modernButtonTitle,
+                                      { color: isActive ? "#FFF" : "#E0E0E0" }
+                                    ]}>
+                                      {feature.label}
+                                    </Text>
+                                  </View>
+                                  <View style={[
+                                    styles.modernStatusIndicator,
+                                    { backgroundColor: isActive ? "#4CAF50" : "#666" }
+                                  ]} />
+                                </View>
+                              </LinearGradient>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                      
+                      {/* Right column: Fan Speed container */}
+                      <View style={{ 
+                        flex: 0.25, 
+                        marginLeft: 10,
+                        alignItems: "center"
+                      }}>
+                        <Text style={{ 
+                          color: "white", 
+                          fontSize: 14,
+                          marginBottom: 5,
+                          textAlign: "center"
+                        }}>
+                          Fan Speed
+                        </Text>
+                        <View style={styles.fanSpeedContainer}>
+                          <ScrollView 
+                            horizontal={false}
+                            contentContainerStyle={styles.fanSpeedScrollContent}
+                            showsVerticalScrollIndicator={false}
+                          >
+                            <FanSpeedButton 
+                              speed="High" 
+                              onPress={() => handleFanSpeedPress("High")} 
+                              isLoading={isLoading}
+                              isActive={speed === "High"}
+                            />
+                            
+                            <FanSpeedButton 
+                              speed="Med" 
+                              onPress={() => handleFanSpeedPress("Med")} 
+                              isLoading={isLoading}
+                              isActive={speed === "Med"}
+                            />
+                            
+                            <FanSpeedButton 
+                              speed="Low" 
+                              onPress={() => handleFanSpeedPress("Low")} 
+                              isLoading={isLoading}
+                              isActive={speed === "Low"}
+                            />
+                            
+                            <FanSpeedButton 
+                              speed="Auto" 
+                              onPress={() => handleFanSpeedPress("Auto")} 
+                              isLoading={isLoading}
+                              isActive={isAutoModeActive}
+                            />
+                          </ScrollView>
+                        </View>
+                      </View>
+                    </View>
                   </Col>
+                  
                   <View style={styles.fixedToggleContainer}>
-  {/* Day/Night Toggle */}
-  <TouchableOpacity
-    onPress={handleNightPress}
-    disabled={isLoading}
-    style={[
-      styles.toggleBase,
-      isNightToggled && styles.toggleActiveDay
-    ]}
-    activeOpacity={0.8}
-  >
-    <Image source={isNightToggled ? moonImage : sunImage} style={styles.toggleIcon} />
-    <Text style={styles.toggleText}>
-      {isNightToggled ? 'Night Mode' : 'Day Mode'}
-    </Text>
-  </TouchableOpacity>
+                    {/* Day/Night Toggle */}
+                    <TouchableOpacity
+                      onPress={handleNightPress}
+                      disabled={isLoading}
+                      style={[
+                        styles.toggleBase,
+                        isNightToggled && styles.toggleActiveDay
+                      ]}
+                      activeOpacity={0.8}
+                    >
+                      <Image source={isNightToggled ? moonImage : sunImage} style={styles.toggleIcon} />
+                      <Text style={styles.toggleText}>
+                        {isNightToggled ? 'Night Mode' : 'Day Mode'}
+                      </Text>
+                    </TouchableOpacity>
 
-  {/* Dehumidify Toggle */}
-  <TouchableOpacity
-    onPress={handleDehumidPress}
-    disabled={isLoading}
-    style={[
-      styles.toggleBase,
-      isDehumidToggled && styles.toggleActiveDehumid
-    ]}
-    activeOpacity={0.8}
-  >
-    <Image source={require("../assets/drop.png")} style={styles.toggleIcon} />
-    <Text style={styles.toggleText}>
-      Dehumidify
-    </Text>
-  </TouchableOpacity>
-</View>
-
-
+                    {/* Dehumidify Toggle */}
+                    <TouchableOpacity
+                      onPress={handleDehumidPress}
+                      disabled={isLoading}
+                      style={[
+                        styles.toggleBase,
+                        isDehumidToggled && styles.toggleActiveDehumid
+                      ]}
+                      activeOpacity={0.8}
+                    >
+                      <Image source={require("../assets/drop.png")} style={styles.toggleIcon} />
+                      <Text style={styles.toggleText}>
+                        Dehumidify
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
             </View>
@@ -1214,24 +1161,14 @@ const ClimateControlScreenTablet = () => {
       </TouchableWithoutFeedback>
     );
   }
-  return null; // Return null if not tablet
+  return null;
 }
 
-const getImageForLabel = (label) => {
-  const images = {
-    "Cool": require("../assets/snowflake.png"),
-    "Toe Kick": require("../assets/toekick.png"),
-    "Furnace": require("../assets/furnace.png"),
-  };
-  return images[label] || require("../assets/questionmark.png");
-};
-
-// Update the FanSpeedButton component to handle active state:
 const FanSpeedButton = ({ speed, onPress, isLoading, isActive }) => {
   const getBackgroundColor = () => {
     return isActive 
-      ? '#4CAF50'    // green when active
-      : '#242124';   // same gray when inactive
+      ? '#4CAF50'
+      : '#242124';
   };
   
   return (
@@ -1255,7 +1192,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  // Modern button styles matching MainScreen
   modernButton: {
     borderRadius: 16,
     shadowColor: '#000',
@@ -1305,28 +1241,6 @@ const styles = StyleSheet.create({
     top: 12,
     right: 12,
   },
-  // Styles for the toggle buttons
-  toggleButtonsContainer: {
-    flexDirection: 'column',
-    justifyContent: 'space-between',
-    width: 80,
-  },
-  toggleButton: {
-    padding: 8,
-    backgroundColor: '#333',
-    borderRadius: 5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 2,
-    width: 80,
-  },
-  activeToggleButton: {
-    backgroundColor: '#FF8200',
-  },
-  toggleButtonText: {
-    color: 'white',
-    fontSize: 14,
-  },
   buttonText: {
     color: "white",
     fontSize: 16,
@@ -1372,16 +1286,13 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
   },
-
   fixedToggleContainer: {
-  position: 'absolute',
-  top: 20, // adjust Y-position
-  left: 400, // adjust X-position
-  zIndex: 1000,
-  alignItems: 'center',
-},
-
-  // Added status container style from AirCon
+    position: 'absolute',
+    top: 20,
+    left: 400,
+    zIndex: 1000,
+    alignItems: 'center',
+  },
   statusContainer: {
     position: "absolute",
     bottom: 80,
@@ -1396,7 +1307,6 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "bold",
   },
-  // New styles for weather error indicator
   weatherErrorIndicator: {
     position: "absolute",
     top: 10,
@@ -1412,22 +1322,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "bold",
   },
-  // Retry button styles
-  retryButton: {
-    backgroundColor: "#FFB267",
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 5,
-    marginTop: 10,
-    alignSelf: "center",
-  },
-  retryButtonText: {
-    color: "white",
-    fontWeight: "bold",
-  },
   fanSpeedContainer: {
     width: 80,
-    height: 195, // Height limit for the container
+    height: 195,
     marginTop:5,
     backgroundColor: 'rgba(0,0,0,0.2)',
     borderRadius: 5,
@@ -1436,7 +1333,6 @@ const styles = StyleSheet.create({
   fanSpeedScrollContent: {
     alignItems: 'center',
     paddingVertical: 2,
-    
   },
   fanSpeedButton: {
     padding: 10,
@@ -1445,56 +1341,40 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 76,
     margin: 2,
-    // no backgroundColor here — it's set dynamically
   },
-  autoSpeedButton: {
-    marginTop: 5,
-    marginBottom: 5,
-  },
-
   toggleBase: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'flex-start',
-  width: 180,
-  paddingVertical: 12,
-  paddingHorizontal: 16,
-  borderRadius: 30,
-  marginVertical: 10,
-  backgroundColor: '#2C2C2E',
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.3,
-  shadowRadius: 4,
-  elevation: 4,
-},
-
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    width: 180,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 30,
+    marginVertical: 10,
+    backgroundColor: '#2C2C2E',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
   toggleActiveDay: {
-    backgroundColor: '#FFBA00',   // gold for Day/Night
+    backgroundColor: '#FFBA00',
   },
   toggleActiveDehumid: {
-    backgroundColor: '#00B9E8',   // cyan for Dehumidify
-  },
-  toggleInactive: {
-    backgroundColor: '#333',      // dark gray when off
+    backgroundColor: '#00B9E8',
   },
   toggleIcon: {
-  width: 26,
-  height: 26,
-  marginRight: 12,
-  tintColor: 'white',
-},
-
+    width: 26,
+    height: 26,
+    marginRight: 12,
+    tintColor: 'white',
+  },
   toggleText: {
-  color: 'white',
-  fontSize: 17,
-  fontWeight: '600',
-},
-
-  toggleTextActive: {
+    color: 'white',
+    fontSize: 17,
     fontWeight: '600',
   },
-  
 });
 
 export default ClimateControlScreenTablet;

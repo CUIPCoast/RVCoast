@@ -1,4 +1,7 @@
-import * as React from "react";
+import React, { useState, useEffect } from "react";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NavigationContainer } from "@react-navigation/native";
+import { View } from "react-native";
 import TabNavigator from "./TabNavigator";
 import MobileSplashScreen from "../components/MobileSplashScreenAdvanced";
 import MobileAnimatedSplashScreen from "../components/MobileAnimatedSplashScreen";

@@ -1,14 +1,9 @@
-// screens/AirCon.jsx - Enhanced with real-time temperature monitoring (Original UI)
-import React, { useState, useEffect } from "react";
-import { StyleSheet, View, Text, TouchableOpacity, Switch, Keyboard, TouchableWithoutFeedback } from "react-native";
+// screens/AirCon.jsx - Fixed temperature synchronization and slider responsiveness
+import React, { useState, useEffect, useRef } from "react";
+import { StyleSheet, View, Text, TouchableOpacity, Keyboard, TouchableWithoutFeedback } from "react-native";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Color,
-  Border,
-  FontFamily,
-  FontSize,
-  Gap,
-  Padding,
   isDarkMode
 } from "../GlobalStyles";
 import { RadialSlider } from 'react-native-radial-slider';
@@ -21,19 +16,38 @@ import rvStateManager from "../API/RVStateManager/RVStateManager";
 // Import temperature monitoring service
 import temperatureMonitoringService from "../Service/TemperatureMonitoringService";
 
-
 const AirCon = ({ onClose }) => {
   const isTablet = useScreenSize();
   
   // Use RV state management hook for climate data
-  const { climate, setTemperature, toggleCooling, toggleHeating } = useRVClimate();
+  const { climate } = useRVClimate();
   
-  // Local state for UI interactions and status
-  const [temp, setTemp] = useState(72);
-  const [lastTemp, setLastTemp] = useState(72);
+  // Get initial temperature from RV state BEFORE rendering to prevent flash
+  const getInitialTemp = () => {
+    try {
+      const currentClimateState = rvStateManager.getCategoryState('climate');
+      if (currentClimateState.temperature !== undefined && currentClimateState.temperature !== null) {
+        return Math.round(currentClimateState.temperature);
+      }
+    } catch (error) {
+      console.error('Error getting initial temp:', error);
+    }
+    return 72; // Only use default if no state exists
+  };
+  
+  const initialTemp = getInitialTemp();
+  
+  // Local state for UI interactions and status - initialized with RV state value
+  const [temp, setTemp] = useState(initialTemp);
+  const [lastTemp, setLastTemp] = useState(initialTemp);
   const [statusMessage, setStatusMessage] = useState('');
   const [showStatus, setShowStatus] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  
+  // Use refs to prevent interference with slider
+  const isSlidingRef = useRef(false);
+  const tempChangeTimeoutRef = useRef(null);
+  const lastSentTempRef = useRef(initialTemp);
   
   // Initialize temperature monitoring service
   useEffect(() => {
@@ -47,16 +61,18 @@ const AirCon = ({ onClose }) => {
       const { temperature } = data;
       console.log('AirCon: Real-time temperature update from RV-C:', temperature.fahrenheit);
       
-      // Update the slider to show actual temperature from CAN bus
-      const roundedTemp = Math.round(temperature.fahrenheit);
-      setTemp(roundedTemp);
-      
-      // Update RV state manager with actual temperature
-      rvStateManager.updateClimateState({
-        actualTemperature: temperature.fahrenheit,
-        actualTemperatureCelsius: temperature.celsius,
-        lastUpdate: temperature.lastUpdate
-      });
+      // Only update if not actively sliding
+      if (!isSlidingRef.current) {
+        const roundedTemp = Math.round(temperature.fahrenheit);
+        setTemp(roundedTemp);
+        
+        // Update RV state manager with actual temperature
+        rvStateManager.updateClimateState({
+          actualTemperature: temperature.fahrenheit,
+          actualTemperatureCelsius: temperature.celsius,
+          lastUpdate: temperature.lastUpdate
+        });
+      }
     };
     
     // Subscribe to temperature change events
@@ -69,75 +85,102 @@ const AirCon = ({ onClose }) => {
       const roundedTemp = Math.round(currentTemp.fahrenheit);
       setTemp(roundedTemp);
       setLastTemp(roundedTemp);
+      lastSentTempRef.current = roundedTemp;
     }
     
     // Cleanup on unmount
     return () => {
       console.log('AirCon: Cleaning up temperature monitoring');
       temperatureMonitoringService.removeListener('temperatureChange', handleTemperatureUpdate);
-      // Don't stop the service here - other screens might be using it
     };
   }, []);
   
-  // Initialize state from RV state manager
+  // Initialize state from RV state manager - FIXED to always use RV state as source of truth
   useEffect(() => {
     const initializeState = async () => {
       try {
-        // Get current climate state from RV state manager
+        // ALWAYS get current climate state from RV state manager first
         const currentClimateState = rvStateManager.getCategoryState('climate');
         
-        // Check if we have actual temperature from CAN bus
-        if (currentClimateState.actualTemperature) {
-          const roundedTemp = Math.round(currentClimateState.actualTemperature);
+        console.log('AirCon: Initializing with climate state:', currentClimateState);
+        
+        // Priority 1: Use temperature from RV state manager (most recent/accurate)
+        if (currentClimateState.temperature !== undefined && currentClimateState.temperature !== null) {
+          const roundedTemp = Math.round(currentClimateState.temperature);
+          console.log('AirCon: Loading temperature from RV state:', roundedTemp);
           setTemp(roundedTemp);
           setLastTemp(roundedTemp);
-        } else {
-          // Fall back to stored temperature
-          const savedTemp = await AsyncStorage.getItem('temperature');
-          if (savedTemp) {
-            const tempValue = parseInt(savedTemp, 10);
-            setTemp(tempValue);
-            setLastTemp(tempValue);
-          } else {
-            setTemp(72);
-            setLastTemp(72);
-          }
+          lastSentTempRef.current = roundedTemp;
+          
+          // Also update AsyncStorage to match
+          await AsyncStorage.setItem('temperature', roundedTemp.toString());
+          return; // Exit early - we found our temperature
         }
+        
+        // Priority 2: Fall back to AsyncStorage only if RV state has no temperature
+        const savedTemp = await AsyncStorage.getItem('temperature');
+        if (savedTemp) {
+          const tempValue = parseInt(savedTemp, 10);
+          console.log('AirCon: Loading temperature from AsyncStorage:', tempValue);
+          setTemp(tempValue);
+          setLastTemp(tempValue);
+          lastSentTempRef.current = tempValue;
+          
+          // Update RV state to match what we loaded
+          rvStateManager.updateClimateState({ 
+            temperature: tempValue,
+            lastUpdated: new Date().toISOString()
+          });
+          return;
+        }
+        
+        // Priority 3: Default value if nothing is found
+        console.log('AirCon: No saved temperature found, using default 72°F');
+        setTemp(72);
+        setLastTemp(72);
+        lastSentTempRef.current = 72;
+        
+        // Save default to both storage locations
+        await AsyncStorage.setItem('temperature', '72');
+        rvStateManager.updateClimateState({ 
+          temperature: 72,
+          lastUpdated: new Date().toISOString()
+        });
+        
       } catch (error) {
         console.error('Error initializing AirCon state:', error);
-        // Set default values on error
-        setTemp(70);
-        setLastTemp(70);
+        // Emergency fallback
+        setTemp(72);
+        setLastTemp(72);
+        lastSentTempRef.current = 72;
       }
     };
     
     initializeState();
-  }, []);
+  }, []); // Empty dependency array - only run once on mount
 
   // Subscribe to external state changes (from other devices/screens)
   useEffect(() => {
     const unsubscribe = rvStateManager.subscribeToExternalChanges((newState) => {
-      if (newState.climate) {
-        // Update temperature when external changes occur
-        if (newState.climate.actualTemperature) {
-          const roundedTemp = Math.round(newState.climate.actualTemperature);
-          if (roundedTemp !== temp) {
-            setTemp(roundedTemp);
-            setLastTemp(roundedTemp);
-            
-            // Show notification of external change
-            setStatusMessage(`Temperature updated to ${roundedTemp}°F`);
-            setShowStatus(true);
-            setTimeout(() => setShowStatus(false), 3000);
-          }
+      if (newState.climate && newState.climate.temperature !== undefined) {
+        // Only update if not actively sliding and temperature is different
+        if (!isSlidingRef.current && newState.climate.temperature !== temp) {
+          const roundedTemp = Math.round(newState.climate.temperature);
+          console.log('AirCon: External temperature change detected:', roundedTemp);
+          setTemp(roundedTemp);
+          setLastTemp(roundedTemp);
+          lastSentTempRef.current = roundedTemp;
+          
+          // Show notification of external change
+          setStatusMessage(`Temperature updated to ${roundedTemp}°F`);
+          setShowStatus(true);
+          setTimeout(() => setShowStatus(false), 3000);
         }
-        
-        // External climate control changes handled silently
       }
     });
     
     return unsubscribe;
-  }, [temp, climate.coolingOn, climate.toeKickOn]);
+  }, [temp]);
 
   // Handle cooling toggle with state management
   const handleCoolingPress = async () => {
@@ -177,24 +220,65 @@ const AirCon = ({ onClose }) => {
     }
   };
 
-  // Handle temperature change with debounce and state management
+  // Handle temperature change from slider with improved responsiveness
   const handleTempChange = (newTemp) => {
+    console.log('AirCon: Slider changed to:', newTemp);
+    
+    // Mark that we're actively sliding
+    isSlidingRef.current = true;
+    
+    // Update local state immediately for smooth UI
     setTemp(newTemp);
     
-    // Update RV state immediately for UI responsiveness
-    rvStateManager.updateClimateState({ 
-      temperature: newTemp,
-      lastUpdated: new Date().toISOString()
-    });
+    // Clear any pending timeout
+    if (tempChangeTimeoutRef.current) {
+      clearTimeout(tempChangeTimeoutRef.current);
+    }
+    
+    // Set a timeout to mark sliding as complete
+    tempChangeTimeoutRef.current = setTimeout(() => {
+      isSlidingRef.current = false;
+      console.log('AirCon: Slider interaction complete');
+    }, 500);
   };
   
-  // Send temperature changes to API when temp changes
+  // Send temperature changes to API with debouncing - FIXED to always save to RV state
   useEffect(() => {
     const sendTempChange = async () => {
+      // Skip if temperature hasn't actually changed
+      if (temp === lastSentTempRef.current) {
+        return;
+      }
+      
+      // ALWAYS update RV state immediately, even if no climate control is active
+      // This ensures the temperature persists when navigating between screens
+      rvStateManager.updateClimateState({
+        temperature: temp,
+        lastUpdated: new Date().toISOString()
+      });
+      
+      // Also save to AsyncStorage immediately for backup
       try {
+        await AsyncStorage.setItem('temperature', temp.toString());
+        console.log('AirCon: Temperature saved to storage:', temp);
+      } catch (storageError) {
+        console.error('AirCon: Failed to save to AsyncStorage:', storageError);
+      }
+      
+      // Skip API call if no climate control is active
+      if (!climate.coolingOn && !climate.toeKickOn) {
+        console.log('AirCon: Temperature updated in state but not sent to API (no climate control active)');
+        lastSentTempRef.current = temp;
+        setLastTemp(temp);
+        return;
+      }
+      
+      try {
+        console.log('AirCon: Sending temperature change from', lastSentTempRef.current, 'to', temp);
+        
         await handleTemperatureChange(
           temp,
-          lastTemp,
+          lastSentTempRef.current,
           climate.coolingOn || climate.toeKickOn,
           setIsProcessing,
           (message) => {
@@ -203,17 +287,24 @@ const AirCon = ({ onClose }) => {
             setTimeout(() => setShowStatus(false), message.includes('Failed') ? 3000 : 2000);
           }
         );
+        
+        // Update references after successful API call
         setLastTemp(temp);
+        lastSentTempRef.current = temp;
+        
       } catch (error) {
-        // Revert to last successful temperature
-        setTemp(lastTemp);
+        console.error('AirCon: Failed to send temperature change:', error);
+        // Don't revert - the state is already saved, just the API call failed
+        // Keep the new temperature in state and storage
+        lastSentTempRef.current = temp;
+        setLastTemp(temp);
       }
     };
     
     // Debounce the temperature change to avoid too many API calls
-    const timeoutId = setTimeout(sendTempChange, 800);
+    const timeoutId = setTimeout(sendTempChange, 1000);
     return () => clearTimeout(timeoutId);
-  }, [temp, lastTemp, climate.coolingOn, climate.toeKickOn, isProcessing]);
+  }, [temp, climate.coolingOn, climate.toeKickOn]);
 
   
   // Tablet view
@@ -230,6 +321,10 @@ const AirCon = ({ onClose }) => {
             sliderTrackColor={"#E5E5E5"}
             linearGradient={[ { offset: '0%', color:'#ffaca6' }, { offset: '100%', color: '#FF8200' }]}
             onChange={handleTempChange}
+            onComplete={() => {
+              console.log('AirCon: Slider interaction complete');
+              isSlidingRef.current = false;
+            }}
             subTitle={'Degrees'}
             subTitleStyle={{ color: isDarkMode ? 'white' : 'black', paddingBottom: 25, fontSize: 20 }}
             unitStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5, fontSize: 20 }}
@@ -302,29 +397,34 @@ const AirCon = ({ onClose }) => {
 
         {/* Radial Slider for Temperature Control */}
         <RadialSlider
-            value={temp}
-            min={60}
-            max={85}
-            thumbColor={"#FFFFFF"}
-            thumbBorderColor={"#848482"}
-            sliderTrackColor={"#E5E5E5"}
-            linearGradient={[ { offset: '0%', color:'#ffaca6' }, { offset: '100%', color: '#FF8200' }]}
-            onChange={handleTempChange}
-            subTitle={'Degrees'}
-            subTitleStyle={{ color: isDarkMode ? 'white' : 'black', paddingBottom: 25, fontSize: 10 }}
-            unitStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5, fontSize: 10 }}
-            valueStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5, fontSize: 14 }}
-            style={{
-              backgroundColor: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
-            }}
-            buttonContainerStyle={{
-              color:"FFFFFF",
-            }}
-            leftIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginRight: 10, top:20, height: 40, width: 50, paddingLeft: 4 }}
-            rightIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginLeft: 10, top:20, height: 40, width: 50, paddingLeft: 5 }}
-            isHideTailText={true}
-            unit={'°F'}
-          />
+          value={temp}
+          min={60}
+          max={85}
+          thumbColor={"#FFFFFF"}
+          thumbBorderColor={"#848482"}
+          sliderTrackColor={"#E5E5E5"}
+          linearGradient={[ { offset: '0%', color:'#ffaca6' }, { offset: '100%', color: '#FF8200' }]}
+          onChange={handleTempChange}
+          onComplete={() => {
+            console.log('AirCon: Slider interaction complete');
+            isSlidingRef.current = false;
+          }}
+          subTitle={'Degrees'}
+          subTitleStyle={{ color: isDarkMode ? 'white' : 'black', paddingBottom: 25, fontSize: 10 }}
+          unitStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5, fontSize: 10 }}
+          valueStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5, fontSize: 14 }}
+          style={{
+            backgroundColor: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
+          }}
+          buttonContainerStyle={{
+            color:"FFFFFF",
+          }}
+          leftIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginRight: 10, top:20, height: 40, width: 50, paddingLeft: 4 }}
+          rightIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginLeft: 10, top:20, height: 40, width: 50, paddingLeft: 5 }}
+          isHideTailText={true}
+          unit={'°F'}
+        />
+        
         {/* Cooling and Toe Kick Switch Buttons */}
         <View style={styles.buttonsContainer}>
           <TouchableOpacity
@@ -527,6 +627,5 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
-
 
 export default AirCon;
