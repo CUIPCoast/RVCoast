@@ -20,13 +20,13 @@ const screenOptions = (route, color) => {
       iconName = "home"; 
       break;
     case "Devices":
-      iconName = "API"; 
+      iconName = "code-sandbox"; 
       break;
     case "Settings":
       iconName = "setting"; 
       break;
     case "System":
-      iconName = "barchart"; 
+      iconName = "api"; 
       break;
     default:
       break;
