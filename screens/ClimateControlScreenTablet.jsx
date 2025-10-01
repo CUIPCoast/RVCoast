@@ -83,7 +83,7 @@ const ClimateControlScreenTablet = () => {
           } else {
             setTemp(72);
             setLastTemp(72);
-            rvStateManager.updateClimateState({ temperature: 72 });
+            rvStateManager.updateClimateState({ temperature: 70 });
           }
         }
         

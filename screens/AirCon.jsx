@@ -1,3 +1,4 @@
+// screens/AirCon.jsx - Enhanced with real-time temperature monitoring (Original UI)
 import React, { useState, useEffect } from "react";
 import { StyleSheet, View, Text, TouchableOpacity, Switch, Keyboard, TouchableWithoutFeedback } from "react-native";
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -17,9 +18,9 @@ import { useScreenSize, handleCoolingToggle, handleToeKickToggle, handleTemperat
 import { useRVClimate } from "../API/RVStateManager/RVStateHooks";
 import rvStateManager from "../API/RVStateManager/RVStateManager";
 
-// Import the API services
-import { RVControlService, RVControls } from "../API/rvAPI";
-import { ClimateService } from "../API/RVControlServices";
+// Import temperature monitoring service
+import temperatureMonitoringService from "../Service/TemperatureMonitoringService";
+
 
 const AirCon = ({ onClose }) => {
   const isTablet = useScreenSize();
@@ -34,6 +35,50 @@ const AirCon = ({ onClose }) => {
   const [showStatus, setShowStatus] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   
+  // Initialize temperature monitoring service
+  useEffect(() => {
+    console.log('AirCon: Starting temperature monitoring service');
+    
+    // Start the temperature monitoring service
+    temperatureMonitoringService.start();
+    
+    // Subscribe to temperature changes from CAN bus
+    const handleTemperatureUpdate = (data) => {
+      const { temperature } = data;
+      console.log('AirCon: Real-time temperature update from RV-C:', temperature.fahrenheit);
+      
+      // Update the slider to show actual temperature from CAN bus
+      const roundedTemp = Math.round(temperature.fahrenheit);
+      setTemp(roundedTemp);
+      
+      // Update RV state manager with actual temperature
+      rvStateManager.updateClimateState({
+        actualTemperature: temperature.fahrenheit,
+        actualTemperatureCelsius: temperature.celsius,
+        lastUpdate: temperature.lastUpdate
+      });
+    };
+    
+    // Subscribe to temperature change events
+    temperatureMonitoringService.on('temperatureChange', handleTemperatureUpdate);
+    
+    // Get initial temperature
+    const currentTemp = temperatureMonitoringService.getCurrentTemperature();
+    if (currentTemp.fahrenheit) {
+      console.log('AirCon: Initial temperature from RV-C:', currentTemp.fahrenheit);
+      const roundedTemp = Math.round(currentTemp.fahrenheit);
+      setTemp(roundedTemp);
+      setLastTemp(roundedTemp);
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      console.log('AirCon: Cleaning up temperature monitoring');
+      temperatureMonitoringService.removeListener('temperatureChange', handleTemperatureUpdate);
+      // Don't stop the service here - other screens might be using it
+    };
+  }, []);
+  
   // Initialize state from RV state manager
   useEffect(() => {
     const initializeState = async () => {
@@ -41,30 +86,28 @@ const AirCon = ({ onClose }) => {
         // Get current climate state from RV state manager
         const currentClimateState = rvStateManager.getCategoryState('climate');
         
-        // Set temperature from state or AsyncStorage
-        if (currentClimateState.temperature) {
-          setTemp(currentClimateState.temperature);
-          setLastTemp(currentClimateState.temperature);
+        // Check if we have actual temperature from CAN bus
+        if (currentClimateState.actualTemperature) {
+          const roundedTemp = Math.round(currentClimateState.actualTemperature);
+          setTemp(roundedTemp);
+          setLastTemp(roundedTemp);
         } else {
-          // Fall back to AsyncStorage for backwards compatibility
+          // Fall back to stored temperature
           const savedTemp = await AsyncStorage.getItem('temperature');
           if (savedTemp) {
             const tempValue = parseInt(savedTemp, 10);
             setTemp(tempValue);
             setLastTemp(tempValue);
-            // Update RV state with loaded temperature
-            rvStateManager.updateClimateState({ temperature: tempValue });
           } else {
             setTemp(72);
             setLastTemp(72);
-            rvStateManager.updateClimateState({ temperature: 72 });
           }
         }
       } catch (error) {
         console.error('Error initializing AirCon state:', error);
         // Set default values on error
-        setTemp(72);
-        setLastTemp(72);
+        setTemp(70);
+        setLastTemp(70);
       }
     };
     
@@ -75,15 +118,18 @@ const AirCon = ({ onClose }) => {
   useEffect(() => {
     const unsubscribe = rvStateManager.subscribeToExternalChanges((newState) => {
       if (newState.climate) {
-        // Update local state when external changes occur
-        if (newState.climate.temperature && newState.climate.temperature !== temp) {
-          setTemp(newState.climate.temperature);
-          setLastTemp(newState.climate.temperature);
-          
-          // Show notification of external change
-          setStatusMessage(`Temperature updated remotely to ${newState.climate.temperature}°F`);
-          setShowStatus(true);
-          setTimeout(() => setShowStatus(false), 3000);
+        // Update temperature when external changes occur
+        if (newState.climate.actualTemperature) {
+          const roundedTemp = Math.round(newState.climate.actualTemperature);
+          if (roundedTemp !== temp) {
+            setTemp(roundedTemp);
+            setLastTemp(roundedTemp);
+            
+            // Show notification of external change
+            setStatusMessage(`Temperature updated to ${roundedTemp}°F`);
+            setShowStatus(true);
+            setTimeout(() => setShowStatus(false), 3000);
+          }
         }
         
         // External climate control changes handled silently
@@ -481,5 +527,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
+
 
 export default AirCon;

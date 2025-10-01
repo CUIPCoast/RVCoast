@@ -38,6 +38,7 @@ const MainScreen = () => {
     const [showErrors, setShowErrors] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [batteryLevel, setBatteryLevel] = useState(12.5);
+    const [energyError, setEnergyError] = useState(null);
 
     // Add temperature monitoring
     const { 

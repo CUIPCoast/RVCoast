@@ -1,7 +1,8 @@
+// components/TemperatureDisplay.jsx - Updated with direct CAN bus monitoring
 import React, { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
-import useTemperature from "../hooks/useTemperature";
 import useScreenSize from "../helper/useScreenSize";
+import temperatureMonitoringService from "../Service/TemperatureMonitoringService";
 
 /**
  * Real-time Temperature Display Component
@@ -14,21 +15,119 @@ const TemperatureDisplay = ({
   style = {} 
 }) => {
   const [temperatureUnit, setTemperatureUnit] = useState('F');
-  const isTablet = useScreenSize();
-  
-  const {
-    temperature,
-    formattedTemperature,
-    setpoints,
-    isConnected,
-    isLoading,
-    error,
-    connectionStatus,
-    refresh
-  } = useTemperature({ 
-    autoStart: true, 
-    temperatureUnit 
+  const [temperature, setTemperature] = useState(null);
+  const [setpoints, setSetpoints] = useState({
+    heat: null,
+    cool: null,
+    operatingMode: null,
+    fanMode: null,
+    unit: 'F'
   });
+  const [isConnected, setIsConnected] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [lastUpdate, setLastUpdate] = useState(null);
+  
+  const isTablet = useScreenSize();
+
+  // Initialize temperature monitoring
+  useEffect(() => {
+    console.log('TemperatureDisplay: Starting temperature monitoring');
+    setIsLoading(true);
+    
+    // Start the service
+    temperatureMonitoringService.start();
+    
+    // Get initial temperature
+    const currentTemp = temperatureMonitoringService.getCurrentTemperature();
+    if (currentTemp.fahrenheit) {
+      console.log('TemperatureDisplay: Initial temperature:', currentTemp.fahrenheit);
+      setTemperature(currentTemp);
+      setIsConnected(currentTemp.isConnected);
+      setLastUpdate(currentTemp.lastUpdate || new Date());
+      setIsLoading(false);
+      setError(null);
+    } else {
+      setIsLoading(false);
+    }
+    
+    // Subscribe to temperature changes
+    const handleTemperatureChange = (data) => {
+      console.log('TemperatureDisplay: Temperature update:', data.temperature.fahrenheit);
+      setTemperature(data.temperature);
+      setLastUpdate(data.temperature.lastUpdate || new Date());
+      setError(null);
+      setIsLoading(false);
+      setIsConnected(true);
+    };
+    
+    // Subscribe to setpoint changes
+    const handleSetpointChange = (data) => {
+      console.log('TemperatureDisplay: Setpoint update:', data);
+      setSetpoints({
+        heat: data.heatSetpoint.fahrenheit,
+        cool: data.coolSetpoint.fahrenheit,
+        operatingMode: data.operatingMode,
+        fanMode: data.fanMode,
+        unit: 'F'
+      });
+    };
+    
+    // Subscribe to connection status
+    const handleConnected = () => {
+      console.log('TemperatureDisplay: Connected to CAN bus');
+      setIsConnected(true);
+      setError(null);
+      setIsLoading(false);
+    };
+    
+    const handleDisconnected = () => {
+      console.log('TemperatureDisplay: Disconnected from CAN bus');
+      setIsConnected(false);
+      setError('Connection lost');
+    };
+    
+    const handleError = (err) => {
+      console.error('TemperatureDisplay: Error:', err);
+      setError('Connection error');
+      setIsConnected(false);
+      setIsLoading(false);
+    };
+    
+    // Add event listeners
+    temperatureMonitoringService.on('temperatureChange', handleTemperatureChange);
+    temperatureMonitoringService.on('setpointChange', handleSetpointChange);
+    temperatureMonitoringService.on('connected', handleConnected);
+    temperatureMonitoringService.on('disconnected', handleDisconnected);
+    temperatureMonitoringService.on('error', handleError);
+    
+    // Check if already connected
+    if (temperatureMonitoringService.isConnected()) {
+      setIsConnected(true);
+      setIsLoading(false);
+    }
+    
+    // Set timeout to stop loading after 5 seconds
+    const loadingTimeout = setTimeout(() => {
+      if (isLoading) {
+        setIsLoading(false);
+        if (!temperature) {
+          setError('No temperature data');
+        }
+      }
+    }, 5000);
+    
+    // Cleanup
+    return () => {
+      console.log('TemperatureDisplay: Cleaning up');
+      clearTimeout(loadingTimeout);
+      temperatureMonitoringService.removeListener('temperatureChange', handleTemperatureChange);
+      temperatureMonitoringService.removeListener('setpointChange', handleSetpointChange);
+      temperatureMonitoringService.removeListener('connected', handleConnected);
+      temperatureMonitoringService.removeListener('disconnected', handleDisconnected);
+      temperatureMonitoringService.removeListener('error', handleError);
+    };
+  }, []);
 
   // Toggle between Celsius and Fahrenheit
   const toggleTemperatureUnit = () => {
@@ -42,6 +141,27 @@ const TemperatureDisplay = ({
     } else {
       toggleTemperatureUnit();
     }
+  };
+
+  // Get formatted temperature based on unit
+  const getFormattedTemperature = () => {
+    if (!temperature) return '--°F';
+    
+    if (temperatureUnit === 'F') {
+      return `${Math.round(temperature.fahrenheit)}°F`;
+    } else {
+      return `${temperature.celsius.toFixed(1)}°C`;
+    }
+  };
+
+  // Refresh connection
+  const refresh = () => {
+    setIsLoading(true);
+    setError(null);
+    temperatureMonitoringService.stop();
+    setTimeout(() => {
+      temperatureMonitoringService.start();
+    }, 500);
   };
 
   // Get connection status indicator
@@ -61,10 +181,10 @@ const TemperatureDisplay = ({
 
   // Format time since last update
   const getTimeSinceUpdate = () => {
-    if (!connectionStatus.lastUpdate) return '';
+    if (!lastUpdate) return '';
     
     const now = new Date();
-    const diff = Math.floor((now - connectionStatus.lastUpdate) / 1000);
+    const diff = Math.floor((now - lastUpdate) / 1000);
     
     if (diff < 60) return `${diff}s ago`;
     if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
@@ -107,11 +227,11 @@ const TemperatureDisplay = ({
 
           {/* Temperature value */}
           <Text className="text-white text-4xl font-bold">
-            {error ? '--' : formattedTemperature}
+            {getFormattedTemperature()}
           </Text>
 
           {/* Last update time */}
-          {connectionStatus.lastUpdate && (
+          {lastUpdate && (
             <Text className="text-gray-400 text-xs mt-2">
               Updated {getTimeSinceUpdate()}
             </Text>
@@ -138,7 +258,7 @@ const TemperatureDisplay = ({
                 <Text className="text-orange-400 text-sm">Heat</Text>
                 <Text className="text-white text-lg">
                   {setpoints.heat !== null ? 
-                    `${setpoints.heat.toFixed(1)}${setpoints.unit}` : 
+                    `${setpoints.heat.toFixed(1)}°${setpoints.unit}` : 
                     '--'
                   }
                 </Text>
@@ -149,7 +269,7 @@ const TemperatureDisplay = ({
                 <Text className="text-blue-400 text-sm">Cool</Text>
                 <Text className="text-white text-lg">
                   {setpoints.cool !== null ? 
-                    `${setpoints.cool.toFixed(1)}${setpoints.unit}` : 
+                    `${setpoints.cool.toFixed(1)}°${setpoints.unit}` : 
                     '--'
                   }
                 </Text>
@@ -210,9 +330,9 @@ const TemperatureDisplay = ({
         {/* Temperature */}
         <View>
           <Text className="text-white text-2xl font-semibold">
-            {error ? '--°F' : formattedTemperature}
+            {getFormattedTemperature()}
           </Text>
-          {connectionStatus.lastUpdate && !error && (
+          {lastUpdate && !error && (
             <Text className="text-gray-400 text-xs">
               {getTimeSinceUpdate()}
             </Text>
@@ -225,10 +345,10 @@ const TemperatureDisplay = ({
         <View style={{ alignItems: 'flex-end' }}>
           <Text className="text-gray-400 text-xs">Setpoints</Text>
           <Text className="text-orange-400 text-sm">
-            H: {setpoints.heat !== null ? `${setpoints.heat.toFixed(0)}${setpoints.unit}` : '--'}
+            H: {setpoints.heat !== null ? `${setpoints.heat.toFixed(0)}°${setpoints.unit}` : '--'}
           </Text>
           <Text className="text-blue-400 text-sm">
-            C: {setpoints.cool !== null ? `${setpoints.cool.toFixed(0)}${setpoints.unit}` : '--'}
+            C: {setpoints.cool !== null ? `${setpoints.cool.toFixed(0)}°${setpoints.unit}` : '--'}
           </Text>
         </View>
       )}

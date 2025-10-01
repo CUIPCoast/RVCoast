@@ -19,7 +19,7 @@ export function useTemperature(options = {}) {
   const [temperatureData, setTemperatureData] = useState({
     current: {
       celsius: 22.22, // Start with current actual temperature (72°F)
-      fahrenheit: 72.0,
+      fahrenheit: 70.0,
       lastUpdate: new Date(),
       instance: null,
       source: 'initial'

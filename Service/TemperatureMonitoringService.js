@@ -13,7 +13,7 @@ class TemperatureMonitoringService extends EventEmitter {
     this.connected = false;
     this.currentTemperature = {
       celsius: 22.22, // Current temperature: 72°F = 22.22°C
-      fahrenheit: 72,
+      fahrenheit: 70,
       lastUpdate: new Date(),
       instance: null
     };
