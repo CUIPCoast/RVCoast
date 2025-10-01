@@ -410,9 +410,9 @@ const AirCon = ({ onClose }) => {
             isSlidingRef.current = false;
           }}
           subTitle={'Degrees'}
-          subTitleStyle={{ color: isDarkMode ? 'white' : 'black', paddingBottom: 25, fontSize: 10 }}
-          unitStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5, fontSize: 10 }}
-          valueStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5, fontSize: 14 }}
+          subTitleStyle={{ color: isDarkMode ? 'white' : 'black', paddingBottom: 25, fontSize: 20 }}
+          unitStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5, fontSize: 20 }}
+          valueStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5, fontSize: 24 }}
           style={{
             backgroundColor: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
           }}
@@ -584,8 +584,8 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   button: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingHorizontal: 30,
+    paddingVertical: 20,
     borderRadius: 5,
     marginHorizontal: 5,
     backgroundColor: 'white',
@@ -598,7 +598,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   buttonText: {
-    fontSize: 12,
+    fontSize: 17,
   },
   statusContainer: {
     position: 'absolute',
