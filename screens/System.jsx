@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+// System.jsx
+import React, { useState, useEffect, useRef } from "react"; // ✨ CHANGED: added useRef
 import {
   SafeAreaView,
   ScrollView,
@@ -9,6 +10,7 @@ import {
   TouchableOpacity,
   Dimensions,
 } from "react-native";
+import SystemCharts from "../components/SystemCharts.jsx";
 
 import Map from "../components/Map";
 import useScreenSize from "../helper/useScreenSize.jsx";
@@ -29,6 +31,10 @@ const System = () => {
   const [batteryLevel, setBatteryLevel] = useState(12.5);
   const [refreshing, setRefreshing] = useState(false);
 
+  // ✨ NEW: tab state & refs
+  const [tabIndex, setTabIndex] = useState(0);
+  const pagerRef = useRef(null);
+
   // Helper function to format numbers to 2 decimal places
   const formatNumber = (value, unit = '') => {
     if (value === null || value === undefined || value === '--') return '--';
@@ -45,7 +51,6 @@ const System = () => {
     return `${num.toFixed(2)}W`;
   };
 
-  // Fetch Victron data when component mounts
   useEffect(() => {
     const fetchVictronData = async () => {
       try {
@@ -53,8 +58,6 @@ const System = () => {
         const data = await VictronEnergyService.getAllData();
         setVictronData(data);
         setEnergyError(null);
-        
-        // Update battery level if available
         if (data && data.battery && data.battery.voltage) {
           setBatteryLevel(data.battery.voltage);
         }
@@ -67,101 +70,76 @@ const System = () => {
     };
 
     fetchVictronData();
-    
-    // Set up refresh interval
-    const intervalId = setInterval(fetchVictronData, 10000); // Refresh every 10 seconds
-    
-    // Clean up on unmount
+    const intervalId = setInterval(fetchVictronData, 10000);
     return () => clearInterval(intervalId);
   }, []);
   
-  // Handle Victron panel error
-  const handleEnergyError = (error) => {
-    setEnergyError(error);
-  };
-  
+  const handleEnergyError = (error) => setEnergyError(error);
 
-  // Create a formatted display for grid power
   const formatGridPower = () => {
-    if (!victronData || !victronData.grid) {
-      return "--";
-    }
-    
-    // If grid is not connected, show as disconnected
-    if (!victronData.grid.isConnected) {
-      return "Shore Disconnected";
-    }
-    
-    // Build a string with total power and individual line info if available
+    if (!victronData || !victronData.grid) return "--";
+    if (!victronData.grid.isConnected) return "Shore Disconnected";
     let displayText = formatPower(victronData.grid.power);
-    
-    // Add line info if we have multiple lines or specific line data
     const l1 = victronData.grid.l1Power;
     const l2 = victronData.grid.l2Power;
-    
     if (l1 !== 0 || l2 !== 0) {
       displayText += `\nL1: ${formatPower(l1)} L2: ${formatPower(l2)}`;
     }
-    
     return displayText;
   };
 
-  // Get battery state of charge as percentage
   const getBatterySOC = () => {
-  if (!victronData || !victronData.battery) return 0;
-  
-  // The SOC comes as a decimal (0.57 = 57%), so multiply by 100
-  const socDecimal = victronData.battery.soc;
-  const socPercentage = socDecimal * 100;
-  
-  return Math.round(socPercentage);
-};
-  // Get battery power with proper sign
+    if (!victronData || !victronData.battery) return 0;
+    const socDecimal = victronData.battery.soc;
+    return Math.round(socDecimal * 100);
+  };
   const getBatteryPower = () => {
     if (!victronData || !victronData.battery) return 0;
     return parseFloat(victronData.battery.power).toFixed(2);
   };
-
-  // Get battery voltage
   const getBatteryVoltage = () => {
     if (!victronData || !victronData.battery) return '0.00';
     return parseFloat(victronData.battery.voltage || 0).toFixed(2);
   };
-
-  // Get battery current
   const getBatteryCurrent = () => {
     if (!victronData || !victronData.battery) return '0.00';
     return parseFloat(victronData.battery.current || 0).toFixed(2);
   };
-
-  // Get system status indicator
   const getSystemStatus = () => {
     if (!victronData) return { status: 'Unknown', color: '#666' };
-    
-    if (victronData.apiStatus === 'simulation') {
-      return { status: 'Simulation', color: '#FF9800' };
-    }
-    
-    if (victronData.grid && victronData.grid.isConnected) {
-      return { status: 'Shore Power', color: '#4CAF50' };
-    }
-    
-    if (victronData.pvCharger && victronData.pvCharger.power > 0) {
-      return { status: 'Solar Charging', color: '#FFD700' };
-    }
-    
+    if (victronData.apiStatus === 'simulation') return { status: 'Simulation', color: '#FF9800' };
+    if (victronData.grid && victronData.grid.isConnected) return { status: 'Shore Power', color: '#4CAF50' };
+    if (victronData.pvCharger && victronData.pvCharger.power > 0) return { status: 'Solar Charging', color: '#FFD700' };
     return { status: 'Battery Power', color: '#2196F3' };
   };
 
-  // Tablet view with integrated Victron data
-  if (isTablet) {
-    return (
-      <SafeAreaView style={styles.tabletContainer}>
-        {/* ————————————— HEADER ————————————— */}
-        <View style={styles.header}>
+  // ✨ NEW: tab helpers
+  const tabs = [
+    { key: 'overview', title: 'Overview' },
+    { key: 'charts', title: 'Charts (Placeholder)' },
+    { key: 'settings', title: 'Settings (Placeholder)' },
+  ];
+
+  const onTabPress = (index) => {
+    setTabIndex(index);
+    if (pagerRef.current) {
+      pagerRef.current.scrollTo({ x: screenWidth * index, y: 0, animated: true });
+    }
+  };
+
+  const onHorizontalScroll = (e) => {
+    const x = e.nativeEvent.contentOffset.x;
+    const newIndex = Math.round(x / screenWidth);
+    if (newIndex !== tabIndex) setTabIndex(newIndex);
+  };
+
+  // ✨ NEW: Overview page extracted so it’s tidy inside the pager
+  const OverviewPage = () => (
+    <SafeAreaView style={[styles.tabletContainer, { width: screenWidth }]}>
+       <View style={styles.header}>
           <View>
             <Text style={styles.headerDay}>Victron System</Text>
-            <Text style={styles.headerDate}>Overview</Text>
+            
           </View>
           <Image
             source={require("../assets/images/icon.png")}
@@ -169,146 +147,154 @@ const System = () => {
           />
         </View>
 
-        {/* ————————————— DIAGRAM CONTAINER ————————————— */}
-        <View style={styles.diagramContainer}>
-          {/* ————————————— TOP ROW OF CARDS ————————————— */}
-          <View style={styles.panelRow}>
-            <GlowingCard glowColor="#D32F2F" style={styles.cardWrapper}>
-              <View style={styles.redCard}>
-                <View style={styles.redCardHeader}>
-                  <Text style={styles.redCardHeaderText}>Grid Power</Text>
-                </View>
-                <Text style={styles.cardValue}>
-                  {formatGridPower()}
-                </Text>
+      {/* ————————————— DIAGRAM CONTAINER ————————————— */}
+      <View style={styles.diagramContainer}>
+        {/* ————————————— TOP ROW OF CARDS ————————————— */}
+        <View style={styles.panelRow}>
+          <GlowingCard glowColor="#D32F2F" style={styles.cardWrapper}>
+            <View style={styles.redCard}>
+              <View style={styles.redCardHeader}>
+                <Text style={styles.redCardHeaderText}>Grid Power</Text>
               </View>
-            </GlowingCard>
-            
-            <GlowingCard glowColor="#6CB4EE" style={styles.cardWrapper}>
-              <Image
-                source={require('../assets/victron.png')}
-                style={styles.blueCard}
-                resizeMode="cover"
-              />
-            </GlowingCard>
-            
-            <GlowingCard glowColor="#228B22" style={styles.cardWrapper}>
-              <View style={styles.greenCard}>
-                <View style={styles.greenCardHeader}>
-                  <Text style={styles.greenCardHeaderText}>AC Loads</Text>
-                </View>
+              <Text style={styles.cardValue}>
+                {formatGridPower()}
+              </Text>
+            </View>
+          </GlowingCard>
+          
+          <GlowingCard glowColor="#6CB4EE" style={styles.cardWrapper}>
+            <Image
+              source={require('../assets/victron.png')}
+              style={styles.blueCard}
+              resizeMode="cover"
+            />
+          </GlowingCard>
+          
+          <GlowingCard glowColor="#228B22" style={styles.cardWrapper}>
+            <View style={styles.greenCard}>
+              <View style={styles.greenCardHeader}>
+                <Text style={styles.greenCardHeaderText}>AC Loads</Text>
+              </View>
+              <Text style={styles.cardValue}>
+                {victronData ? formatPower(victronData.acLoads.power) : "--"}
+              </Text>
+              <Text style={styles.cardSubtitle}>
+                L1 + L2
+              </Text>
+            </View>
+          </GlowingCard>
+        </View>
+
+        {/* ————————————— BOTTOM ROW OF CARDS ————————————— */}
+        <View style={styles.panelRow}>
+          <BatteryCard>
+            {victronData ? (
+              <>
                 <Text style={styles.cardValue}>
-                  {victronData ? formatPower(victronData.acLoads.power) : "--"}
+                  {`${getBatterySOC()}%`}
                 </Text>
                 <Text style={styles.cardSubtitle}>
-                  L1 + L2
+                  {formatPower(getBatteryPower())}
                 </Text>
+              </>
+            ) : (
+              <Text style={styles.cardValue}>--</Text>
+            )}
+          </BatteryCard>
+          
+          <GlowingCard glowColor="#228B22" style={styles.cardWrapper}>
+            <View style={styles.darkerGreenCard}>
+              <View style={styles.darkerGreenCardHeader}>
+                <Text style={styles.greenCardHeaderText}>DC Power</Text>
               </View>
-            </GlowingCard>
-          </View>
-
-          {/* ————————————— BOTTOM ROW OF CARDS ————————————— */}
-          <View style={styles.panelRow}>
-            <BatteryCard>
-              {victronData ? (
-                <>
-                  <Text style={styles.cardValue}>
-                    {`${getBatterySOC()}%`}
-                  </Text>
-                  <Text style={styles.cardSubtitle}>
-                    {formatPower(getBatteryPower())}
-                  </Text>
-                </>
-              ) : (
-                <Text style={styles.cardValue}>--</Text>
-              )}
-            </BatteryCard>
-            
-            <GlowingCard glowColor="#228B22" style={styles.cardWrapper}>
-              <View style={styles.darkerGreenCard}>
-                <View style={styles.darkerGreenCardHeader}>
-                  <Text style={styles.greenCardHeaderText}>DC Power</Text>
-                </View>
-                <Text style={[styles.cardValue, { top: 20 }]}>
-                  {victronData ? formatPower(victronData.dcSystem.power) : "--"}
-                </Text>
-              </View>
-            </GlowingCard>
-            
-            <GlowingCard glowColor="#FFBF00" style={styles.cardWrapper}>
-              <PVChargerCard
-                power={
-                  victronData
-                    ? formatPower(victronData.pvCharger.power)
-                    : '0.00W'
-                }
-                imageSource={require('../assets/smartsolar.png')}   
-                cardOffset={{ top: 110, left: -60 }}     // tweak these anytime
-                imageOffset={{ top: 160, left: -154 }}   //   ″      ″
-              />
-            </GlowingCard>
-          </View>
-
-          {/* ————————————— CONNECTION LINES ————————————— */}
+              <Text style={[styles.cardValue, { top: 20 }]}>
+                {victronData ? formatPower(victronData.dcSystem.power) : "--"}
+              </Text>
+            </View>
+          </GlowingCard>
           
-          {/* Red to Blue (Left to Center in top row) */}
-          <ConnectionDot top={87} left={330}></ConnectionDot>
-          <ConnectionDot top={88} left={490}></ConnectionDot>
-          <HorizontalLine top={86} left={245} width={250}></HorizontalLine>
-          
-          {/* Blue to Green (Center to Right in top row) */}
-          <ConnectionDot top={88} left={670}></ConnectionDot>
-          <ConnectionDot top={88} left={832}></ConnectionDot>
-          <HorizontalLine top={86} left={560} width={450}></HorizontalLine>
-
-          {/* Bottom of Bulk Victron Image */}
-          <ConnectionDot top={210} left={576}></ConnectionDot>
-
-          {/* Vertical line from Blue box down */}
-          <VerticalLine top={215} left={575} height={220}></VerticalLine>
-
-          {/* Dot in Middle */}
-          <ConnectionDot top={432} left={576}></ConnectionDot>
-          <HorizontalLine top={431} left={389} width={180}></HorizontalLine>
-
-          {/* Battery Lines */}
-          
-          <ConnectionDot top={432} left={384}></ConnectionDot>
-          
-          <ConnectionDot top={432} left={310}></ConnectionDot>
-          
-          <HorizontalLine top={431} left={314} width={65}></HorizontalLine>
-
-          {/* DC Lines */}
-
-          <VerticalLine top={438} left={383} height={120}></VerticalLine>
-
-          <ConnectionDot top={557} left={384}></ConnectionDot>
-
-          <HorizontalLine top={556} left={384} width={75}></HorizontalLine>
-          
-          <ConnectionDot top={557} left={464}></ConnectionDot>
-
-          {/* PV Charger Lines */}
-
-          <HorizontalLine top={431} left={578} width={165}></HorizontalLine>
-
-          <ConnectionDot top={433} left={744}></ConnectionDot>
-
-          <VerticalLine top={438} left={743} height={70}></VerticalLine>
-
-          <ConnectionDot top={513} left={744}></ConnectionDot>
-
-          <HorizontalLine top={512} left={738} width={75}></HorizontalLine>
-
-          <ConnectionDot top={513} left={815}></ConnectionDot>
-
+          <GlowingCard glowColor="#FFBF00" style={styles.cardWrapper}>
+            <PVChargerCard
+              power={
+                victronData
+                  ? formatPower(victronData.pvCharger.power)
+                  : '0.00W'
+              }
+              imageSource={require('../assets/smartsolar.png')}   
+              cardOffset={{ top: 110, left: -60 }}
+              imageOffset={{ top: 160, left: -154 }}
+            />
+          </GlowingCard>
         </View>
-      </SafeAreaView>
-    );
-  }
-  
-  // Enhanced Mobile view with Victron data integration
+
+        {/* ————————————— CONNECTION LINES ————————————— */}
+        <ConnectionDot top={87} left={330} />
+        <ConnectionDot top={88} left={490} />
+        <HorizontalLine top={86} left={245} width={250} />
+        <ConnectionDot top={88} left={670} />
+        <ConnectionDot top={88} left={832} />
+        <HorizontalLine top={86} left={560} width={450} />
+        <ConnectionDot top={210} left={576} />
+        <VerticalLine top={215} left={575} height={220} />
+        <ConnectionDot top={432} left={576} />
+        <HorizontalLine top={431} left={389} width={180} />
+        <ConnectionDot top={432} left={384} />
+        <ConnectionDot top={432} left={310} />
+        <HorizontalLine top={431} left={314} width={65} />
+        <VerticalLine top={438} left={383} height={120} />
+        <ConnectionDot top={557} left={384} />
+        <HorizontalLine top={556} left={384} width={75} />
+        <ConnectionDot top={557} left={464} />
+        <HorizontalLine top={431} left={578} width={165} />
+        <ConnectionDot top={433} left={744} />
+        <VerticalLine top={438} left={743} height={70} />
+        <ConnectionDot top={513} left={744} />
+        <HorizontalLine top={512} left={738} width={75} />
+        <ConnectionDot top={513} left={815} />
+      </View>
+    </SafeAreaView>
+  );
+
+
+
+  // —————————————————— TABLET VIEW WITH SWIPEABLE TABS ——————————————————
+ if (isTablet) {
+  return (
+    <View style={styles.tabletRoot}>
+      {/* Pager wrapper so we can absolutely-position dots on top */}
+      <View style={styles.pagerWrapper}>
+        <ScrollView
+          ref={pagerRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={onHorizontalScroll}
+          scrollEventThrottle={16}
+        >
+          <OverviewPage />
+          <SystemCharts />
+         
+          
+        </ScrollView>
+
+        {/* ——— Bottom dots ——— */}
+        <View style={styles.pagerDotsContainer}>
+          {[0, 1, 2].map((i) => (
+            <TouchableOpacity
+              key={i}
+              onPress={() => onTabPress(i)}
+              style={[styles.pagerDot, tabIndex === i && styles.pagerDotActive]}
+              accessibilityRole="button"
+              accessibilityLabel={`Go to page ${i + 1}`}
+            />
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+  // —————————————————— MOBILE VIEW ——————————————————
   return (
     <SafeAreaView style={styles.mobileContainer}>
       <ScrollView 
@@ -317,7 +303,6 @@ const System = () => {
         showsVerticalScrollIndicator={false}
         decelerationRate={0.8}
       >
-        {/* ————————————— MOBILE HEADER ————————————— */}
         <View style={styles.mobileHeader}>
           <View style={styles.headerLeft}>
             <Text style={styles.mobileHeaderTitle}>RV Energy System</Text>
@@ -327,20 +312,15 @@ const System = () => {
               {refreshing && <Text style={styles.refreshText}>Updating...</Text>}
             </View>
           </View>
-          <Image
-            source={require("../assets/images/icon.png")}
-            style={styles.mobileLogo}
-          />
+         
         </View>
 
-        {/* ————————————— DETAILED VIEW (ALWAYS VISIBLE) ————————————— */}
         <VictronEnergyPanel 
           onError={handleEnergyError} 
           refreshInterval={10000} 
         />
         <EnergyFlowDiagram energyData={victronData} />
 
-        {/* ————————————— MAP SECTION ————————————— */}
         <View style={styles.mapSection}>
           <Text style={styles.mapTitle}>Live Location</Text>
           <View style={styles.mapContainer}>
@@ -348,7 +328,6 @@ const System = () => {
           </View>
         </View>
 
-        {/* ————————————— ERROR STATE ————————————— */}
         {energyError && (
           <View style={styles.errorContainer}>
             <Text style={styles.errorText}>{energyError}</Text>
@@ -366,17 +345,58 @@ const System = () => {
 };
 
 const styles = StyleSheet.create({
-  // Tablet styles (unchanged)
+  // ✨ NEW: tablet root & tab bar styles
+  tabletRoot: {
+    flex: 1,
+    backgroundColor: "#000",
+  },
+  tabBar: {
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 4,
+    backgroundColor: '#000',
+    borderBottomWidth: 1,
+    borderBottomColor: '#222',
+  },
+  tabBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginRight: 8,
+    borderRadius: 10,
+  },
+  tabBtnActive: {
+    backgroundColor: '#121212',
+  },
+  tabLabel: {
+    color: '#AAA',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  tabLabelActive: {
+    color: '#FFF',
+  },
+  activeUnderline: {
+    marginTop: 6,
+    height: 2,
+    backgroundColor: '#FF8C00',
+    borderRadius: 2,
+  },
+
+  // Tablet styles (existing)
   tabletContainer: {
     flex: 1,
     backgroundColor: "#000",
     padding: 16,
+    top:20,
+    right:10,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 15,
+    paddingHorizontal: 20,
   },
   headerDay: {
     color: "#fff",
@@ -403,7 +423,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     zIndex: 1,
   },
-  
+
   // Card header styles
   redCardHeader: {
     backgroundColor: '#FE6F5E',
@@ -417,7 +437,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 10,
   },
-
   greenCardHeader: {
     backgroundColor: '#50C878',
     width: '100%',
@@ -429,8 +448,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'absolute',
     top: 10,
+    
   },
-
   darkerGreenCardHeader: {
     backgroundColor: '#004225',
     width: '100%',
@@ -443,7 +462,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 10,
   },
- 
   redCardHeaderText: {
     color: '#FFF',
     fontSize: 18,
@@ -459,7 +477,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
   },
-  
+
   // Top row cards
   redCard: {
     borderRadius: 12,
@@ -472,20 +490,17 @@ const styles = StyleSheet.create({
     backgroundColor: "#D32F2F",
     position: "relative",
     paddingTop: 40,
-  
-    // Glow
-    shadowColor: "#FF6B6B",         // Soft red glow
+    shadowColor: "#FF6B6B",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.8,
     shadowRadius: 15,
-    elevation: 10, // Android
+    elevation: 10,
   },
-  
   blueCard: {
     borderRadius: 12,
     marginHorizontal: 8,
-    width: 180,    // was 180
-    height: 200,   // was 140
+    width: 180,
+    height: 200,
     backgroundColor: "#1976D2",
     shadowColor: "#6CB4EE",
     shadowOffset: { width: 0, height: 0 },
@@ -494,7 +509,6 @@ const styles = StyleSheet.create({
     elevation: 10,
     overflow: "hidden",
   },
-  
   greenCard: {
     borderRadius: 12,
     padding: 12,
@@ -506,15 +520,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#388E3C",
     position: "relative",
     paddingTop: 40,
-  
-    // Glow
     shadowColor: "#A0FF9F",
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 15,
     elevation: 10,
+    right:20,
   },
-  
   darkerGreenCard: {
     marginTop: 155,
     borderRadius: 12,
@@ -523,19 +535,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     right: 27,
-    top:60,
+    top: 60,
     width: 220,
     height: 130,
     backgroundColor: "#1B5E20",
-  
-    // Glow
     shadowColor: "#66FF99",
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 15,
     elevation: 10,
   },
-  
   cardTitle: {
     color: "#fff",
     fontSize: 18,
@@ -560,10 +569,10 @@ const styles = StyleSheet.create({
     tintColor: '#fff',
   },
 
-  // Enhanced Mobile Styles
+  // ——— Mobile styles (unchanged) ———
   mobileContainer: {
     flex: 1,
-    backgroundColor: "#211D1D", // Match your brown theme
+    backgroundColor: "#211D1D",
   },
   mobileContent: {
     paddingHorizontal: 16,
@@ -577,334 +586,82 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     paddingHorizontal: 4,
   },
-  headerLeft: {
-    flex: 1,
-  },
+  headerLeft: { flex: 1 },
   mobileHeaderTitle: {
     color: '#FFFFFF',
     fontSize: 24,
     fontWeight: '700',
     marginBottom: 4,
   },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 8,
-  },
-  statusText: {
-    color: '#CCCCCC',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  refreshText: {
-    color: '#FFB267',
-    fontSize: 12,
-    marginLeft: 8,
-    fontStyle: 'italic',
-  },
-  mobileLogo: {
-    width: 50,
-    height: 32,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 6,
-  },
+  statusRow: { flexDirection: 'row', alignItems: 'center' },
+  statusDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
+  statusText: { color: '#CCCCCC', fontSize: 14, fontWeight: '500' },
+  refreshText: { color: '#FFB267', fontSize: 12, marginLeft: 8, fontStyle: 'italic' },
+  mobileLogo: { width: 50, height: 32, backgroundColor: '#FFFFFF', borderRadius: 6 },
 
-  // Energy Cards Container
-  energyCardsContainer: {
-    marginBottom: 20,
-  },
+  // Map, errors, legacy styles — unchanged
+  mapSection: { marginBottom: 20 },
+  mapTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '600', marginBottom: 12 },
+  mapContainer: { borderRadius: 12, overflow: 'hidden', height: 200 },
+  errorContainer: { backgroundColor: '#F44336', borderRadius: 12, padding: 16, marginBottom: 20, alignItems: 'center' },
+  errorText: { color: '#FFFFFF', fontSize: 14, fontWeight: '500', textAlign: 'center', marginBottom: 12 },
+  retryButton: { backgroundColor: '#FFFFFF', borderRadius: 6, paddingVertical: 8, paddingHorizontal: 16 },
+  retryText: { color: '#F44336', fontSize: 14, fontWeight: '600' },
 
-  // Updated Mobile Card Layout - All Same Size
-  topRowCards: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  bottomRowCards: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  quarterCardWrapper: {
-    flex: 1,
-    marginHorizontal: 6,
-  },
+  // Simple/legacy blocks (unchanged but kept for compatibility)
+  simplePanelContainer: { backgroundColor: '#211D1D', borderRadius: 15, padding: 16, marginBottom: 20 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  title: { fontSize: 18, fontWeight: 'bold', color: 'white' },
+  viewDetailText: { fontSize: 12, color: '#FFB267' },
+  simpleEnergyData: { flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap' },
+  energyItem: { alignItems: 'center', paddingHorizontal: 5, marginBottom: 12, width: '48%' },
+  energyValue: { fontSize: 24, fontWeight: 'bold', color: 'white' },
+  energyLabel: { fontSize: 12, color: '#999', marginTop: 4 },
+  energyDetail: { fontSize: 10, color: '#999', marginTop: 2 },
+  loadingContainer: { padding: 20, alignItems: 'center' },
+  loadingText: { color: '#999' },
+  tanksContainer: { backgroundColor: '#211D1D', borderRadius: 15, padding: 16, marginBottom: 20 },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: 'white', marginBottom: 12 },
 
-  // Battery Card (Black and Orange Theme)
-  mobileBatteryCard: {
-    backgroundColor: '#1A1A1A', // Black background
-    borderRadius: 12,
-    padding: 16,
-    minHeight: 120,
-    borderWidth: 2,
-    borderColor: '#FF8C00', // Orange border
-  },
-  batteryHeader: {
-    marginBottom: 8,
-  },
-  batteryHeaderText: {
-    color: '#FF8C00', // Orange text
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  batteryMainContent: {
-    alignItems: 'center',
-  },
-  batterySOC: {
-    color: '#FFFFFF',
+  // ✨ NEW: placeholder text styles
+  placeholderTitle: {
+    color: '#FFF',
     fontSize: 24,
     fontWeight: '700',
-    lineHeight: 26,
-  },
-  batterySOCLabel: {
-    color: '#FF8C00', // Orange
-    fontSize: 10,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  batteryStatValue: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  batteryStatLabel: {
-    color: '#CCCCCC',
-    fontSize: 9,
-    fontWeight: '400',
-    marginTop: 2,
-    textAlign: 'center',
-  },
-
-  // Updated Cards with Black/Orange Theme
-  solarCard: {
-    backgroundColor: '#FF8F00',
-    borderRadius: 12,
-    padding: 16,
-    minHeight: 120,
-    justifyContent: 'center',
-  },
-  gridCard: {
-    backgroundColor: '#1A1A1A', // Black background
-    borderRadius: 12,
-    padding: 16,
-    minHeight: 120,
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#FF8C00', // Orange border
-  },
-  acLoadsCard: {
-    backgroundColor: '#1A1A1A', // Black background
-    borderRadius: 12,
-    padding: 16,
-    minHeight: 120,
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#FF8C00', // Orange border
-  },
-
-  // DC System Card (Full Width) - Updated with Black/Orange Theme
-  dcSystemCardWrapper: {
-    marginBottom: 20,
-  },
-  dcSystemCard: {
-    backgroundColor: '#1A1A1A', // Black background
-    borderRadius: 12,
-    padding: 16,
-    minHeight: 100,
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#FF8C00', // Orange border
-  },
-
-  // Mobile Card Common Styles - Updated for Orange Text
-  cardHeaderMobile: {
     marginBottom: 8,
   },
-  cardHeaderTextMobile: {
-    color: '#FF8C00', // Orange text for headers
+  placeholderText: {
+    color: '#AAA',
     fontSize: 14,
-    fontWeight: '600',
-    opacity: 0.9,
   },
-  cardValueMobile: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  cardSubtitleMobile: {
-    color: '#CCCCCC', // Light gray for subtitles
-    fontSize: 10,
-    fontWeight: '400',
-    opacity: 0.8,
-  },
+  // Container that lets dots float above the pager
+pagerWrapper: {
+  flex: 1,
+  position: 'relative',
+},
 
-  // System Overview Card - Updated with Black/Orange Theme
-  overviewCardWrapper: {
-    marginBottom: 20,
-  },
-  systemOverviewCard: {
-    backgroundColor: '#1A1A1A', // Black background
-    borderRadius: 12,
-    padding: 20,
-    borderWidth: 2,
-    borderColor: '#FF8C00', // Orange border
-  },
-  overviewTitle: {
-    color: '#FF8C00', // Orange title
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 16,
-  },
-  overviewContent: {
-    gap: 12,
-  },
-  overviewRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  overviewLabel: {
-    color: '#CCCCCC', // Light gray for labels
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  overviewValue: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
+// Dots row at the bottom
+pagerDotsContainer: {
+  position: 'absolute',
+  bottom: 12,
+  left: 0,
+  right: 0,
+  flexDirection: 'row',
+  justifyContent: 'center',
+  alignItems: 'center',
+  gap: 10,
+},
 
-  // Detail Toggle Button
-  detailToggleButton: {
-    backgroundColor: '#FFB267',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  detailToggleText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+pagerDot: {
+  width: 10,
+  height: 10,
+  borderRadius: 5,
+  backgroundColor: '#3A3A3A',
+},
 
-  // Map Section
-  mapSection: {
-    marginBottom: 20,
-  },
-  mapTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  mapContainer: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    height: 200,
-  },
-
-  // Error State
-  errorContainer: {
-    backgroundColor: '#F44336',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-    alignItems: 'center',
-  },
-  errorText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '500',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  retryButton: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-  },
-  retryText: {
-    color: '#F44336',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-
-  // Legacy styles for backward compatibility
-  simplePanelContainer: {
-    backgroundColor: '#211D1D',
-    borderRadius: 15,
-    padding: 16,
-    marginBottom: 20,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  viewDetailText: {
-    fontSize: 12,
-    color: '#FFB267',
-  },
-  simpleEnergyData: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-  },
-  energyItem: {
-    alignItems: 'center',
-    paddingHorizontal: 5,
-    marginBottom: 12,
-    width: '48%', // Allow for 2 items in a row on smaller screens
-  },
-  energyValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  energyLabel: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 4,
-  },
-  energyDetail: {
-    fontSize: 10,
-    color: '#999',
-    marginTop: 2,
-  },
-  loadingContainer: {
-    padding: 20,
-    alignItems: 'center',
-  },
-  loadingText: {
-    color: '#999',
-  },
-  tanksContainer: {
-    backgroundColor: '#211D1D',
-    borderRadius: 15,
-    padding: 16,
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 12,
-  }
+pagerDotActive: {
+  backgroundColor: '#FF8C00',
+},
 });
 
 export default System;

@@ -13,8 +13,6 @@ import { Ionicons } from '@expo/vector-icons';
 
 const screenWidth = Dimensions.get('window').width;
 
-// Default labels + icons that mirror your TabletTabs layout.
-// (Components are supplied from the navigator via props; these are only fallbacks.)
 const DEFAULT_TABS = [
   { name: 'Home', icon: 'home-outline' },
   { name: 'System', icon: 'stats-chart-outline' },
@@ -24,30 +22,27 @@ const DEFAULT_TABS = [
   { name: 'Settings', icon: 'settings-outline' },
 ];
 
-
-
 const AnimatedTabletTabs = ({
-  tabs: tabsProp,        // [{ name, icon, component }]
+  tabs: tabsProp,
   initialTab,
   onTabChange,
-  renderScene,          // optional: (activeTabName) => ReactNode
+  renderScene,
 }) => {
   const tabs = useMemo(
     () => (tabsProp?.length ? tabsProp : DEFAULT_TABS),
     [tabsProp]
   );
 
-  const initialIndex = Math.max(
-    0,
-    tabs.findIndex((t) => t.name === initialTab)
-  );
-
+  const initialIndex = Math.max(0, tabs.findIndex((t) => t.name === initialTab));
   const [activeTab, setActiveTab] = useState(tabs[initialIndex]?.name ?? tabs[0].name);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
+  // Drives BOTH the underline and the glow X position
   const tabIndicatorAnim = useRef(new Animated.Value(initialIndex)).current;
 
-  // Keep indicator in sync if tabs/activeTab change
+  // Extra pulse for the glow (opacity/scale) so it feels alive
+  const glowAnim = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
     const idx = Math.max(0, tabs.findIndex((t) => t.name === activeTab));
     tabIndicatorAnim.setValue(idx);
@@ -60,42 +55,75 @@ const AnimatedTabletTabs = ({
     if (toIndex < 0 || name === activeTab) return;
 
     setIsTransitioning(true);
-    Animated.timing(tabIndicatorAnim, {
-      toValue: toIndex,
-      duration: 220,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start(() => {
+
+    // Animate the underline + run a synced glow pulse
+    Animated.parallel([
+      Animated.timing(tabIndicatorAnim, {
+        toValue: toIndex,
+        duration: 220,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.sequence([
+        Animated.timing(glowAnim, {
+          toValue: 1,
+          duration: 110,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(glowAnim, {
+          toValue: 0,
+          duration: 110,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start(() => {
       setActiveTab(name);
       setIsTransitioning(false);
       onTabChange?.(name);
     });
   };
 
-const INDICATOR_WIDTH_RATIO = 0.95; // 60% of a tab (tweak to taste)
+  const INDICATOR_WIDTH_RATIO = 0.95;
+  const indicatorWidth = useMemo(() => perTabWidth * INDICATOR_WIDTH_RATIO, [perTabWidth]);
+  const indicatorCenterOffset = useMemo(
+    () => (perTabWidth - indicatorWidth) / 2,
+    [perTabWidth, indicatorWidth]
+  );
 
-const indicatorWidth = useMemo(
-  () => perTabWidth * INDICATOR_WIDTH_RATIO,
-  [perTabWidth]
-);
+  // Glow geometry (a bit wider/taller than the underline, sits behind icons/labels)
+  const GLOW_WIDTH_RATIO = 0.86;  // a hair narrower than full tab to avoid touching edges
+  const glowWidth = useMemo(() => perTabWidth * GLOW_WIDTH_RATIO, [perTabWidth]);
+  const glowCenterOffset = useMemo(
+    () => (perTabWidth - glowWidth) / 2,
+    [perTabWidth, glowWidth]
+  );
 
-const indicatorCenterOffset = useMemo(
-  () => (perTabWidth - indicatorWidth) / 2,
-  [perTabWidth, indicatorWidth]
-);
+  // Shared X interpolation (keeps glow + indicator perfectly in sync)
+  const sharedTranslateX = tabIndicatorAnim.interpolate({
+    inputRange: [0, tabs.length - 1],
+    outputRange: [glowCenterOffset, perTabWidth * (tabs.length - 1) + glowCenterOffset],
+    extrapolate: 'clamp',
+  });
 
+  // Glow pulse (opacity + scale) tied to glowAnim, so it "breathes" on switch
+  const glowOpacity = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.16, 0.28],
+  });
+  const glowScale = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.04],
+  });
 
-  // Render active screen (exactly like TabletTabs shows each Screen component)
   const renderContent = () => {
     if (typeof renderScene === 'function') return renderScene(activeTab);
-
     const activeRoute = tabs.find((t) => t.name === activeTab);
     if (activeRoute?.component) {
       const ScreenComponent = activeRoute.component;
       return <ScreenComponent />;
     }
-
-    // Fallback if no component provided
     return (
       <View style={[styles.contentContainer, { alignItems: 'center', justifyContent: 'center' }]}>
         <Text style={{ color: '#fff', fontSize: 18 }}>{activeTab}</Text>
@@ -112,27 +140,40 @@ const indicatorCenterOffset = useMemo(
       {/* Custom Tab Bar */}
       <View style={styles.tabBarContainer}>
         <View style={styles.tabBar}>
-          {/* Animated Tab Indicator */}
+          {/* Moving GLOW (behind icons/labels), synced with indicator */}
           <Animated.View
-  style={[
-    styles.tabIndicator,
-    {
-      width: indicatorWidth,
-      transform: [
-        {
-          translateX: tabIndicatorAnim.interpolate({
-            inputRange: [0, tabs.length - 1],
-            outputRange: [
-              indicatorCenterOffset,
-              perTabWidth * (tabs.length - 1) + indicatorCenterOffset
-            ],
-            extrapolate: 'clamp',
-          }),
-        },
-      ],
-    },
-  ]}
-/>
+            pointerEvents="none"
+            style={[
+              styles.tabGlow,
+              {
+                width: glowWidth,
+                transform: [{ translateX: sharedTranslateX }, { scaleY: glowScale }],
+                opacity: glowOpacity,
+              },
+            ]}
+          />
+
+          {/* Animated Tab Indicator (orange line), shares the same position math */}
+          <Animated.View
+            style={[
+              styles.tabIndicator,
+              {
+                width: indicatorWidth,
+                transform: [
+                  {
+                    translateX: tabIndicatorAnim.interpolate({
+                      inputRange: [0, tabs.length - 1],
+                      outputRange: [
+                        indicatorCenterOffset,
+                        perTabWidth * (tabs.length - 1) + indicatorCenterOffset,
+                      ],
+                      extrapolate: 'clamp',
+                    }),
+                  },
+                ],
+              },
+            ]}
+          />
 
           {tabs.map((tab) => {
             const isActive = activeTab === tab.name;
@@ -198,13 +239,31 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
     position: 'relative',
+    overflow: 'hidden', // keeps glow nicely clipped to the bar
   },
+
+  /* NEW: the moving glow "pill" behind icons/labels */
+  tabGlow: {
+    position: 'absolute',
+    top: 7,
+    bottom: 7,
+    left: 0,
+    borderRadius: 12,
+    backgroundColor: '#FFB267',
+    opacity: 0.2,
+    // Make it feel like a glow without custom libraries
+    shadowColor: '#FFB267',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.45,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+
   tabIndicator: {
     position: 'absolute',
     bottom: 5,
     left: 0,
     height: 3,
-    
     backgroundColor: '#FFB267',
     borderRadius: 2,
     shadowColor: '#FFB267',
@@ -214,8 +273,13 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   tabButton: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-    paddingVertical: 10, borderRadius: 12, marginHorizontal: 2, minHeight: 60,
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 12,
+    marginHorizontal: 2,
+    minHeight: 60,
   },
   activeTabButton: {
     backgroundColor: 'rgba(255, 178, 103, 0.1)',
