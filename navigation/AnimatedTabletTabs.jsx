@@ -10,6 +10,7 @@ import {
   Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { FontFamily } from '../GlobalStyles';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -126,8 +127,8 @@ const AnimatedTabletTabs = ({
     }
     return (
       <View style={[styles.contentContainer, { alignItems: 'center', justifyContent: 'center' }]}>
-        <Text style={{ color: '#fff', fontSize: 18 }}>{activeTab}</Text>
-        <Text style={{ color: '#bbb', marginTop: 6 }}>Add your screen for “{activeTab}”.</Text>
+        <Text style={{ color: '#fff', fontSize: 18, fontFamily: FontFamily.latoBold }}>{activeTab}</Text>
+        <Text style={{ color: '#bbb', marginTop: 6, fontFamily: FontFamily.latoRegular }}>Add your screen for "{activeTab}".</Text>
       </View>
     );
   };
@@ -290,7 +291,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   iconContainer: { marginBottom: 4, padding: 2 },
-  tabLabel: { fontSize: 10, textAlign: 'center', letterSpacing: 0.3 },
+  tabLabel: { fontSize: 10, textAlign: 'center', letterSpacing: 0.3, fontFamily: FontFamily.latoRegular },
 });
 
 export default AnimatedTabletTabs;

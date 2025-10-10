@@ -262,13 +262,13 @@ const styles = StyleSheet.create({
   weatherTitle: {
     color: isDarkMode ? Color.colorWhitesmoke_100 : Color.colorDarkslategray_200,
     fontSize: FontSize.size_mid,
-    fontFamily: FontFamily.manropeSemiBold,
+    fontFamily: FontFamily.latoBold,
   },
   
   locationText: {
     color: isDarkMode ? Color.colorWhitesmoke_100 : Color.colorDarkslategray_200,
     fontSize: FontSize.textXSM_size,
-    fontFamily: FontFamily.manropeRegular,
+    fontFamily: FontFamily.latoRegular,
     opacity: 0.7,
   },
   
@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
   weatherHour: {
     color: isDarkMode ? Color.colorWhitesmoke_100 : Color.colorDarkslategray_200,
     fontSize: FontSize.textXSM_size,
-    fontFamily: FontFamily.manropeRegular,
+    fontFamily: FontFamily.latoRegular,
     marginBottom: 4,
   },
   
@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
   weatherTemp: {
     color: isDarkMode ? Color.colorWhitesmoke_100 : Color.colorDarkslategray_200,
     fontSize: FontSize.textXSM_size,
-    fontFamily: FontFamily.manropeSemiBold,
+    fontFamily: FontFamily.latoBold,
     marginTop: 4,
   },
   
@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
   weatherPlaceholderText: {
     color: isDarkMode ? Color.colorWhitesmoke_100 : Color.colorDarkslategray_200,
     fontSize: FontSize.textXSM_size,
-    fontFamily: FontFamily.manropeRegular,
+    fontFamily: FontFamily.latoRegular,
     opacity: 0.6,
   },
   
@@ -359,13 +359,13 @@ const styles = StyleSheet.create({
   cardValue: {
     color: isDarkMode ? Color.colorWhitesmoke_100 : Color.colorDarkslategray_200,
     fontSize: FontSize.size_17xl,
-    fontFamily: FontFamily.manropeBold,
+    fontFamily: FontFamily.latoBold,
   },
   
   cardLabel: {
     color: isDarkMode ? Color.colorWhitesmoke_100 : Color.colorDarkslategray_200,
     fontSize: FontSize.textXSM_size,
-    fontFamily: FontFamily.manropeRegular,
+    fontFamily: FontFamily.latoRegular,
     marginBottom: 12,
     opacity: 0.8,
   },
@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
   energyModeLabel: {
     color: isDarkMode ? Color.colorWhitesmoke_100 : Color.colorDarkslategray_200,
     fontSize: FontSize.textXSM_size,
-    fontFamily: FontFamily.manropeRegular,
+    fontFamily: FontFamily.latoRegular,
   },
   
   acControlButton: {
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
   acButtonText: {
     color: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
     fontSize: FontSize.size_sm,
-    fontFamily: FontFamily.manropeSemiBold,
+    fontFamily: FontFamily.latoBold,
   },
   
   // Air Con Modal

@@ -361,7 +361,7 @@ const styles = StyleSheet.create({
   },
   screenTitle: {
     fontSize: FontSize.size_13xl,
-    fontFamily: FontFamily.manropeMedium,
+    fontFamily: FontFamily.latoRegular,
     textAlign: 'center',
     numberOfLines: 1,
     adjustsFontSizeToFit: true,
@@ -375,7 +375,7 @@ const styles = StyleSheet.create({
   },
   sectionHeader: {
     fontSize: FontSize.size_lg,
-    fontFamily: FontFamily.manropeBold,
+    fontFamily: FontFamily.latoBold,
     fontWeight: 'bold',
   },
   sectionListContent: {
@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: FontSize.size_md,
-    fontFamily: FontFamily.manropeRegular,
+    fontFamily: FontFamily.latoRegular,
     flex: 1,
   },
   arrow: {
@@ -434,17 +434,17 @@ const styles = StyleSheet.create({
   },
   tabletDay: {
     fontSize: FontSize.size_5xl,
-    fontFamily: FontFamily.manropeBold,
+    fontFamily: FontFamily.latoBold,
     fontWeight: 'bold',
   },
   tabletDate: {
     fontSize: FontSize.size_lg,
-    fontFamily: FontFamily.manropeRegular,
+    fontFamily: FontFamily.latoRegular,
     marginTop: 4,
   },
   tabletTitle: {
     fontSize: FontSize.size_9xl,
-    fontFamily: FontFamily.manropeBold,
+    fontFamily: FontFamily.latoBold,
     fontWeight: 'bold',
   },
   tabletLogo: {
@@ -479,7 +479,7 @@ const styles = StyleSheet.create({
   },
   tabletProfileInitials: {
     fontSize: FontSize.size_5xl,
-    fontFamily: FontFamily.manropeBold,
+    fontFamily: FontFamily.latoBold,
     fontWeight: 'bold',
   },
   tabletProfileInfo: {
@@ -488,12 +488,12 @@ const styles = StyleSheet.create({
   },
   tabletProfileName: {
     fontSize: FontSize.size_5xl,
-    fontFamily: FontFamily.manropeBold,
+    fontFamily: FontFamily.latoBold,
     fontWeight: 'bold',
   },
   tabletProfileEmail: {
     fontSize: FontSize.size_lg,
-    fontFamily: FontFamily.manropeRegular,
+    fontFamily: FontFamily.latoRegular,
     marginTop: 4,
   },
   tabletProfileEditButton: {
@@ -505,7 +505,7 @@ const styles = StyleSheet.create({
   },
   tabletProfileEditText: {
     fontSize: FontSize.size_md,
-    fontFamily: FontFamily.manropeMedium,
+    fontFamily: FontFamily.latoRegular,
   },
   tabletGrid: {
     flexDirection: 'row',
@@ -527,7 +527,7 @@ const styles = StyleSheet.create({
   },
   tabletCardTitle: {
     fontSize: FontSize.size_3xl,
-    fontFamily: FontFamily.manropeBold,
+    fontFamily: FontFamily.latoBold,
     fontWeight: 'bold',
     marginBottom: 16,
   },
@@ -549,7 +549,7 @@ const styles = StyleSheet.create({
   },
   tabletItemLabel: {
     fontSize: FontSize.size_lg,
-    fontFamily: FontFamily.manropeRegular,
+    fontFamily: FontFamily.latoRegular,
     flex: 1,
   },
   tabletArrow: {
@@ -562,7 +562,7 @@ const styles = StyleSheet.create({
   },
   tabletFooterText: {
     fontSize: FontSize.size_sm,
-    fontFamily: FontFamily.manropeRegular,
+    fontFamily: FontFamily.latoRegular,
     color: '#FFFFFF',
   },
   

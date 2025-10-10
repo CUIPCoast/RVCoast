@@ -758,8 +758,8 @@ const ClimateControlScreenTablet = () => {
           <Row size={10}>
             <Row className="bg-black" size={9}>
               <Col className="m-1 ml-3">
-                <Text className="text-3xl text-white">{DayOfTheWeek}</Text>
-                <Text className="text-lg text-white">{currentDate}</Text>
+                <Text className="text-3xl text-white" style={{ fontFamily: FontFamily.latoBold }}>{DayOfTheWeek}</Text>
+                <Text className="text-lg text-white" style={{ fontFamily: FontFamily.latoBold }}>{currentDate}</Text>
               </Col>
             </Row>
            <Row className="bg-black" size={1}>

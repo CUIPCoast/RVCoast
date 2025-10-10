@@ -209,7 +209,7 @@ const MainScreen = () => {
                                 <Text className="text-3xl text-white" style={{fontFamily: FontFamily.latoBold}}>{DayOfTheWeek}</Text>
                                 <Text className="text-lg text-white" style={{fontFamily: FontFamily.latoBold}}>{currentDate}</Text>
                             </View>
-                            
+                    
                             {/* Error Toggle Button */}
                             <TouchableOpacity 
                                 style={styles.errorToggleButton}

@@ -79,7 +79,7 @@ const styles = StyleSheet.create({
     color: isDarkMode ? Color.white0 : Color.colorDarkslategray_200,
 
     textAlign: "left",
-    fontFamily: FontFamily.manropeRegular,
+    fontFamily: FontFamily.latoRegular,
     fontSize: FontSize.textLMedium_size,
     left: 0,
   },
@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
   accountSettings: {
     color: "black",
     textAlign: "left",
-    fontFamily: FontFamily.manropeRegular,
+    fontFamily: FontFamily.latoRegular,
     fontSize: FontSize.textLMedium_size,
     left: 0,
     top: 0,
@@ -173,9 +173,9 @@ const styles = StyleSheet.create({
   },
   addUser: {
     color:  isDarkMode ?  Color.white0 : Color.colorDarkslategray_200,
-    
+
     textAlign: "left",
-    fontFamily: FontFamily.manropeRegular,
+    fontFamily: FontFamily.latoRegular,
     fontSize: FontSize.textLMedium_size,
     left: 0,
   },

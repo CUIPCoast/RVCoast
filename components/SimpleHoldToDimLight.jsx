@@ -449,21 +449,23 @@ const SimpleHoldToDimLight = ({
         alignItems: "center",
         marginBottom: 5
       }}>
-        <Text style={{ 
-          color: getDisplayColor(), 
+        <Text style={{
+          color: getDisplayColor(),
           fontSize: 14,
-          flex: 1
+          flex: 1,
+          fontFamily: FontFamily.latoRegular
         }}>
           {name}
         </Text>
         
         {/* Brightness indicator */}
-        <Text style={{ 
-          color: getDisplayColor(), 
+        <Text style={{
+          color: getDisplayColor(),
           fontSize: 12,
           marginRight: 15, // Increased margin to push button left
           minWidth: 80,
-          textAlign: 'center'
+          textAlign: 'center',
+          fontFamily: FontFamily.latoBold
         }}>
           {getBrightnessText()}
         </Text>
@@ -514,10 +516,11 @@ const SimpleHoldToDimLight = ({
       {/* Error message */}
       {error && (
         <View style={{ marginTop: 5 }}>
-          <Text style={{ 
-            color: "#FF6B6B", 
+          <Text style={{
+            color: "#FF6B6B",
             fontSize: 10,
-            textAlign: 'center'
+            textAlign: 'center',
+            fontFamily: FontFamily.latoRegular
           }}>
             {error}
           </Text>
@@ -527,11 +530,12 @@ const SimpleHoldToDimLight = ({
       {/* Status indicator for dimming */}
       {isDimming && dimmingDirection && (
         <View style={{ marginTop: 5 }}>
-          <Text style={{ 
-            color: "#FFB267", 
+          <Text style={{
+            color: "#FFB267",
             fontSize: 10,
             textAlign: 'center',
-            fontStyle: 'italic'
+            fontStyle: 'italic',
+            fontFamily: FontFamily.latoRegular
           }}>
             Cycling {dimmingDirection.toUpperCase()} • Hold to continue
           </Text>
@@ -541,11 +545,12 @@ const SimpleHoldToDimLight = ({
       {/* Help text for new users */}
       {supportsDimming && localIsOn && !isDimming && !error && (
         <View style={{ marginTop: 5 }}>
-          <Text style={{ 
-            color: "#888", 
+          <Text style={{
+            color: "#888",
             fontSize: 9,
             textAlign: 'center',
-            fontStyle: 'italic'
+            fontStyle: 'italic',
+            fontFamily: FontFamily.latoLight
           }}>
             Tap: On/Off • Hold: Cycle brightness
           </Text>

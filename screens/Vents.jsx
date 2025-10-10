@@ -171,8 +171,8 @@ const Vents = () => {
         <Row size={10}>
                 <Row className="bg-black" size={9}>
                   <Col className="m-1 ml-3">
-                    <Text className="text-3xl text-white">{dayOfTheWeek}</Text>
-                    <Text className="text-lg text-white">{currentDate}</Text>
+                    <Text className="text-3xl text-white" style={{ fontFamily: FontFamily.latoBold }}>{dayOfTheWeek}</Text>
+                    <Text className="text-lg text-white" style={{ fontFamily: FontFamily.latoBold }}>{currentDate}</Text>
                   </Col>
                 </Row>
                 <Row className="bg-black" size={1}>
@@ -212,7 +212,7 @@ const Vents = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  headerText: { color: '#FFF', fontSize: 24, fontWeight: '600' },
+  headerText: { color: '#FFF', fontSize: 24, fontWeight: '600', fontFamily: FontFamily.latoBold },
   centered: { justifyContent: 'center', alignItems: 'center' },
   fanControlsContainer: { 
     flexDirection: 'row', 
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
     width: '50%',
   },
   mobileStatusContainer: { position: 'absolute', bottom: 50, backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 5, alignSelf: 'center', zIndex: 1000 },
-  statusText: { color: '#FFF', fontSize: 12, fontWeight: '700' },
+  statusText: { color: '#FFF', fontSize: 12, fontWeight: '700', fontFamily: FontFamily.latoBold },
   loadingIndicator: { marginVertical: 20 },
 });
 

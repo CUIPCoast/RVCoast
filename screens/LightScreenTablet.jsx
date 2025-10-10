@@ -161,7 +161,7 @@ const ImprovedLightScreenTablet = () => {
           width: 300,
           alignItems: 'center'
         }}>
-          <Text style={{ color: 'white', fontSize: 16 }}>{statusMessage}</Text>
+          <Text style={{ color: 'white', fontSize: 16, fontFamily: FontFamily.latoRegular }}>{statusMessage}</Text>
         </View>
       )}
       
@@ -201,12 +201,13 @@ const ImprovedLightScreenTablet = () => {
                   marginRight: 10,
                 }}
               />
-              <Text className="text-white">Light Master</Text>
-              <Text style={{ 
-                color: '#FFB267', 
-                fontSize: 12, 
+              <Text className="text-white" style={{ fontFamily: FontFamily.latoBold }}>Light Master</Text>
+              <Text style={{
+                color: '#FFB267',
+                fontSize: 12,
                 marginLeft: 10,
-                fontStyle: 'italic'
+                fontStyle: 'italic',
+                fontFamily: FontFamily.latoRegular
               }}>
                 Hold-to-Dim Mode
               </Text>
@@ -231,9 +232,10 @@ const ImprovedLightScreenTablet = () => {
                     onPress={handleAllLightsOnPress}
                     disabled={isLoading}
                   >
-                    <Text style={{ 
+                    <Text style={{
                       color: masterLightOn ? '#000' : '#FFF',
-                      fontWeight: 'bold'
+                      fontWeight: 'bold',
+                      fontFamily: FontFamily.latoBold
                     }}>ON</Text>
                   </TouchableOpacity>
                   
@@ -249,9 +251,10 @@ const ImprovedLightScreenTablet = () => {
                     onPress={handleAllLightsOffPress}
                     disabled={isLoading}
                   >
-                    <Text style={{ 
+                    <Text style={{
                       color: !masterLightOn ? '#000' : '#FFF',
-                      fontWeight: 'bold'
+                      fontWeight: 'bold',
+                      fontFamily: FontFamily.latoBold
                     }}>OFF</Text>
                   </TouchableOpacity>
                 </>
@@ -302,6 +305,7 @@ const ImprovedLightScreenTablet = () => {
                 position: "absolute",
                 top: 10,
                 left: 10,
+                fontFamily: FontFamily.latoBold
               }}
             >
               Kitchen & Living Area
@@ -357,6 +361,7 @@ const ImprovedLightScreenTablet = () => {
                 position: "absolute",
                 top: 10,
                 left: 10,
+                fontFamily: FontFamily.latoBold
               }}
             >
               Bedroom
@@ -411,6 +416,7 @@ const ImprovedLightScreenTablet = () => {
                 position: "absolute",
                 top: 10,
                 left: 10,
+                fontFamily: FontFamily.latoBold
               }}
             >
               Bathroom

@@ -904,7 +904,7 @@ const styles = StyleSheet.create({
   devices1: {
     fontSize: FontSize.size_13xl,
     color: Color.colorWhitesmoke_100,
-    fontFamily: FontFamily.manropeMedium,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: "500",
     textAlign: "left",
     top: 30,
@@ -943,7 +943,7 @@ const styles = StyleSheet.create({
   tabText: {
     color: Color.white0,
     fontSize: FontSize.textLMedium_size,
-    fontFamily: FontFamily.manropeMedium,
+    fontFamily: FontFamily.latoRegular,
     textAlign: "center",
   },
   activeTabText: {
@@ -960,7 +960,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     color: Color.white0,
     fontSize: FontSize.textXSM_size,
-    fontFamily: FontFamily.manropeMedium,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: "500",
     textAlign: "center",
   },
