@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  Image, 
-  StyleSheet, 
-  Animated, 
+import {
+  View,
+  Text,
+  Image,
+  StyleSheet,
+  Animated,
   Dimensions,
   StatusBar,
   TouchableOpacity,
@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons as Icon } from '@expo/vector-icons';
+import { FontFamily } from "../GlobalStyles";
 const { width, height } = Dimensions.get('window');
 
 const TabletSplashScreen = ({ onSplashComplete, children }) => {
@@ -503,6 +504,7 @@ const styles = StyleSheet.create({
   skipButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '600',
   },
   logoSection: {
@@ -534,6 +536,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 42,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: 'bold',
     color: '#FFFFFF',
     textAlign: 'center',
@@ -587,6 +590,7 @@ const styles = StyleSheet.create({
   swipeText: {
     color: '#FFB267',
     fontSize: 18,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '600',
     textAlign: 'center',
     letterSpacing: 1,
@@ -605,11 +609,13 @@ const styles = StyleSheet.create({
   versionText: {
     color: '#888888',
     fontSize: 14,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '500',
   },
   copyrightText: {
     color: '#666666',
     fontSize: 12,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '400',
   },
 });

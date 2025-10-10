@@ -10,6 +10,7 @@ import {
   Button,
   Alert,
 } from 'react-native';
+import { FontFamily } from "../GlobalStyles";
 
 const Wifi = () => {
   const [wifiList, setWifiList] = useState([
@@ -108,6 +109,7 @@ const styles = StyleSheet.create({
   },
   header: {
     fontSize: 18,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '600',
     marginBottom: 20,
     color: '#333',
@@ -148,6 +150,7 @@ const styles = StyleSheet.create({
   },
   modalHeader: {
     fontSize: 18,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '600',
     marginBottom: 20,
     color: '#333',

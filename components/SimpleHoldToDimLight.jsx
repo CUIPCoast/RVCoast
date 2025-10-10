@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
 import { LightControlService } from "../Service/LightControlService";
 import rvStateManager from "../API/RVStateManager/RVStateManager";
+import { FontFamily } from "../GlobalStyles";
 
 const SimpleHoldToDimLight = ({ 
   name, 
@@ -501,6 +502,7 @@ const SimpleHoldToDimLight = ({
             <Text style={{
               color: localIsOn ? "#000" : "#FFF",
               fontSize: 16,
+              fontFamily: FontFamily.latoRegular,
               fontWeight: 'bold'
             }}>
               ⟲

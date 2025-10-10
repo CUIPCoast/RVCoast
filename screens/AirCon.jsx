@@ -8,6 +8,7 @@ import {
 } from "../GlobalStyles";
 import { RadialSlider } from 'react-native-radial-slider';
 import { useScreenSize, handleCoolingToggle, handleToeKickToggle, handleTemperatureChange, dismissKeyboard } from "../helper";
+import { FontFamily } from "../GlobalStyles";
 
 // Import RV State Management hooks
 import { useRVClimate } from "../API/RVStateManager/RVStateHooks";
@@ -575,6 +576,7 @@ const styles = StyleSheet.create({
   label: {
     color:  isDarkMode ? Color.white0 : Color.colorDarkslategray_200,
     fontSize: 20,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: 'bold',
     backgroundColor: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
     margin: 10,

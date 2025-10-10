@@ -1,15 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  Image, 
-  StyleSheet, 
-  Animated, 
+import {
+  View,
+  Text,
+  Image,
+  StyleSheet,
+  Animated,
   Dimensions,
   StatusBar,
   Easing
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { FontFamily } from "../GlobalStyles";
 
 const { width, height } = Dimensions.get('window');
 
@@ -363,6 +364,7 @@ const styles = StyleSheet.create({
   },
   appName: {
     fontSize: 48,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: 'bold',
     color: '#FFFFFF',
     textAlign: 'center',

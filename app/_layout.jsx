@@ -9,10 +9,10 @@ import { useEffect } from 'react'
 
 const Rootlayout = () => {
   const [fontsLoaded, error] = useFonts({
-    "Manrope-Bold": require("../assets/Manrope/static/Manrope-Bold.ttf"),
-    "Manrope-SemiBold": require("../assets/Manrope/static/Manrope-SemiBold.ttf"),
-    "Manrope-Medium": require("../assets/Manrope/static/Manrope-Medium.ttf"),
-    "Manrope-Regular": require("../assets/Manrope/static/Manrope-Regular.ttf"),
+    "Lato-Bold": require("../assets/Lato/Lato-Bold.ttf"),
+    "Lato-ThinItalic": require("../assets/Lato/Lato-ThinItalic.ttf"),
+    "Lato-Light": require("../assets/Lato/Lato-Light.ttf"),
+    "Lato-Regular": require("../assets/Lato/Lato-Regular.ttf"),
   });
   if (!fontsLoaded) {
     return null;

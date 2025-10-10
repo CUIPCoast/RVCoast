@@ -11,7 +11,7 @@ import { RVControlService } from "../API/rvAPI";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-
+import { FontFamily } from '../GlobalStyles';
 // Import RV State Management hooks
 import { useRVClimate } from "../API/RVStateManager/RVStateHooks";
 import rvStateManager from "../API/RVStateManager/RVStateManager";
@@ -762,20 +762,20 @@ const ClimateControlScreenTablet = () => {
                 <Text className="text-lg text-white">{currentDate}</Text>
               </Col>
             </Row>
-            <Row className="bg-black" size={1}>
-              <View className="pt-3 pl-3">
-                <Image
-                  source={require("../assets/images/icon.png")}
-                  style={{
-                    width: 90,
-                    height: 55,
-                    right: 0,
-                    paddingTop: 0,
-                    backgroundColor: "white"
-                  }}
-                />
-              </View>
-            </Row>
+           <Row className="bg-black" size={1}>
+                               <View className="pt-3 pl-3">
+                                   <Image
+                                       source={require("../assets/trailer.png")}
+                                       style={{
+                                           width: 90,
+                                           height: 55,
+                                           right: 0,
+                                           paddingTop: 0,
+                                           backgroundColor: "black"
+                                       }}
+                                   />
+                               </View>
+                           </Row>
           </Row>
 
           {/* Weather error indicator */}
@@ -1230,6 +1230,7 @@ const styles = StyleSheet.create({
   },
   modernButtonTitle: {
     fontSize: 14,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '700',
     letterSpacing: 0.5,
   },
@@ -1320,6 +1321,7 @@ const styles = StyleSheet.create({
   weatherErrorText: {
     color: "white",
     fontSize: 12,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: "bold",
   },
   fanSpeedContainer: {
@@ -1373,6 +1375,7 @@ const styles = StyleSheet.create({
   toggleText: {
     color: 'white',
     fontSize: 17,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '600',
   },
 });

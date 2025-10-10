@@ -21,6 +21,7 @@ import BatteryCard from "../components/BatteryCard.jsx";
 import { HorizontalLine, VerticalLine, ConnectionDot } from '../components/Lines.js';
 import PVChargerCard from "../components/PVChargerCard.jsx";
 import GlowingCard from '../components/GlowingCards.jsx';
+import { FontFamily } from "../GlobalStyles";
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -142,7 +143,7 @@ const System = () => {
             
           </View>
           <Image
-            source={require("../assets/images/icon.png")}
+            source={require("../assets/trailer.png")}
             style={styles.logo}
           />
         </View>
@@ -371,6 +372,7 @@ const styles = StyleSheet.create({
   tabLabel: {
     color: '#AAA',
     fontSize: 16,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '600',
   },
   tabLabelActive: {
@@ -401,6 +403,7 @@ const styles = StyleSheet.create({
   headerDay: {
     color: "#fff",
     fontSize: 28,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: "600",
   },
   headerDate: {
@@ -410,7 +413,7 @@ const styles = StyleSheet.create({
   logo: {
     width: 70,
     height: 45,
-    backgroundColor: "#fff",
+    backgroundColor: "black",
     borderRadius: 8,
   },
   diagramContainer: {
@@ -465,16 +468,19 @@ const styles = StyleSheet.create({
   redCardHeaderText: {
     color: '#FFF',
     fontSize: 18,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '700',
   },
   greenCardHeaderText: {
     color: '#FFF',
     fontSize: 18,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '700',
   },
   darkerGreenCardHeaderText: {
     color: '#FFF',
     fontSize: 18,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '700',
   },
 
@@ -548,12 +554,14 @@ const styles = StyleSheet.create({
   cardTitle: {
     color: "#fff",
     fontSize: 18,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: "600",
     marginBottom: 8,
   },
   cardValue: {
     color: "#fff",
     fontSize: 24,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: "700",
     textAlign: "center",
   },
@@ -590,6 +598,7 @@ const styles = StyleSheet.create({
   mobileHeaderTitle: {
     color: '#FFFFFF',
     fontSize: 24,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '700',
     marginBottom: 4,
   },
@@ -627,6 +636,7 @@ const styles = StyleSheet.create({
   placeholderTitle: {
     color: '#FFF',
     fontSize: 24,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '700',
     marginBottom: 8,
   },

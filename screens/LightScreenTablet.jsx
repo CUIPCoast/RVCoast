@@ -9,6 +9,7 @@ import { CANBusMonitor } from "../Service/CANBusMonitor.js";
 import { LightingScenes } from "../API/rvAPI.js";
 import rvStateManager from "../API/RVStateManager/RVStateManager";
 import { handleAllLightsOn, handleAllLightsOff, getLightDisplayName, getLightGroups, showStatusMessage } from "../helper";
+import { FontFamily } from "../GlobalStyles";
 
 const ImprovedLightScreenTablet = () => {
   // Current date/time
@@ -126,20 +127,20 @@ const ImprovedLightScreenTablet = () => {
       <Row size={10}>
         <Row className="bg-black" size={9}>
           <Col className="m-1 ml-3">
-            <Text className="text-3xl text-white">{dayOfTheWeek}</Text>
-            <Text className="text-lg text-white">{currentDate}</Text>
+            <Text className="text-3xl text-white" style={{fontFamily: FontFamily.latoBold}}>{dayOfTheWeek}</Text>
+            <Text className="text-lg text-white" style={{fontFamily: FontFamily.latoBold}}>{currentDate}</Text>
           </Col>
         </Row>
        <Row className="bg-black" size={1}>
                            <View className="pt-3 pl-3">
                                <Image
-                                   source={require("../assets/images/icon.png")}
+                                   source={require("../assets/trailer.png")}
                                    style={{
                                        width: 90,
                                        height: 55,
                                        right: 0,
                                        paddingTop: 0,
-                                       backgroundColor: "white"
+                                       backgroundColor: "black"
                                    }}
                                />
                            </View>

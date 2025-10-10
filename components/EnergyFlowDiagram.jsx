@@ -7,6 +7,7 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
+import { FontFamily } from "../GlobalStyles";
 
 // Wrap SVG's Circle for animation
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -169,6 +170,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 18,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: 'bold',
     color: 'white',
   },

@@ -4,6 +4,12 @@ export const FontFamily = {
     manropeMedium: "Manrope-Medium",
     manropeSemiBold: "Manrope-SemiBold",
     manropeBold: "Manrope-Bold",
+
+
+    latoRegular: "Lato-Regular",
+    latoLight: "Lato-Light",
+    latoBold: "Lato-Bold",
+    latoThinItalic: "Lato-ThinItalic",
   };
   /* font sizes */
   export const FontSize = {

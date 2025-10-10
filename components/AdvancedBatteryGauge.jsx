@@ -1,14 +1,15 @@
 import React, { useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Path, Circle, Text as SvgText } from 'react-native-svg';
-import Animated, { 
-  Easing, 
-  useAnimatedProps, 
-  useSharedValue, 
+import Animated, {
+  Easing,
+  useAnimatedProps,
+  useSharedValue,
   withTiming,
   interpolateColor
 } from 'react-native-reanimated';
 import { useFocusEffect } from '@react-navigation/native';
+import { FontFamily } from "../GlobalStyles";
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -248,6 +249,7 @@ const styles = StyleSheet.create({
   infoValue: {
     color: 'white',
     fontSize: 16,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: 'bold',
   },
   infoLabel: {

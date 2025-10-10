@@ -8,7 +8,7 @@ import useTemperature from "../hooks/useTemperature"; // New hook
 import {BatteryCard, SmallBatteryCard} from "../components/BatteryCard.jsx";
 import AwningControlModal from "../components/AwningControlModal";
 import AirCon from "./AirCon.jsx";
-
+import { FontFamily } from "../GlobalStyles";
 import { WaterService } from '../API/RVControlServices.js';
 import { useAuth } from '../components/AuthContext';
 import { useScreenSize } from '../helper';
@@ -206,8 +206,8 @@ const MainScreen = () => {
                     <Col className="m-1 ml-3">
                         <View style={styles.headerRow}>
                             <View>
-                                <Text className="text-3xl text-white">{DayOfTheWeek}</Text>
-                                <Text className="text-lg text-white">{currentDate}</Text>
+                                <Text className="text-3xl text-white" style={{fontFamily: FontFamily.latoBold}}>{DayOfTheWeek}</Text>
+                                <Text className="text-lg text-white" style={{fontFamily: FontFamily.latoBold}}>{currentDate}</Text>
                             </View>
                             
                             {/* Error Toggle Button */}
@@ -228,13 +228,13 @@ const MainScreen = () => {
                 <Row className="bg-black" size={1}>
                     <View className="pt-3 pl-3">
                         <Image
-                            source={require("../assets/images/icon.png")}
+                            source={require("../assets/trailer.png")}
                             style={{
                                 width: 90,
                                 height: 55,
                                 right: 0,
                                 paddingTop: 0,
-                                backgroundColor: "white"
+                                backgroundColor: "black"
                             }}
                         />
                     </View>
@@ -375,7 +375,7 @@ const MainScreen = () => {
 
                 <View className="flex-row justify-between items-start w-full mt-[-5] pb-2">
                 <View>
-                    <Text className="text-white mb-1">RV Tanks</Text>
+                    <Text className="text-white mb-1" style={{fontFamily: FontFamily.latoBold}}>RV Tanks</Text>
                     
                     <View className="mt-5 space-y-2 mb-5">
                     
@@ -618,6 +618,7 @@ const MainScreen = () => {
                                 top: 10,
                                 left: 10,
                                 zIndex: 1,
+                                fontFamily: FontFamily.latoBold,
                             }}
                         >
                             Awning
@@ -644,7 +645,7 @@ const MainScreen = () => {
                         shadowOpacity: 0.5,
                         shadowRadius: 6,
                         elevation: 6,}} >
-                    <Text className="text-white">Air Conditioning</Text>
+                    <Text className="text-white" style={{fontFamily: FontFamily.latoBold}}>Air Conditioning</Text>
                     <AirCon />
                 </Col>
             </Row>
@@ -698,11 +699,13 @@ const styles = {
     },
     buttonTitle: {
         fontSize: 14,
+        fontFamily: FontFamily.latoRegular,
         fontWeight: '700',
         letterSpacing: 0.5,
     },
     buttonSubtitle: {
         fontSize: 11,
+        fontFamily: FontFamily.latoRegular,
         fontWeight: '500',
         marginTop: 2,
         textTransform: 'uppercase',
@@ -760,11 +763,13 @@ const styles = {
     statusLabel: {
         color: '#CCCCCC',
         fontSize: 12,
+        fontFamily: FontFamily.latoRegular,
         fontWeight: '500',
     },
     statusValue: {
         color: '#FFFFFF',
         fontSize: 12,
+        fontFamily: FontFamily.latoRegular,
         fontWeight: '600',
     },
     
@@ -793,6 +798,7 @@ const styles = {
     errorToastText: {
         color: 'white',
         fontSize: 12,
+        fontFamily: FontFamily.latoRegular,
         fontWeight: '500',
         flex: 1,
         marginHorizontal: 8,
@@ -820,6 +826,7 @@ const styles = {
     warningToastText: {
         color: 'white',
         fontSize: 11,
+        fontFamily: FontFamily.latoRegular,
         fontWeight: '500',
         marginLeft: 4,
     },
@@ -846,6 +853,7 @@ const styles = {
     loadingToastText: {
         color: 'white',
         fontSize: 12,
+        fontFamily: FontFamily.latoRegular,
         fontWeight: '500',
         marginLeft: 8,
     },
@@ -883,6 +891,7 @@ const styles = {
     welcomeText: {
         color: '#E0E0E0',
         fontSize: 14,
+        fontFamily: FontFamily.latoRegular,
         fontWeight: '500',
         marginBottom: 4,
     },
@@ -898,6 +907,7 @@ const styles = {
     connectionText: {
         color: '#4CAF50',
         fontSize: 12,
+        fontFamily: FontFamily.latoRegular,
         fontWeight: '600',
         marginLeft: 4,
     },
@@ -913,6 +923,7 @@ const styles = {
     connectText: {
         color: '#FF9800',
         fontSize: 12,
+        fontFamily: FontFamily.latoRegular,
         fontWeight: '600',
         marginLeft: 4,
     },
@@ -932,6 +943,7 @@ const styles = {
     weatherTitle: {
         color: '#FFB267',
         fontSize: 14,
+        fontFamily: FontFamily.latoRegular,
         fontWeight: '600',
         marginLeft: 6,
     },
@@ -946,6 +958,7 @@ const styles = {
     weatherText: {
         color: '#E0E0E0',
         fontSize: 12,
+        fontFamily: FontFamily.latoRegular,
         fontWeight: '500',
         marginLeft: 6,
     },
@@ -959,6 +972,7 @@ const styles = {
     tanksSectionTitle: {
         color: 'white',
         fontSize: 14,
+        fontFamily: FontFamily.latoRegular,
         fontWeight: '600',
         marginBottom: 8,
         textAlign: 'center',

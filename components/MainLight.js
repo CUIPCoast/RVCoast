@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Slider } from 'react-native-elements';
 import useScreenSize from "../helper/useScreenSize.jsx";
+import { FontFamily } from "../GlobalStyles";
 
 
 const MainLight = ({
@@ -79,6 +80,7 @@ const styles = StyleSheet.create({
   },
   name: {
     fontSize: 16,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: 'bold',
     marginBottom: 16,
     color: '#FFF',

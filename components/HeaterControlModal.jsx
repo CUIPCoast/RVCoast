@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { StyleSheet, View, Text, Modal, TouchableOpacity, ActivityIndicator } from "react-native";
-import { Color } from "../GlobalStyles";
+import { Color, FontFamily } from "../GlobalStyles";
 import { ClimateService } from "../API/RVControlServices";
 import { RVControlService } from "../API/rvAPI";
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -420,6 +420,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 28,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '800',
     color: '#ffffff',
     marginBottom: 15,
@@ -442,6 +443,7 @@ const styles = StyleSheet.create({
   sectionTitleText: {
     color: Color.white0,
     fontSize: 16,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '600',
   },
   modeContainer: {
@@ -480,6 +482,7 @@ const styles = StyleSheet.create({
   modeButtonText: {
     color: 'white',
     fontSize: 18,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '700',
     letterSpacing: 0.5,
   },
@@ -516,6 +519,7 @@ const styles = StyleSheet.create({
   fanSpeedText: {
     color: 'white',
     fontSize: 16,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '600',
     letterSpacing: 0.3,
   },
@@ -546,6 +550,7 @@ const styles = StyleSheet.create({
   closeButtonText: {
     color: '#ffffff',
     fontSize: 18,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '800',
     letterSpacing: 0.5,
   },

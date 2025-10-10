@@ -3,7 +3,7 @@ import { StyleSheet, View, Text, Modal, TouchableOpacity, Animated, Easing } fro
 import { Color } from '../GlobalStyles';
 import { AwningService } from '../API/RVControlServices';
 import { createAwningCANListener } from '../Service/AwningCANListener';
-
+import { FontFamily } from "../GlobalStyles";
 /**
  * Enhanced Awning Control Modal with fluid command switching and CAN bus status detection
  * 
@@ -730,6 +730,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 24,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: 'bold',
     color: Color.white0,
     marginBottom: 20,
@@ -752,6 +753,7 @@ const styles = StyleSheet.create({
   demoToggleText: {
     color: Color.white0,
     fontSize: 14,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: 'bold',
     textAlign: 'center',
   },
@@ -936,6 +938,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontSize: 16,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: 'bold',
     color: Color.colorGray_200,
   },
@@ -953,6 +956,7 @@ const styles = StyleSheet.create({
   closeButtonText: {
     color: Color.white0,
     fontSize: 16,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: 'bold',
   },
   statusContainer: {

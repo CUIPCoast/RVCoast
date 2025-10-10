@@ -6,6 +6,7 @@ import moment from 'moment';
 import { FanService } from '../API/RVControlServices';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import rvStateManager from '../API/RVStateManager/RVStateManager';
+import { FontFamily } from "../GlobalStyles";
 
 // Import our new scalable button
 import FanButton from '../components/FanButton';
@@ -175,19 +176,19 @@ const Vents = () => {
                   </Col>
                 </Row>
                 <Row className="bg-black" size={1}>
-                  <View className="pt-3 pl-3">
-                    <Image
-                      source={require("../assets/images/icon.png")}
-                      style={{
-                        width: 70,
-                        height: 45,
-                        right: 0,
-                        
-                        backgroundColor: "white",
-                      }}
-                    />
-                  </View>
-                </Row>
+                                    <View className="pt-3 pl-3">
+                                        <Image
+                                            source={require("../assets/trailer.png")}
+                                            style={{
+                                                width: 90,
+                                                height: 55,
+                                                right: 0,
+                                                paddingTop: 0,
+                                                backgroundColor: "black"
+                                            }}
+                                        />
+                                    </View>
+                                </Row>
               </Row>
         <Row size={70} style={styles.centered}>
           <Col style={styles.centered}>

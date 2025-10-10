@@ -823,6 +823,7 @@ const styles = StyleSheet.create({
   whiteButtonText: {
     color: 'black',
     fontSize: 16,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '600',
   },
   orangeButton: {
@@ -835,6 +836,7 @@ const styles = StyleSheet.create({
   orangeButtonText: {
     color: 'black',
     fontSize: 16,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '600',
   },
   modalContainer: {
@@ -852,6 +854,7 @@ const styles = StyleSheet.create({
   },
   modalText: {
     fontSize: 18,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: "bold",
     marginBottom: 10,
   },
@@ -992,6 +995,7 @@ const styles = StyleSheet.create({
   fanControlsText: {
     color: "#FFFFFF",
     fontSize: 14,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: "600",
     textAlign: "center",
     marginTop: 10,
@@ -1032,6 +1036,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 18,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
@@ -1110,6 +1115,7 @@ iconCircleInactive: {
 fanButtonLabel: {
   color: '#FFFFFF',
   fontSize: 16,
+  fontFamily: FontFamily.latoRegular,
   fontWeight: '600',
   marginBottom: 8,
 },
@@ -1129,6 +1135,7 @@ statusInactive: {
 statusText: {
   color: '#FFFFFF',
   fontSize: 12,
+  fontFamily: FontFamily.latoRegular,
   fontWeight: '700',
 },
 disabledButton: {
@@ -1182,6 +1189,7 @@ waterIconCircleInactive: {
 },
 waterButtonLabel: {
   fontSize: 14,
+  fontFamily: FontFamily.latoRegular,
   fontWeight: '600',
   marginBottom: 8,
   textAlign: 'center',
@@ -1203,6 +1211,7 @@ waterStatusInactive: {
 },
 waterStatusText: {
   fontSize: 12,
+  fontFamily: FontFamily.latoRegular,
   fontWeight: '700',
 },
 

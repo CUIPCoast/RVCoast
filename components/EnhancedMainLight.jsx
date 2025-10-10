@@ -4,6 +4,7 @@ import { View, Text, TouchableOpacity, ActivityIndicator, Alert } from "react-na
 import Slider from "@react-native-community/slider";
 import { LightControlService } from "../Service/LightControlService";
 import rvStateManager from "../API/RVStateManager/RVStateManager";
+import { FontFamily } from "../GlobalStyles";
 
 const EnhancedMainLight = ({ 
   name, 
@@ -317,6 +318,7 @@ const EnhancedMainLight = ({
             <Text style={{ 
               color: localIsOn ? "#000" : "#FFF", 
               fontSize: 12,
+              fontFamily: FontFamily.latoRegular,
               fontWeight: 'bold'
             }}>
               {localIsOn ? "ON" : "OFF"}

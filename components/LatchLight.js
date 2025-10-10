@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import ToggleSwitch from "../components/ToggleSwitch.jsx";
+import { FontFamily } from "../GlobalStyles";
 const LatchLight = ({ name }) => {
   const [isOn, setIsOn] = useState(false);
 
@@ -44,6 +45,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontSize: 16,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: 'bold', // For better text visibility
   },
   onText: {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, useWindowDimensions } from 'react-native';
-
+import { FontFamily } from "../GlobalStyles";
 const SystemCharts = () => {
   const { width } = useWindowDimensions(); // matches OverviewPage width
 
@@ -24,6 +24,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: 'bold',
     color: '#fff',
   },

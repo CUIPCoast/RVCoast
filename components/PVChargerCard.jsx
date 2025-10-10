@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
-
+import { FontFamily } from "../GlobalStyles";
 /**
  * PVChargerCard – shows the current PV charger power output with a branded orange card
  * and a decorative sun icon in the bottom‑right corner.
@@ -86,11 +86,13 @@ const styles = StyleSheet.create({
   orangeCardHeaderText: {
     color: '#F7E7CE',
     fontSize: 18,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '700',
   },
   cardValue: {
     color: '#fff',
     fontSize: 24,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '700',
     marginTop: 28, // clears the header strip
   },

@@ -11,6 +11,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 
+
 const Settings = () => {
   const isTablet = useScreenSize();
   const isDark = isDarkMode;
@@ -579,6 +580,7 @@ const styles = StyleSheet.create({
   rvConnectionText: {
     color: '#4CAF50',
     fontSize: 12,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '600',
     marginLeft: 4,
   },

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { VictronEnergyService } from '../API/VictronEnergyService';
-
+import { FontFamily } from "../GlobalStyles";
 /**
  * Component to display Victron Energy data from Cerbo GX
  */
@@ -220,6 +220,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: 'bold',
     color: 'white',
   },
@@ -255,6 +256,7 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#F44336',
     fontSize: 18,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: 'bold',
     marginBottom: 8,
   },
@@ -315,6 +317,7 @@ const styles = StyleSheet.create({
   },
   batteryValue: {
     fontSize: 32,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: 'bold',
     color: '#FFC107',
   },
@@ -347,6 +350,7 @@ const styles = StyleSheet.create({
   powerValue: {
     color: 'white',
     fontSize: 14,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: 'bold',
   },
   systemContainer: {
@@ -366,6 +370,7 @@ const styles = StyleSheet.create({
   systemValue: {
     color: 'white',
     fontSize: 14,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: 'bold',
   },
   lastUpdated: {

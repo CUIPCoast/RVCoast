@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  Image, 
-  StyleSheet, 
-  Animated, 
+import {
+  View,
+  Text,
+  Image,
+  StyleSheet,
+  Animated,
   Dimensions,
   StatusBar,
   TouchableOpacity,
@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons as Icon } from '@expo/vector-icons';
+import { FontFamily } from "../GlobalStyles";
 
 const { width, height } = Dimensions.get('window');
 
@@ -505,6 +506,7 @@ const styles = StyleSheet.create({
   skipButtonText: {
     color: '#FFFFFF',
     fontSize: 14,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '600',
   },
   logoSection: {
@@ -537,6 +539,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: 'bold',
     color: '#FFFFFF',
     textAlign: 'center',
@@ -596,6 +599,7 @@ const styles = StyleSheet.create({
   swipeText: {
     color: '#FFB267',
     fontSize: 16,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '600',
     textAlign: 'center',
     letterSpacing: 0.8,
@@ -615,11 +619,13 @@ const styles = StyleSheet.create({
   versionText: {
     color: '#888888',
     fontSize: 12,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '500',
   },
   copyrightText: {
     color: '#666666',
     fontSize: 10,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '400',
   },
 });

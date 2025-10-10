@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from './AuthContext';
 import { useScreenSize } from '../helper';
 import { Ionicons } from '@expo/vector-icons';
+import { FontFamily } from "../GlobalStyles";
 
 const RVConnectionModal = ({ visible, onClose }) => {
   const [rvData, setRvData] = useState({
@@ -196,6 +197,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 22,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: 'bold',
     color: '#fff',
   },
@@ -251,6 +253,7 @@ const styles = StyleSheet.create({
   connectionTitle: {
     color: '#4CAF50',
     fontSize: 14,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: 'bold',
     marginBottom: 5,
   },
@@ -288,6 +291,7 @@ const styles = StyleSheet.create({
   connectButtonText: {
     color: '#fff',
     fontSize: 16,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: 'bold',
   },
   tabletConnectButtonText: {

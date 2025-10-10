@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import useScreenSize from "../helper/useScreenSize.jsx";
 import { createCANBusListener } from "../Service/CANBusListener.js";
+import { FontFamily } from "../GlobalStyles";
 
 const WaterTanks = ({ name, tankType, trackColor }) => {
   const [percentage, setPercentage] = useState(25); // Start with current actual levels
@@ -484,10 +485,12 @@ const styles = {
   tankName: {
     color: '#FFF',  // Changed from '#333' to '#FFF' for white text
     fontSize: 12,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '600',
   },
   tankPercentage: {
     fontSize: 14,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '700',
     marginTop: 1,
   },
@@ -588,6 +591,7 @@ const styles = {
   mobileTankName: {
     color: '#FFF',  // Changed from '#333' to '#FFF' for white text
     fontSize: 11,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '600',
     marginLeft: 4,
   },
@@ -620,6 +624,7 @@ const styles = {
   },
   mobileTankPercentage: {
     fontSize: 12,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '700',
   },
 };

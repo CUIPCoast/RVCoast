@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from './AuthContext';
 import { useScreenSize } from '../helper';
 import { Ionicons } from '@expo/vector-icons';
+import { FontFamily } from "../GlobalStyles";
 
 const LoginScreen = ({ onSwitchToSignup }) => {
   const [username, setUsername] = useState('');
@@ -303,6 +304,7 @@ const styles = StyleSheet.create({
   },
   appTitle: {
     fontSize: 32,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '800',
     color: '#FFFFFF',
     marginBottom: 6,
@@ -326,6 +328,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '700',
     color: '#FFFFFF',
     marginBottom: 8,
@@ -374,6 +377,7 @@ const styles = StyleSheet.create({
     height: 56,
     color: '#FFFFFF',
     fontSize: 16,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '500',
   },
   tabletInput: {
@@ -406,6 +410,7 @@ const styles = StyleSheet.create({
   loginButtonText: {
     color: '#000',
     fontSize: 18,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '700',
     letterSpacing: 0.3,
   },
@@ -420,6 +425,7 @@ const styles = StyleSheet.create({
   forgotPasswordText: {
     color: '#FFB267',
     fontSize: 14,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '500',
   },
   tabletForgotPasswordText: {
@@ -439,6 +445,7 @@ const styles = StyleSheet.create({
     color: '#666',
     marginHorizontal: 16,
     fontSize: 14,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '500',
   },
   tabletDividerText: {
@@ -454,6 +461,7 @@ const styles = StyleSheet.create({
   signupText: {
     color: '#888',
     fontSize: 16,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '400',
     marginRight: 4,
   },
@@ -467,6 +475,7 @@ const styles = StyleSheet.create({
   signupLinkText: {
     color: '#FFB267',
     fontSize: 16,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: '600',
   },
   tabletSignupLinkText: {

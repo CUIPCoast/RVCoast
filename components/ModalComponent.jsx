@@ -9,6 +9,7 @@ import Home from '../screens/Home';
 import GroupComponent from './GroupComponent';
 import Wifi from './Wifi';
 import { Ionicons } from '@expo/vector-icons';
+import { FontFamily } from "../GlobalStyles";
 
 const ModalComponent = ({ nameComponent }) => {
   const [modalVisible, setModalVisible] = useState(false);
@@ -103,6 +104,7 @@ const styles = StyleSheet.create({
   },
   closeText: {
     fontSize: 18,
+    fontFamily: FontFamily.latoRegular,
     fontWeight: 'bold',
   },
 });
