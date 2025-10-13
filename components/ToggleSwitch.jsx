@@ -1,34 +1,22 @@
-import React, { useState } from 'react';
-import { View, TouchableWithoutFeedback, Animated, Text } from 'react-native';
+import React from 'react';
+import { Switch, Platform } from 'react-native';
 
-const ToggleSwitch = ( { isOn, setIsOn } ) => {
-  const translateX = new Animated.Value(isOn ? 18 : 0);
-
-  const toggleSwitch = () => {
-    setIsOn((prev) => !prev);
-    Animated.timing(translateX, {
-      toValue: isOn ? 0 : 18,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-
-  };
-
+const ToggleSwitch = ({ isOn, setIsOn, disabled = false }) => {
   return (
-    <TouchableWithoutFeedback onPress={toggleSwitch} >
-      <View className={`w-10 h-5 rounded-full flex-row items-center p-1 ${
-            isOn ? 'bg-orange-300' : 'bg-gray-300'
-          }`} 
-      >
-        
-        <Animated.View
-          style={{
-            transform: [{ translateX }],
-          }}
-          className={`w-4 h-4 rounded-full bg-white`}
-        />
-      </View>
-    </TouchableWithoutFeedback>
+    <Switch
+      value={isOn}
+      onValueChange={setIsOn}
+      disabled={disabled}
+      trackColor={{
+        false: '#767577',
+        true: '#FFB267'
+      }}
+      thumbColor={isOn ? '#FFFFFF' : '#f4f3f4'}
+      ios_backgroundColor="#3e3e3e"
+      style={{
+        transform: Platform.OS === 'ios' ? [{ scaleX: 0.9 }, { scaleY: 0.9 }] : [],
+      }}
+    />
   );
 };
 

@@ -50,10 +50,13 @@ export const fetchHourlyWeather = async (city = "Chattanooga", isTablet = false)
  */
 export const formatWeatherItem = (item) => {
   const date = new Date(item.dt * 1000);
-  const hour = date.toLocaleTimeString([], {
-    hour: '2-digit',
+
+  // Convert to Eastern Time (12-hour format)
+  const hour = date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
     minute: '2-digit',
-    hour12: false
+    hour12: true,
+    timeZone: 'America/New_York'
   });
 
   const tempF = (((item.main.temp - 273.15) * 9/5) + 32).toFixed(0);

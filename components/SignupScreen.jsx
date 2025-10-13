@@ -159,11 +159,13 @@ const SignupScreen = ({ onSwitchToLogin }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <LinearGradient
-        colors={['#0D1117', '#1B1B1B', '#27303F']}
+        colors={['#0D0D0D', '#1A1A1A', '#2D2D2D']}
         style={styles.background}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
       >
         <ScrollView
-          contentContainerStyle={styles.scrollContainer}
+          
           showsVerticalScrollIndicator={false}
         >
           <View style={[styles.card, cardStyle]}>
@@ -176,7 +178,7 @@ const SignupScreen = ({ onSwitchToLogin }) => {
                   style={[styles.logoGradient, isTablet && styles.tabletLogoGradient]}
                 >
                   <Image
-                    source={require('../assets/images/icon.png')}
+                    source={require('../assets/trailer.png')}
                     style={[styles.logo, isTablet && styles.tabletLogo]}
                   />
                 </LinearGradient>
@@ -287,20 +289,20 @@ const SignupScreen = ({ onSwitchToLogin }) => {
                 activeOpacity={0.8}
               >
                 <LinearGradient
-                  colors={['#FFB267', '#FF7043', '#FF5722']}
+                  colors={['#FFB267', '#FF9A3D', '#E8751A']}
                   style={[styles.signupGradient, isTablet && styles.tabletSignupGradient]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                 >
                   {isLoading ? (
-                    <ActivityIndicator color="#fff" size={isTablet ? 'large' : 'default'} />
+                    <ActivityIndicator color="#000" size={isTablet ? 'large' : 'default'} />
                   ) : (
                     <>
-                      <Ionicons 
-                        name="rocket-outline" 
-                        size={isTablet ? 24 : 20} 
-                        color="#fff" 
-                        style={{ marginRight: 8 }} 
+                      <Ionicons
+                        name="rocket-outline"
+                        size={isTablet ? 24 : 20}
+                        color="#000"
+                        style={{ marginRight: 8 }}
                       />
                       <Text style={[styles.signupButtonText, isTablet && styles.tabletSignupButtonText]}>
                         Create Account
@@ -358,7 +360,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   mobileContainer: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 0,
   },
   tabletContainer: {
     paddingHorizontal: 60,
@@ -372,7 +374,7 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
   },
   card: {
-    backgroundColor: 'rgba(27, 27, 27, 0.95)',
+    backgroundColor: 'rgba(26, 26, 26, 0.95)',
     borderRadius: 24,
     padding: 30,
     marginVertical: 20,
@@ -482,12 +484,12 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(39, 48, 63, 0.8)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 16,
     marginBottom: 20,
     paddingHorizontal: 16,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 178, 103, 0.1)',
+    borderColor: 'rgba(255, 178, 103, 0.2)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -496,7 +498,7 @@ const styles = StyleSheet.create({
   },
   inputContainerFocused: {
     borderColor: '#FFB267',
-    backgroundColor: 'rgba(39, 48, 63, 0.95)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     shadowColor: '#FFB267',
     shadowOpacity: 0.2,
   },
@@ -582,11 +584,11 @@ const styles = StyleSheet.create({
     height: 64,
   },
   signupButtonText: {
-    color: '#fff',
+    color: '#000',
     fontSize: 18,
     fontFamily: FontFamily.latoRegular,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
   tabletSignupButtonText: {
     fontSize: 20,
@@ -597,12 +599,12 @@ const styles = StyleSheet.create({
 
   // Features Section
   featuresContainer: {
-    backgroundColor: 'rgba(39, 48, 63, 0.5)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 12,
     padding: 16,
     marginBottom: 25,
     borderWidth: 1,
-    borderColor: 'rgba(255, 178, 103, 0.1)',
+    borderColor: 'rgba(255, 178, 103, 0.15)',
   },
   featuresTitle: {
     color: '#FFB267',

@@ -6,29 +6,22 @@ import { RVControlService } from "../API/rvAPI";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
- * Modal for controlling toe kick heater and cooling settings
- * 
+ * Modal for controlling climate system fan speed settings
+ *
  * @param {Object} props Component props
  * @param {boolean} props.isVisible Controls whether the modal is visible
  * @param {Function} props.onClose Callback when modal is closed
  */
 const HeaterControlModal = ({ isVisible, onClose }) => {
-  // Mode states
-  const [isCoolSettingOn, setCoolSettingOn] = useState(false);
-  const [isToeKickOn, setToeKickOn] = useState(false);
-  
   // Fan speed states
   const [selectedFanSpeed, setSelectedFanSpeed] = useState(null);
   const [isAutoModeActive, setIsAutoModeActive] = useState(false);
-  
+
   // UI states
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [showStatus, setShowStatus] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
-  
-  // Current temperature
-  const [currentTemp, setCurrentTemp] = useState(75);
 
   // Load saved states when component mounts
   useEffect(() => {
@@ -40,24 +33,12 @@ const HeaterControlModal = ({ isVisible, onClose }) => {
   // Load saved states from AsyncStorage
   const loadSavedStates = async () => {
     try {
-      // Load toe kick state
-      const savedToeKickState = await AsyncStorage.getItem('toeKickState');
-      if (savedToeKickState !== null) {
-        setToeKickOn(JSON.parse(savedToeKickState));
-      }
-      
-      // Load cooling state
-      const savedCoolingState = await AsyncStorage.getItem('coolingState');
-      if (savedCoolingState !== null) {
-        setCoolSettingOn(JSON.parse(savedCoolingState));
-      }
-      
       // Load fan speed state
       const savedFanSpeed = await AsyncStorage.getItem('fanSpeed');
       if (savedFanSpeed !== null) {
         setSelectedFanSpeed(savedFanSpeed);
       }
-      
+
       // Load auto mode state
       const savedAutoMode = await AsyncStorage.getItem('autoModeState');
       if (savedAutoMode !== null) {
@@ -79,65 +60,6 @@ const HeaterControlModal = ({ isVisible, onClose }) => {
     }
   }, [errorMessage]);
 
-  // Toggle toe kick
-  const toggleToeKick = async () => {
-    setIsLoading(true);
-    try {
-      // Use ClimateService to toggle the toe kick
-      const result = await ClimateService.toggleToeKick();
-      if (result.success) {
-        const newState = !isToeKickOn;
-        setToeKickOn(newState);
-        
-        // Save state to AsyncStorage
-        await AsyncStorage.setItem('toeKickState', JSON.stringify(newState));
-        
-        // Show status message
-        setStatusMessage(`Toe kick heater ${newState ? 'turned on' : 'turned off'}`);
-        setShowStatus(true);
-        setTimeout(() => setShowStatus(false), 3000);
-        
-        setErrorMessage(null);
-      } else {
-        setErrorMessage(`Failed to toggle toe kick: ${result.error}`);
-      }
-    } catch (error) {
-      console.error('Error toggling toe kick:', error);
-      setErrorMessage(`Error: ${error.message}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Toggle cool setting
-  const toggleCoolSetting = async () => {
-    setIsLoading(true);
-    try {
-      // Use ClimateService to toggle the cooling
-      const result = await ClimateService.toggleCooling();
-      if (result.success) {
-        const newState = !isCoolSettingOn;
-        setCoolSettingOn(newState);
-        
-        // Save state to AsyncStorage
-        await AsyncStorage.setItem('coolingState', JSON.stringify(newState));
-        
-        // Show status message
-        setStatusMessage(`Cooling ${newState ? 'turned on' : 'turned off'}`);
-        setShowStatus(true);
-        setTimeout(() => setShowStatus(false), 3000);
-        
-        setErrorMessage(null);
-      } else {
-        setErrorMessage(`Failed to toggle cooling: ${result.error}`);
-      }
-    } catch (error) {
-      console.error('Error toggling cooling:', error);
-      setErrorMessage(`Error: ${error.message}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   // Set fan speed
   const setFanSpeed = async (speed) => {
@@ -276,25 +198,6 @@ const HeaterControlModal = ({ isVisible, onClose }) => {
     );
   };
 
-  // Function to render mode button (Cooling/Toe Kick)
-  const ModeButton = ({ title, icon, isActive, onPress }) => {
-    return (
-      <TouchableOpacity
-        style={[
-          styles.modeButton,
-          title === 'Cooling' && isActive ? styles.coolingActive : {},
-          title === 'Toe Kick' && isActive ? styles.toeKickActive : {},
-          isLoading ? styles.disabledButton : {}
-        ]}
-        onPress={onPress}
-        disabled={isLoading}
-      >
-        <Text style={[styles.modeButtonText, isActive ? styles.activeText : {}]}>
-          {title}
-        </Text>
-      </TouchableOpacity>
-    );
-  };
 
   return (
     <Modal
@@ -305,8 +208,7 @@ const HeaterControlModal = ({ isVisible, onClose }) => {
     >
       <View style={styles.modalContainer}>
         <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Climate Control Settings</Text>
-          <Text style={styles.currentTemp}>Current temperature: {currentTemp}°F</Text>
+          <Text style={styles.modalTitle}>Fan Speed Control</Text>
 
           {/* Error message display */}
           {errorMessage && (
@@ -330,29 +232,7 @@ const HeaterControlModal = ({ isVisible, onClose }) => {
             </View>
           )}
 
-          {/* Mode Selection */}
-          <View style={styles.sectionTitle}>
-            <Text style={styles.sectionTitleText}>Mode</Text>
-          </View>
-          
-          <View style={styles.modeContainer}>
-            <ModeButton
-              title="Cooling"
-              isActive={isCoolSettingOn}
-              onPress={toggleCoolSetting}
-            />
-            <ModeButton
-              title="Toe Kick"
-              isActive={isToeKickOn}
-              onPress={toggleToeKick}
-            />
-          </View>
-
           {/* Fan Speed Selection */}
-          <View style={styles.sectionTitle}>
-            <Text style={styles.sectionTitleText}>Fan Speed</Text>
-          </View>
-          
           <View style={styles.fanSpeedContainer}>
             <View style={styles.fanSpeedRow}>
               <FanSpeedButton
@@ -380,9 +260,6 @@ const HeaterControlModal = ({ isVisible, onClose }) => {
             </View>
           </View>
 
-          {/* Bottom Spacing */}
-          <View style={styles.buttonSpacing} />
-
           {/* Close Button */}
           <TouchableOpacity
             style={styles.closeButton}
@@ -402,191 +279,135 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
   modalContent: {
-    width: '90%',
-    maxWidth: 500,
+    width: '85%',
+    maxWidth: 420,
     backgroundColor: '#1a1a1a',
-    borderRadius: 24,
-    padding: 30,
+    borderRadius: 28,
+    padding: 32,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.3,
-    shadowRadius: 30,
-    elevation: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    shadowOffset: { width: 0, height: 24 },
+    shadowOpacity: 0.4,
+    shadowRadius: 32,
+    elevation: 24,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
   modalTitle: {
-    fontSize: 28,
-    fontFamily: FontFamily.latoRegular,
+    fontSize: 32,
+    fontFamily: FontFamily.latoBold,
     fontWeight: '800',
     color: '#ffffff',
-    marginBottom: 15,
+    marginBottom: 28,
     textAlign: 'center',
-    letterSpacing: 0.5,
-  },
-  currentTemp: {
-    fontSize: 16,
-    color: Color.white0,
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  sectionTitle: {
-    marginTop: 15,
-    marginBottom: 10,
-    paddingBottom: 5,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.2)',
-  },
-  sectionTitleText: {
-    color: Color.white0,
-    fontSize: 16,
-    fontFamily: FontFamily.latoRegular,
-    fontWeight: '600',
-  },
-  modeContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  modeButton: {
-    flex: 1,
-    paddingVertical: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#2a2a2a',
-    borderRadius: 16,
-    marginHorizontal: 8,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.1)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  coolingActive: {
-    backgroundColor: '#3b82f6',
-    borderColor: '#60a5fa',
-    shadowColor: '#3b82f6',
-    shadowOpacity: 0.4,
-  },
-  toeKickActive: {
-    backgroundColor: '#ef4444',
-    borderColor: '#f87171',
-    shadowColor: '#ef4444',
-    shadowOpacity: 0.4,
-  },
-  modeButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontFamily: FontFamily.latoRegular,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: -0.5,
   },
   fanSpeedContainer: {
-    marginBottom: 10,
+    marginBottom: 20,
   },
   fanSpeedRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 14,
   },
   fanSpeedButton: {
     flex: 1,
-    paddingVertical: 16,
+    paddingVertical: 22,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#2a2a2a',
-    borderRadius: 14,
+    borderRadius: 18,
     marginHorizontal: 6,
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: 'rgba(255,255,255,0.12)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  activeFanButton: {
-    backgroundColor: '#10b981',
-    borderColor: '#34d399',
-    shadowColor: '#10b981',
-    shadowOpacity: 0.4,
-  },
-  fanSpeedText: {
-    color: 'white',
-    fontSize: 16,
-    fontFamily: FontFamily.latoRegular,
-    fontWeight: '600',
-    letterSpacing: 0.3,
-  },
-  activeText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  disabledButton: {
-    opacity: 0.6,
-  },
-  buttonSpacing: {
-    height: 10, // Add some space before the close button
-  },
-  closeButton: {
-    backgroundColor: '#f97316',
-    paddingVertical: 16,
-    borderRadius: 16,
-    alignItems: 'center',
-    marginTop: 15,
-    shadowColor: '#f97316',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 6,
-    borderWidth: 2,
-    borderColor: '#fb923c',
+  },
+  activeFanButton: {
+    backgroundColor: '#FFB267',
+    borderColor: '#FFD4A8',
+    shadowColor: '#FFB267',
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  fanSpeedText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 18,
+    fontFamily: FontFamily.latoBold,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  activeText: {
+    color: '#1a1a1a',
+    fontWeight: '800',
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  closeButton: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    paddingVertical: 18,
+    borderRadius: 18,
+    alignItems: 'center',
+    marginTop: 10,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   closeButtonText: {
     color: '#ffffff',
-    fontSize: 18,
-    fontFamily: FontFamily.latoRegular,
-    fontWeight: '800',
+    fontSize: 17,
+    fontFamily: FontFamily.latoBold,
+    fontWeight: '700',
     letterSpacing: 0.5,
   },
   errorContainer: {
-    backgroundColor: 'rgba(255, 0, 0, 0.1)',
-    padding: 10,
-    borderRadius: 5,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: 'red',
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderWidth: 1.5,
+    borderColor: 'rgba(239, 68, 68, 0.4)',
   },
   errorText: {
-    color: 'white',
+    color: '#FCA5A5',
     textAlign: 'center',
+    fontSize: 14,
+    fontFamily: FontFamily.latoRegular,
   },
   statusContainer: {
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 5,
-    marginBottom: 15,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginBottom: 20,
     alignSelf: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
   },
   statusText: {
-    color: 'white',
-    fontWeight: 'bold',
+    color: '#6EE7B7',
+    fontWeight: '600',
+    fontSize: 14,
+    fontFamily: FontFamily.latoRegular,
   },
   loadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 15,
+    marginBottom: 20,
+    paddingVertical: 12,
   },
   loadingText: {
-    color: 'white',
-    marginLeft: 10,
+    color: 'rgba(255,255,255,0.8)',
+    marginLeft: 12,
+    fontSize: 15,
+    fontFamily: FontFamily.latoRegular,
   },
 });
 

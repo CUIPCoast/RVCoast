@@ -344,10 +344,10 @@ const Settings = () => {
 };
 
 const styles = StyleSheet.create({
-  // Mobile Styles
+  // Mobile Styles - Modernized
   settingsLayout: {
     width: '100%',
-    paddingTop: 60,
+    paddingTop: 64,
     overflow: 'hidden',
   },
   settings: {
@@ -355,56 +355,69 @@ const styles = StyleSheet.create({
     backgroundColor: '#1B1B1B',
   },
   mobileHeader: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingHorizontal: 24,
+    paddingBottom: 24,
     alignItems: 'center',
   },
   screenTitle: {
-    fontSize: FontSize.size_13xl,
-    fontFamily: FontFamily.latoRegular,
+    fontSize: 32,
+    fontFamily: FontFamily.latoBold,
+    fontWeight: '700',
     textAlign: 'center',
     numberOfLines: 1,
     adjustsFontSizeToFit: true,
     minimumFontScale: 0.8,
+    letterSpacing: -0.5,
   },
   sectionHeaderContainer: {
-    paddingVertical: 12,
-    paddingHorizontal: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: Color.colorGray_100,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderBottomWidth: 0,
+    backgroundColor: 'rgba(30, 30, 30, 0.6)',
   },
   sectionHeader: {
-    fontSize: FontSize.size_lg,
+    fontSize: 16,
     fontFamily: FontFamily.latoBold,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    opacity: 0.8,
   },
   sectionListContent: {
-    paddingBottom: 20,
+    paddingBottom: 32,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 15,
-    minHeight: 56,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    minHeight: 60,
+    backgroundColor: 'rgba(40, 40, 40, 0.4)',
+    marginHorizontal: 16,
+    marginVertical: 1,
+    borderRadius: 12,
   },
   label: {
-    fontSize: FontSize.size_md,
+    fontSize: 16,
     fontFamily: FontFamily.latoRegular,
+    fontWeight: '500',
     flex: 1,
+    letterSpacing: 0.2,
   },
   arrow: {
-    fontSize: 18,
-    marginLeft: 10,
+    fontSize: 20,
+    marginLeft: 12,
+    opacity: 0.6,
   },
   toggleContainer: {
     marginLeft: 'auto',
   },
   separator: {
     height: 1,
-    backgroundColor: Color.colorGray_100,
-    marginLeft: 15,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    marginLeft: 20,
+    marginRight: 20,
   },
 
   // Tablet Styles

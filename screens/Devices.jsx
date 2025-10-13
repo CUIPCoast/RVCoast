@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { StyleSheet, View, Text, Pressable, TouchableOpacity, Image, ScrollView, Modal, Button, ActivityIndicator } from "react-native";
+import { StyleSheet, View, Text, Pressable, TouchableOpacity, Image, ScrollView, Modal, Button, ActivityIndicator, Animated } from "react-native";
 import SimpleHoldToDimLight from "../components/SimpleHoldToDimLight.jsx";
 
 import useScreenSize from "../helper/useScreenSize.jsx";
 import AwningControlModal from "../components/AwningControlModal";
 import HeaterControlModal from "../components/HeaterControlModal";
+import AddDeviceModal from "../components/AddDeviceModal";
 import { LightService, FanService, WaterService } from "../API/RVControlServices"; 
 import MasterLightControl from "../components/MasterLightControl.jsx";
 import { Feather as Icon } from '@expo/vector-icons';
@@ -84,15 +85,43 @@ const Devices = () => {
   const [isModalVisible, setModalVisible] = useState(false);
   const [isHeaterModalVisible, setHeaterModalVisible] = useState(false);
   const [isScheduleModalVisible, setScheduleModalVisible] = useState(false);
+  const [isAddDeviceModalVisible, setAddDeviceModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
   // Use RV State Management hooks
   const { lights, toggleLight, setLightBrightness: updateLightBrightness, turnAllLightsOn, turnAllLightsOff } = useRVLights();
   const { water, toggleWaterPump, toggleWaterHeater } = useRVWater();
-  
-  // Fan control states (these could be moved to RV state manager too)
+
+  // Fan control states using RV state manager
   const [isBathroomFanOn, setBathroomFanOn] = useState(false);
   const [isBayVentFanOn, setBayVentFanOn] = useState(false);
+
+  // Initialize fan states from RV state manager
+  useEffect(() => {
+    const fanState = rvStateManager.getCategoryState('fans');
+    if (fanState.bathroomFan !== undefined) {
+      setBathroomFanOn(fanState.bathroomFan);
+    }
+    if (fanState.bayVentFan !== undefined) {
+      setBayVentFanOn(fanState.bayVentFan);
+    }
+  }, []);
+
+  // Subscribe to fan state changes
+  useEffect(() => {
+    const unsubscribe = rvStateManager.subscribe(({ category, state }) => {
+      if (category === 'fans') {
+        if (state.fans.bathroomFan !== undefined) {
+          setBathroomFanOn(state.fans.bathroomFan);
+        }
+        if (state.fans.bayVentFan !== undefined) {
+          setBayVentFanOn(state.fans.bayVentFan);
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, []);
   
   // State for API operation status
   const [statusMessage, setStatusMessage] = useState('');
@@ -284,12 +313,15 @@ const Devices = () => {
     try {
       setIsLoading(true);
       const newState = !isBathroomFanOn;
-      
+
       // Update state first for immediate UI feedback
       setBathroomFanOn(newState);
-      
+
+      // Update RV state manager
+      rvStateManager.updateState('fans', { bathroomFan: newState });
+
       const result = await FanService.toggleBathroomFan();
-      
+
       if (result.success) {
         // Show status message
         setStatusMessage(`Bathroom fan ${newState ? 'turned on' : 'turned off'}`);
@@ -297,10 +329,11 @@ const Devices = () => {
         setTimeout(() => setShowStatus(false), 3000);
       } else {
         console.error('Failed to toggle bathroom fan:', result.error);
-        
+
         // Revert state on error
         setBathroomFanOn(!newState);
-        
+        rvStateManager.updateState('fans', { bathroomFan: !newState });
+
         // Show error message
         setStatusMessage('Failed to toggle bathroom fan');
         setShowStatus(true);
@@ -308,10 +341,12 @@ const Devices = () => {
       }
     } catch (error) {
       console.error('Error toggling bathroom fan:', error);
-      
+
       // Revert state on error
-      setBathroomFanOn(!isBathroomFanOn);
-      
+      const revertedState = !isBathroomFanOn;
+      setBathroomFanOn(revertedState);
+      rvStateManager.updateState('fans', { bathroomFan: revertedState });
+
       // Show error message
       setStatusMessage(`Error: ${error.message}`);
       setShowStatus(true);
@@ -326,12 +361,15 @@ const Devices = () => {
     try {
       setIsLoading(true);
       const newState = !isBayVentFanOn;
-      
+
       // Update state first for immediate UI feedback
       setBayVentFanOn(newState);
-      
+
+      // Update RV state manager
+      rvStateManager.updateState('fans', { bayVentFan: newState });
+
       const result = await FanService.toggleBayVentFan();
-      
+
       if (result.success) {
         // Show status message
         setStatusMessage(`Bay vent fan ${newState ? 'turned on' : 'turned off'}`);
@@ -339,10 +377,11 @@ const Devices = () => {
         setTimeout(() => setShowStatus(false), 3000);
       } else {
         console.error('Failed to toggle bay vent fan:', result.error);
-        
+
         // Revert state on error
         setBayVentFanOn(!newState);
-        
+        rvStateManager.updateState('fans', { bayVentFan: !newState });
+
         // Show error message
         setStatusMessage('Failed to toggle bay vent fan');
         setShowStatus(true);
@@ -350,10 +389,12 @@ const Devices = () => {
       }
     } catch (error) {
       console.error('Error toggling bay vent fan:', error);
-      
+
       // Revert state on error
-      setBayVentFanOn(!isBayVentFanOn);
-      
+      const revertedState = !isBayVentFanOn;
+      setBayVentFanOn(revertedState);
+      rvStateManager.updateState('fans', { bayVentFan: revertedState });
+
       // Show error message
       setStatusMessage(`Error: ${error.message}`);
       setShowStatus(true);
@@ -505,7 +546,7 @@ const handleWaterHeaterToggle = async () => {
                 />
               </Pressable>
               <Text className="text-white text-base">
-                Toe Kick Heater
+                Fan Controls
               </Text>
             </View>
           </View>
@@ -659,9 +700,9 @@ const handleWaterHeaterToggle = async () => {
     } else if (selectedTab === TABS.BATHROOM) {
       return (
         <View className="">
-          <View style={[styles.fanControlsContainer,{ flexDirection: 'row', justifyContent: 'center', gap: 30 } ]}>
+          <View style={[styles.fanControlsContainer,{ flexDirection: 'row', justifyContent: 'center', gap: 16 } ]}>
         <FanButton
-          size={130}
+          size={110}
           isOn={isBayVentFanOn}
           onPress={toggleBayVentFan}
           iconName="sun"
@@ -669,7 +710,7 @@ const handleWaterHeaterToggle = async () => {
           loading={isLoading}
         />
         <FanButton
-          size={130}
+          size={110}
           isOn={isBathroomFanOn}
           onPress={toggleBathroomFan}
           iconName="wind"
@@ -730,7 +771,7 @@ const handleWaterHeaterToggle = async () => {
         <View style={styles.headerContainer}>
           <Text style={styles.devices1}>Devices</Text>
         </View>
-        <Text style={styles.hiDrax}>Hi, Drax</Text>
+        
         <View>
           <View style={styles.tabContainer}>
             {Object.values(TABS).map((tab) => (
@@ -749,10 +790,13 @@ const handleWaterHeaterToggle = async () => {
 
         {/* Awning Control Modal */}
         <AwningControlModal isVisible={isModalVisible} onClose={() => setModalVisible(false)} />
-        
+
         {/* Heater Control Modal */}
         <HeaterControlModal isVisible={isHeaterModalVisible} onClose={() => setHeaterModalVisible(false)} />
-        
+
+        {/* Add Device Modal */}
+        <AddDeviceModal isVisible={isAddDeviceModalVisible} onClose={() => setAddDeviceModalVisible(false)} />
+
         {/* Status message */}
         {showStatus && (
           <View style={styles.statusContainer}>
@@ -762,7 +806,10 @@ const handleWaterHeaterToggle = async () => {
       </ScrollView>
       
       <View style={styles.buttonContainer} className="bg-brown py-5">
-        <TouchableOpacity style={styles.orangeButton}>
+        <TouchableOpacity
+          style={styles.orangeButton}
+          onPress={() => setAddDeviceModalVisible(true)}
+        >
           <Text style={styles.orangeButtonText}>Add Device</Text>
         </TouchableOpacity>
       </View>
@@ -801,10 +848,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   divider: {
-    height: 3,
-    backgroundColor: '#696969',
-    marginVertical: 16,
-    marginHorizontal: 17
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    marginVertical: 20,
+    marginHorizontal: 20,
   },
   buttonContainer: {
     position: 'absolute',
@@ -828,16 +875,22 @@ const styles = StyleSheet.create({
   },
   orangeButton: {
     backgroundColor: '#FFB267',
-    paddingVertical: 20,
-    borderRadius: 12,
+    paddingVertical: 18,
+    borderRadius: 16,
     alignItems: 'center',
     width: '100%',
+    shadowColor: '#FFB267',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   orangeButtonText: {
-    color: 'black',
+    color: '#1B1B1B',
     fontSize: 16,
-    fontFamily: FontFamily.latoRegular,
-    fontWeight: '600',
+    fontFamily: FontFamily.latoBold,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   modalContainer: {
     flex: 1,
@@ -897,57 +950,66 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: Padding.p_5xs,
-    paddingTop: Padding.p_3xs,
-    marginTop: 20,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    marginTop: 24,
   },
   devices1: {
-    fontSize: FontSize.size_13xl,
+    fontSize: 32,
     color: Color.colorWhitesmoke_100,
-    fontFamily: FontFamily.latoRegular,
-    fontWeight: "500",
+    fontFamily: FontFamily.latoBold,
+    fontWeight: "700",
     textAlign: "left",
-    top: 30,
-    left: 19
+    top: 20,
+    left: 8,
+    letterSpacing: -0.5,
   },
   wifisolar: {
     fontSize: FontSize.textXSM_size,
     color: Color.white0,
     top: 30,
-    right: 30
+    right: 20,
   },
   hiDrax: {
     color: Color.white0,
     lineHeight: 24,
-    fontSize: FontSize.size_mid,
-    marginLeft: 18,
+    fontSize: 16,
+    fontFamily: FontFamily.latoRegular,
+    marginLeft: 28,
     marginTop: 10,
     top: 30,
-    left: 10
+    opacity: 0.8,
   },
   tabContainer: {
     flexDirection: "row",
     justifyContent: "space-around",
-    paddingVertical: Padding.p_5xs,
-    backgroundColor: Color.colorGray_200,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(30, 30, 30, 0.8)',
     marginBottom: 20,
     marginTop: 30,
+    borderRadius: 16,
+    marginHorizontal: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   tabButton: {
-    paddingVertical: Padding.p_5xs,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 12,
   },
   activeTabButton: {
-    borderBottomWidth: 2,
-    borderBottomColor: Color.white0,
+    backgroundColor: 'rgba(255, 178, 103, 0.15)',
+    borderBottomWidth: 0,
   },
   tabText: {
-    color: Color.white0,
-    fontSize: FontSize.textLMedium_size,
-    fontFamily: FontFamily.latoRegular,
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 16,
+    fontFamily: FontFamily.latoBold,
     textAlign: "center",
+    letterSpacing: 0.3,
   },
   activeTabText: {
-    color: Color.white0,
+    color: Color.colorSandybrown,
   },
   tabContentText: {
     fontSize: FontSize.size_mid,

@@ -577,45 +577,46 @@ const styles = StyleSheet.create({
     tintColor: '#fff',
   },
 
-  // ——— Mobile styles (unchanged) ———
+  // ——— Mobile styles - Modernized ———
   mobileContainer: {
     flex: 1,
     backgroundColor: "#211D1D",
   },
   mobileContent: {
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-    paddingBottom: 40,
+    paddingHorizontal: 20,
+    paddingVertical: 24,
+    paddingBottom: 48,
   },
   mobileHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 28,
     paddingHorizontal: 4,
   },
   headerLeft: { flex: 1 },
   mobileHeaderTitle: {
     color: '#FFFFFF',
-    fontSize: 24,
-    fontFamily: FontFamily.latoRegular,
+    fontSize: 28,
+    fontFamily: FontFamily.latoBold,
     fontWeight: '700',
-    marginBottom: 4,
+    marginBottom: 6,
+    letterSpacing: -0.5,
   },
-  statusRow: { flexDirection: 'row', alignItems: 'center' },
-  statusDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
-  statusText: { color: '#CCCCCC', fontSize: 14, fontWeight: '500' },
-  refreshText: { color: '#FFB267', fontSize: 12, marginLeft: 8, fontStyle: 'italic' },
-  mobileLogo: { width: 50, height: 32, backgroundColor: '#FFFFFF', borderRadius: 6 },
+  statusRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  statusDot: { width: 10, height: 10, borderRadius: 5, marginRight: 10, shadowColor: '#4CAF50', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 4, elevation: 4 },
+  statusText: { color: '#DDDDDD', fontSize: 15, fontWeight: '600', fontFamily: FontFamily.latoRegular, letterSpacing: 0.2 },
+  refreshText: { color: '#FFB267', fontSize: 13, marginLeft: 10, fontStyle: 'italic', fontWeight: '500' },
+  mobileLogo: { width: 52, height: 34, backgroundColor: '#FFFFFF', borderRadius: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 3 },
 
-  // Map, errors, legacy styles — unchanged
-  mapSection: { marginBottom: 20 },
-  mapTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '600', marginBottom: 12 },
-  mapContainer: { borderRadius: 12, overflow: 'hidden', height: 200 },
-  errorContainer: { backgroundColor: '#F44336', borderRadius: 12, padding: 16, marginBottom: 20, alignItems: 'center' },
-  errorText: { color: '#FFFFFF', fontSize: 14, fontWeight: '500', textAlign: 'center', marginBottom: 12 },
-  retryButton: { backgroundColor: '#FFFFFF', borderRadius: 6, paddingVertical: 8, paddingHorizontal: 16 },
-  retryText: { color: '#F44336', fontSize: 14, fontWeight: '600' },
+  // Map, errors - Modernized
+  mapSection: { marginBottom: 24, marginTop: 8 },
+  mapTitle: { color: '#FFFFFF', fontSize: 20, fontFamily: FontFamily.latoBold, fontWeight: '700', marginBottom: 16, letterSpacing: 0.3 },
+  mapContainer: { borderRadius: 16, overflow: 'hidden', height: 220, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 6 },
+  errorContainer: { backgroundColor: '#F44336', borderRadius: 16, padding: 20, marginBottom: 24, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.2)', shadowColor: '#F44336', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
+  errorText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600', textAlign: 'center', marginBottom: 14, fontFamily: FontFamily.latoRegular, letterSpacing: 0.2 },
+  retryButton: { backgroundColor: '#FFFFFF', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4, elevation: 3 },
+  retryText: { color: '#F44336', fontSize: 15, fontWeight: '700', fontFamily: FontFamily.latoBold, letterSpacing: 0.3 },
 
   // Simple/legacy blocks (unchanged but kept for compatibility)
   simplePanelContainer: { backgroundColor: '#211D1D', borderRadius: 15, padding: 16, marginBottom: 20 },

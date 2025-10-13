@@ -67,16 +67,13 @@ const LoginScreen = ({ onSwitchToSignup }) => {
           <View style={[styles.floatingElement, styles.element3]} />
         </View>
 
-        <View style={[styles.card, cardStyle]}>
+        <View style={[, cardStyle]}>
           {/* Logo Section */}
           <View style={styles.logoContainer}>
-            <View style={[styles.logoWrapper, isTablet && styles.tabletLogoWrapper]}>
-              <Image
-                source={require('../assets/images/icon.png')}
-                style={[styles.logo, isTablet && styles.tabletLogo]}
-              />
-              <View style={styles.logoGlow} />
-            </View>
+            <Image
+              source={require('../assets/trailer.png')}
+              style={[styles.logo, isTablet && styles.tabletLogo]}
+            />
             <Text style={[styles.appTitle, isTablet && styles.tabletAppTitle]}>
               Coast RV
             </Text>
@@ -203,7 +200,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   mobileContainer: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 0,
   },
   tabletContainer: {
     paddingHorizontal: 60,
@@ -268,13 +265,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 32,
   },
-  logoWrapper: {
-    position: 'relative',
-    marginBottom: 16,
-  },
-  tabletLogoWrapper: {
-    marginBottom: 20,
-  },
   logo: {
     width: 88,
     height: 66,
@@ -285,22 +275,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+    marginBottom: 16,
   },
   tabletLogo: {
     width: 110,
     height: 82,
     borderRadius: 20,
-  },
-  logoGlow: {
-    position: 'absolute',
-    top: -4,
-    left: -4,
-    right: -4,
-    bottom: -4,
-    backgroundColor: '#FFB267',
-    borderRadius: 20,
-    opacity: 0.2,
-    zIndex: -1,
+    marginBottom: 20,
   },
   appTitle: {
     fontSize: 32,
@@ -373,7 +354,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   input: {
-    flex: 1,
+    flex: 2,
     height: 56,
     color: '#FFFFFF',
     fontSize: 16,
