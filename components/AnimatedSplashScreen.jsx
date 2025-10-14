@@ -163,20 +163,26 @@ const AnimatedSplashScreen = ({ onComplete, children }) => {
               }
             ]}>
               
-              {/* Motion Lines */}
-              <Animated.View style={[
-                styles.motionLinesContainer,
-                { opacity: logoOpacity }
-              ]}>
-                <MotionLine delay={0} />
-                <MotionLine delay={150} />
-                <MotionLine delay={300} />
-              </Animated.View>
-
               <Image
                 source={require("../assets/trailer.png")}
                 style={styles.logo}
               />
+              
+              {/* Motion Lines - Road effect below RV */}
+              <Animated.View style={[
+                styles.motionLinesContainer,
+                { opacity: logoOpacity }
+              ]}>
+                <MotionLine delay={0} offsetX={0} />
+  <MotionLine delay={100} offsetX={20} />
+  <MotionLine delay={200} offsetX={40} />
+  <MotionLine delay={300} offsetX={60} />
+  <MotionLine delay={400} offsetX={80} />
+  
+ 
+                
+                
+              </Animated.View>
               
               {/* Glow effect */}
               <Animated.View style={[
@@ -223,44 +229,41 @@ const AnimatedSplashScreen = ({ onComplete, children }) => {
 };
 
 // Motion line component with continuous movement animation
-const MotionLine = ({ delay }) => {
-  const lineTranslateX = useRef(new Animated.Value(-60)).current;
-  const lineOpacity = useRef(new Animated.Value(0.8)).current;
+
+
+const MotionLine = ({ delay, offsetX = 0 }) => {
+  const lineTranslateX = useRef(new Animated.Value(-60 + offsetX)).current;
 
   useEffect(() => {
     const animate = () => {
+      // Reset position before starting loop
+      lineTranslateX.setValue(-60 + offsetX);
+      
       Animated.loop(
-        Animated.sequence([
-          Animated.timing(lineTranslateX, {
-            toValue: 60,
-            duration: 1200,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(lineTranslateX, {
-            toValue: -60,
-            duration: 0,
-            useNativeDriver: true,
-          }),
-        ])
+        Animated.timing(lineTranslateX, {
+          toValue: 80 + offsetX,
+          duration: 1000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        })
       ).start();
     };
 
     const timer = setTimeout(animate, delay);
     return () => clearTimeout(timer);
-  }, [delay]);
+  }, [delay, offsetX]);
 
   return (
     <Animated.View style={[
       styles.motionLine,
       {
-        opacity: lineOpacity,
+        opacity: 0.8,
         transform: [{ translateX: lineTranslateX }]
       }
-    ]} />
+    ]} 
+    />
   );
 };
-
 // Loading dot component with individual animation
 const LoadingDot = ({ delay }) => {
   const dotOpacity = useRef(new Animated.Value(0.3)).current;
@@ -324,19 +327,21 @@ const styles = StyleSheet.create({
   },
   motionLinesContainer: {
     position: 'absolute',
-    left: -80,
-    top: '50%',
-    width: 60,
-    height: 60,
-    justifyContent: 'space-evenly',
-    alignItems: 'flex-end',
-    transform: [{ translateY: -30 }],
+    bottom: -10,
+    left: '20%',
+    transform: [{ translateX: -60 }],
+    flexDirection: 'row',
+    width: 120,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
   },
   motionLine: {
-    width: 30,
-    height: 2,
+    width: 35,
+    height: 3,
     backgroundColor: '#FFFFFF',
-    borderRadius: 1,
+    borderRadius: 1.5,
     shadowColor: '#FFFFFF',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
@@ -350,12 +355,12 @@ const styles = StyleSheet.create({
   },
   logoGlow: {
     position: 'absolute',
-    top: -10,
-    left: -10,
-    width: 140,
-    height: 140,
+    top: -8,
+    left: -8,
+    width: 106,
+    height: 106,
     backgroundColor: '',
-    borderRadius: 70,
+    borderRadius: 53,
     zIndex: -1,
   },
   textContainer: {

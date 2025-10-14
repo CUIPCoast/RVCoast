@@ -162,14 +162,16 @@ const MobileAnimatedSplashScreen = ({ onComplete, children }) => {
               }
             ]}>
               
-              {/* Motion Lines - Mobile optimized */}
+              {/* Motion Lines - Mobile optimized with infinite animation */}
               <Animated.View style={[
                 styles.motionLinesContainer,
                 { opacity: logoOpacity }
               ]}>
-                <MotionLine delay={0} />
-                <MotionLine delay={150} />
-                <MotionLine delay={300} />
+                <MotionLine delay={0} offsetX={0} />
+                <MotionLine delay={100} offsetX={15} />
+                <MotionLine delay={200} offsetX={30} />
+                
+               
               </Animated.View>
 
               <Image
@@ -221,39 +223,34 @@ const MobileAnimatedSplashScreen = ({ onComplete, children }) => {
   );
 };
 
-// Motion line component with continuous movement animation
-const MotionLine = ({ delay }) => {
-  const lineTranslateX = useRef(new Animated.Value(-50)).current; // Reduced for mobile
-  const lineOpacity = useRef(new Animated.Value(0.8)).current;
+// Motion line component with continuous infinite movement animation
+const MotionLine = ({ delay, offsetX = 0 }) => {
+  const lineTranslateX = useRef(new Animated.Value(-50 + offsetX)).current;
 
   useEffect(() => {
     const animate = () => {
+      // Reset position before starting loop
+      lineTranslateX.setValue(-50 + offsetX);
+      
       Animated.loop(
-        Animated.sequence([
-          Animated.timing(lineTranslateX, {
-            toValue: 50,
-            duration: 1200,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(lineTranslateX, {
-            toValue: -50,
-            duration: 0,
-            useNativeDriver: true,
-          }),
-        ])
+        Animated.timing(lineTranslateX, {
+          toValue: 60 + offsetX,
+          duration: 800,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        })
       ).start();
     };
 
     const timer = setTimeout(animate, delay);
     return () => clearTimeout(timer);
-  }, [delay]);
+  }, [delay, offsetX]);
 
   return (
     <Animated.View style={[
       styles.motionLine,
       {
-        opacity: lineOpacity,
+        opacity: 0.8,
         transform: [{ translateX: lineTranslateX }]
       }
     ]} />
@@ -311,28 +308,30 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 30, // Reduced for mobile
+    paddingHorizontal: 30,
   },
   logoContainer: {
     position: 'relative',
-    marginBottom: 50, // Reduced for mobile
-    width: 160, // Reduced for mobile
-    height: 100, // Reduced for mobile
+    marginBottom: 50,
+    width: 160,
+    height: 100,
     justifyContent: 'center',
     alignItems: 'center',
   },
   motionLinesContainer: {
     position: 'absolute',
-    left: -60, // Adjusted for mobile
-    top: '50%',
-    width: 50, // Reduced for mobile
-    height: 50, // Reduced for mobile
-    justifyContent: 'space-evenly',
-    alignItems: 'flex-end',
-    transform: [{ translateY: -25 }], // Adjusted for mobile
+    bottom: -8,
+    left: '20%',
+    transform: [{ translateX: -50 }],
+    flexDirection: 'row',
+    width: 100,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
   },
   motionLine: {
-    width: 25, // Reduced for mobile
+    width: 28,
     height: 2,
     backgroundColor: '#FFFFFF',
     borderRadius: 1,
@@ -342,48 +341,57 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
   },
   logo: {
-    width: 90, // Reduced from tablet's 120
-    height: 90, // Reduced from tablet's 120
+    width: 90,
+    height: 90,
     resizeMode: 'contain',
     tintColor: '#FFFFFF',
   },
-  
+  logoGlow: {
+    position: 'absolute',
+    top: -8,
+    left: -8,
+    width: 106,
+    height: 106,
+    backgroundColor: '',
+    borderRadius: 53,
+    zIndex: -1,
+  },
   textContainer: {
     alignItems: 'center',
-    marginBottom: 60, // Reduced for mobile
+    marginBottom: 60,
   },
   appName: {
-    fontSize: 36, // Reduced from tablet's 48
+    fontSize: 36,
     fontWeight: 'bold',
     color: '#FFFFFF',
     textAlign: 'center',
     marginBottom: 8,
-    letterSpacing: 1.5, // Reduced from tablet's 2
+    letterSpacing: 1.5,
     textShadowColor: 'rgba(255, 140, 0, 0.5)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
   },
   tagline: {
-    fontSize: 16, // Reduced from tablet's 18
+    fontSize: 16,
     color: '#FFB267',
     textAlign: 'center',
     fontWeight: '300',
-    letterSpacing: 0.8, // Reduced from tablet's 1
+    letterSpacing: 0.8,
   },
   loadingContainer: {
     position: 'absolute',
-    bottom: 80, // Adjusted for mobile
+    bottom: 80,
     alignItems: 'center',
   },
   loadingDots: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6, // Reduced from tablet's 8
+    gap: 6,
   },
   loadingDot: {
-    width: 7, // Reduced from tablet's 8
-    height: 7, // Reduced from tablet's 8
-    borderRadius: 3.5, // Adjusted for smaller size
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
     backgroundColor: '#FF8C00',
   },
 });
