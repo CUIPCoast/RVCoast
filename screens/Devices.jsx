@@ -94,15 +94,6 @@ const Devices = () => {
   const { lights, toggleLight, setLightBrightness: updateLightBrightness, turnAllLightsOn, turnAllLightsOff } = useRVLights();
   const { water, toggleWaterPump, toggleWaterHeater } = useRVWater();
 
-  // DEBUG: Log water state to console whenever it changes
-  useEffect(() => {
-    console.log('💧 WATER STATE CHANGED:', {
-      heaterOn: water.heaterOn,
-      pumpOn: water.pumpOn,
-      fullWaterObject: water
-    });
-  }, [water]);
-
   // Fan control states using RV state manager
   const [isBathroomFanOn, setBathroomFanOn] = useState(false);
   const [isBayVentFanOn, setBayVentFanOn] = useState(false);
@@ -419,27 +410,24 @@ const Devices = () => {
   // Water heater toggle with improved state management
 const handleWaterHeaterToggle = async () => {
   setIsLoading(true);
-
+  
   try {
-    // Get current FULL water state to preserve all properties
-    const currentWaterState = rvStateManager.getCategoryState('water');
+    // Get current state directly from the hook
     const currentState = water.heaterOn;
     const newState = !currentState;
-
+    
     console.log(`Water heater toggle: ${currentState} -> ${newState}`);
-    console.log(`Current water state before update:`, currentWaterState);
-
+    
     // Call the API first
     const result = await WaterService.toggleWaterHeater();
-
+    
     if (result.success) {
-      // CRITICAL: Preserve pump state while updating heater state
-      rvStateManager.updateWaterState({
-        pumpOn: currentWaterState.pumpOn || false, // Preserve pump state
+      // Update RV state after successful API call
+      rvStateManager.updateWaterState({ 
         heaterOn: newState,
         lastUpdated: new Date().toISOString()
       });
-
+      
       setStatusMessage(`Water heater ${newState ? 'turned on' : 'turned off'}`);
     } else {
       console.error('Failed to toggle water heater:', result.error);
@@ -457,27 +445,24 @@ const handleWaterHeaterToggle = async () => {
 
   const handleWaterPumpToggle = async () => {
   setIsLoading(true);
-
+  
   try {
-    // Get current FULL water state to preserve all properties
-    const currentWaterState = rvStateManager.getCategoryState('water');
+    // Get current state directly from the hook
     const currentState = water.pumpOn;
     const newState = !currentState;
-
+    
     console.log(`Water pump toggle: ${currentState} -> ${newState}`);
-    console.log(`Current water state before update:`, currentWaterState);
-
+    
     // Call the API first
     const result = await WaterService.toggleWaterPump();
-
+    
     if (result.success) {
-      // CRITICAL: Preserve heater state while updating pump state
-      rvStateManager.updateWaterState({
+      // Update RV state after successful API call
+      rvStateManager.updateWaterState({ 
         pumpOn: newState,
-        heaterOn: currentWaterState.heaterOn || false, // Preserve heater state
         lastUpdated: new Date().toISOString()
       });
-
+      
       setStatusMessage(`Water pump ${newState ? 'turned on' : 'turned off'}`);
     } else {
       console.error('Failed to toggle water pump:', result.error);
@@ -502,13 +487,13 @@ const handleWaterHeaterToggle = async () => {
       if (isOn) {
         // Turn on all lights using LightControlService
         const result = await LightControlService.allLightsOn();
-
+        
         if (result.success) {
-          // Update RV state manager for all lights to 100% (matching what the service does)
+          // Update RV state manager for all lights
           allLights.forEach(lightId => {
-            rvStateManager.updateLightState(lightId, true, 100);
+            rvStateManager.updateLightState(lightId, true, 75); // Default to 75% brightness
           });
-
+          
           setMasterLightOn(true);
           showStatusMessage('All lights turned ON');
         } else {
