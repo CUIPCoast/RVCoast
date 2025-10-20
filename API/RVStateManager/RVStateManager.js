@@ -326,11 +326,21 @@ class RVStateManager {
       if (instance === 44) { // Water pump (0x2C)
         const isOn = data[2] && parseInt(data[2], 16) > 0;
         console.log(`RVStateManager: Water pump ${isOn ? 'ON' : 'OFF'} from CAN`);
-        this.updateWaterState({ pumpOn: isOn });
+        // CRITICAL: Preserve heater state when updating pump
+        const currentWaterState = this.getCategoryState('water');
+        this.updateWaterState({
+          pumpOn: isOn,
+          heaterOn: currentWaterState.heaterOn || false
+        });
       } else if (instance === 43) { // Water heater (0x2B)
         const isOn = data[2] && parseInt(data[2], 16) > 0;
         console.log(`RVStateManager: Water heater ${isOn ? 'ON' : 'OFF'} from CAN`);
-        this.updateWaterState({ heaterOn: isOn });
+        // CRITICAL: Preserve pump state when updating heater
+        const currentWaterState = this.getCategoryState('water');
+        this.updateWaterState({
+          heaterOn: isOn,
+          pumpOn: currentWaterState.pumpOn || false
+        });
       } else {
         // Check for light commands
         const lightId = this.mapInstanceToLightId(instance);

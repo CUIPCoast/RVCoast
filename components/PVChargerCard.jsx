@@ -12,7 +12,7 @@ import { FontFamily } from "../GlobalStyles";
  *  cardOffset     {top,left} fine‑tune position of the orange card
  *  imageOffset    {top,left} fine‑tune position of the background photo
  */
-const PVChargerCard = ({
+const PVChargerCard = React.memo(({
   power,
   imageSource,
   sunIcon = require('../assets/sun.png'),
@@ -21,7 +21,11 @@ const PVChargerCard = ({
 }) => (
   <View style={styles.frame}>
     {/* — back layer : SmartSolar photo — */}
-    <Image source={imageSource} style={[styles.photo, imageOffset]} />
+    <Image
+      source={imageSource}
+      style={[styles.photo, imageOffset]}
+      fadeDuration={0}
+    />
 
     {/* — front layer : orange card — */}
     <View style={[styles.orangeCard, cardOffset]}>
@@ -32,10 +36,14 @@ const PVChargerCard = ({
       <Text style={styles.cardValue}>{power}</Text>
 
       {/* decorative sun icon */}
-      <Image source={sunIcon} style={styles.sunIcon} />
+      <Image
+        source={sunIcon}
+        style={styles.sunIcon}
+        fadeDuration={0}
+      />
     </View>
   </View>
-);
+));
 
 export default PVChargerCard;
 

@@ -1,10 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import { StyleSheet, Platform, Animated, View } from 'react-native';
 
-const GlowingCard = ({ children, glowColor = '#4A90E2', style }) => {
+const GlowingCard = React.memo(({ children, glowColor = '#4A90E2', style }) => {
   // Animation setup
   const pulseAnim = useRef(new Animated.Value(0.3)).current;
-  
+
   // Set up the pulsing animation
   useEffect(() => {
     const pulsate = () => {
@@ -21,15 +21,15 @@ const GlowingCard = ({ children, glowColor = '#4A90E2', style }) => {
         })
       ]).start(() => pulsate());
     };
-    
+
     pulsate();
-    
+
     return () => pulseAnim.stopAnimation();
   }, []);
-  
+
   // Only operate on a single React element
   if (!React.isValidElement(children)) return children;
-  
+
   const animatedStyle = {
     transform: [{
       scale: pulseAnim.interpolate({
@@ -38,17 +38,17 @@ const GlowingCard = ({ children, glowColor = '#4A90E2', style }) => {
       })
     }]
   };
-  
-  
-  
+
+
+
   // Create a wrapper style that adds margin space for the shadow to be visible
   return (
     <View style={styles.outerContainer}>
-      <Animated.View 
+      <Animated.View
         style={[
-          styles.container, 
-           
-          animatedStyle, 
+          styles.container,
+
+          animatedStyle,
           { backgroundColor: 'transparent' },
           style
         ]}
@@ -57,7 +57,15 @@ const GlowingCard = ({ children, glowColor = '#4A90E2', style }) => {
       </Animated.View>
     </View>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison: only re-render if children's props changed (not the children object itself)
+  // This prevents re-render when parent re-renders but props are functionally the same
+  return prevProps.glowColor === nextProps.glowColor &&
+         JSON.stringify(prevProps.style) === JSON.stringify(nextProps.style) &&
+         React.isValidElement(prevProps.children) &&
+         React.isValidElement(nextProps.children) &&
+         prevProps.children.type === nextProps.children.type;
+});
 
 const styles = StyleSheet.create({
   outerContainer: {

@@ -1,5 +1,5 @@
 // System.jsx
-import React, { useState, useEffect, useRef } from "react"; // ✨ CHANGED: added useRef
+import React, { useState, useEffect, useRef, useMemo } from "react"; // ✨ CHANGED: added useRef, useMemo
 import {
   SafeAreaView,
   ScrollView,
@@ -134,7 +134,11 @@ const System = () => {
     if (newIndex !== tabIndex) setTabIndex(newIndex);
   };
 
-  // ✨ NEW: Overview page extracted so it’s tidy inside the pager
+  // ✨ Static image sources - defined once, never changes
+  const victronImageSource = require('../assets/victron.png');
+  const smartSolarImageSource = require('../assets/smartsolar.png');
+
+  // ✨ NEW: Overview page extracted so it's tidy inside the pager
   const OverviewPage = () => (
     <SafeAreaView style={[styles.tabletContainer, { width: screenWidth }]}>
        <View style={styles.header}>
@@ -162,15 +166,19 @@ const System = () => {
               </Text>
             </View>
           </GlowingCard>
-          
-          <GlowingCard glowColor="#6CB4EE" style={styles.cardWrapper}>
-            <Image
-              source={require('../assets/victron.png')}
-              style={styles.blueCard}
-              resizeMode="cover"
-            />
-          </GlowingCard>
-          
+
+          <View collapsable={false} key="victron-container">
+            <GlowingCard glowColor="#6CB4EE" style={styles.cardWrapper}>
+              <Image
+                source={victronImageSource}
+                style={styles.blueCard}
+                resizeMode="cover"
+                fadeDuration={0}
+                defaultSource={victronImageSource}
+              />
+            </GlowingCard>
+          </View>
+
           <GlowingCard glowColor="#228B22" style={styles.cardWrapper}>
             <View style={styles.greenCard}>
               <View style={styles.greenCardHeader}>
@@ -213,19 +221,17 @@ const System = () => {
               </Text>
             </View>
           </GlowingCard>
-          
-          <GlowingCard glowColor="#FFBF00" style={styles.cardWrapper}>
-            <PVChargerCard
-              power={
-                victronData
-                  ? formatPower(victronData.pvCharger.power)
-                  : '0.00W'
-              }
-              imageSource={require('../assets/smartsolar.png')}   
-              cardOffset={{ top: 110, left: -60 }}
-              imageOffset={{ top: 160, left: -154 }}
-            />
-          </GlowingCard>
+
+          <View collapsable={false} key="pvcharger-container">
+            <GlowingCard glowColor="#FFBF00" style={styles.cardWrapper}>
+              <PVChargerCard
+                power={victronData ? formatPower(victronData.pvCharger.power) : '0.00W'}
+                imageSource={smartSolarImageSource}
+                cardOffset={{ top: 110, left: -100 }}
+                imageOffset={{ top: 160, left: -174 }}
+              />
+            </GlowingCard>
+          </View>
         </View>
 
         {/* ————————————— CONNECTION LINES ————————————— */}
@@ -280,7 +286,7 @@ const System = () => {
 
         {/* ——— Bottom dots ——— */}
         <View style={styles.pagerDotsContainer}>
-          {[0, 1, 2].map((i) => (
+          {[0, 1].map((i) => (
             <TouchableOpacity
               key={i}
               onPress={() => onTabPress(i)}
@@ -504,9 +510,10 @@ const styles = StyleSheet.create({
   },
   blueCard: {
     borderRadius: 12,
-    marginHorizontal: 8,
+    marginHorizontal: 12,
     width: 180,
     height: 200,
+    right:12,
     backgroundColor: "#1976D2",
     shadowColor: "#6CB4EE",
     shadowOffset: { width: 0, height: 0 },

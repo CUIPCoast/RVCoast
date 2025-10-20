@@ -1,5 +1,6 @@
 // components/SimpleHoldToDimLight.jsx - FIXED VERSION
-// Single button: Tap to toggle, Hold to cycle brightness
+// Single button: Tap to toggle, Hold to dim (up/down based on current brightness)
+// Uses DC Dimmer Command 2 protocol: Command 13 (Ramp Up), Command 14 (Ramp Down), Command 04 (Stop)
 import React, { useState, useEffect, useRef } from "react";
 import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
 import { LightControlService } from "../Service/LightControlService";
@@ -24,18 +25,13 @@ const SimpleHoldToDimLight = ({
   // Refs for combined tap/hold functionality
   const holdTimeoutRef = useRef(null);
   const rampingRef = useRef(false);
-  const monitoringIntervalRef = useRef(null);
   const pressStartTimeRef = useRef(null);
-  const commandSequenceRef = useRef(null);
   const pressTypeRef = useRef(null); // 'tap' or 'hold'
   const touchActiveRef = useRef(false); // Track if touch is still active
-  const keepAliveIntervalRef = useRef(null); // Keep dimming alive
   const lastBrightnessRef = useRef(value); // Track last known brightness
 
-  // Constants for timing - IMPROVED VALUES
+  // Constants for timing
   const HOLD_DELAY = 500; // 500ms to distinguish between tap and hold
-  const KEEP_ALIVE_INTERVAL = 1500; // Send keep-alive every 1.5 seconds (more frequent)
-  const MONITORING_INTERVAL = 80; // Check brightness every 80ms (more frequent)
 
   // Light ID to hex prefix mapping
   const lightPrefixMap = {
@@ -69,15 +65,6 @@ const SimpleHoldToDimLight = ({
       if (holdTimeoutRef.current) {
         clearTimeout(holdTimeoutRef.current);
       }
-      if (monitoringIntervalRef.current) {
-        clearInterval(monitoringIntervalRef.current);
-      }
-      if (commandSequenceRef.current) {
-        clearTimeout(commandSequenceRef.current);
-      }
-      if (keepAliveIntervalRef.current) {
-        clearInterval(keepAliveIntervalRef.current);
-      }
       rampingRef.current = false;
       touchActiveRef.current = false;
     };
@@ -88,15 +75,22 @@ const SimpleHoldToDimLight = ({
     const unsubscribe = rvStateManager.subscribe(({ category, state }) => {
       if (category === 'lights') {
         const lightState = state.lights?.[lightId];
+        // Only block updates during active dimming to prevent interference
+        // But allow updates when not dimming so state persists on navigation
         if (lightState) {
-          setLocalIsOn(lightState.isOn);
-          setLocalBrightness(lightState.brightness || 0);
-          lastBrightnessRef.current = lightState.brightness || 0;
+          if (!isDimming) {
+            setLocalIsOn(lightState.isOn);
+            setLocalBrightness(lightState.brightness || 0);
+            lastBrightnessRef.current = lightState.brightness || 0;
+          } else {
+            // During dimming, only update lastBrightnessRef to track latest value
+            lastBrightnessRef.current = lightState.brightness || 0;
+          }
         }
       }
     });
 
-    // Initialize from current state
+    // Initialize from current state on mount/navigation
     const currentState = rvStateManager.getCategoryState('lights')?.[lightId];
     if (currentState) {
       setLocalIsOn(currentState.isOn);
@@ -105,7 +99,7 @@ const SimpleHoldToDimLight = ({
     }
 
     return unsubscribe;
-  }, [lightId]);
+  }, [lightId, isDimming]);
 
   // Enhanced command execution with retry and proper timing
   const executeCommandWithRetry = async (command, retries = 2, delay = 150) => {
@@ -186,7 +180,7 @@ const SimpleHoldToDimLight = ({
     }
   };
 
-  // Start cycle dimming for hold action - IMPROVED VERSION
+  // Start cycle dimming - continuously dim down to 0%, then back up to 100%
   const startCycleDimming = async () => {
     if (!supportsDimming || !localIsOn || isDimming) return;
 
@@ -195,37 +189,83 @@ const SimpleHoldToDimLight = ({
       setIsDimming(true);
       rampingRef.current = true;
       pressStartTimeRef.current = Date.now();
-      lastBrightnessRef.current = localBrightness;
 
       const prefix = lightPrefixMap[lightId];
       if (!prefix) {
         throw new Error(`Unknown light: ${lightId}`);
       }
 
-      // Determine direction based on current brightness
-      let direction;
-      if (localBrightness > 50) {
-        direction = 'down';
-      } else {
-        direction = 'up';
-      }
-
+      // Start from current brightness and go down
+      let currentBrightness = localBrightness;
+      let direction = 'down';
       setDimmingDirection(direction);
-      console.log(`🔄 Starting cycle dimming for ${lightId} - direction: ${direction} (brightness: ${localBrightness}%)`);
 
-      // Start ramp command
-      const rampCommand = `19FEDB9F#${prefix}FF00150000FFFF`;
-      await executeCommandWithRetry(rampCommand, 1, 50);
+      console.log(`🔄 Starting dimming cycle for ${lightId} - starting at ${currentBrightness}%`);
 
-      // Start monitoring with improved intervals
-      startMonitoring();
+      // Start the dimming loop
+      const dimmingLoop = async () => {
+        while (rampingRef.current && touchActiveRef.current) {
+          try {
+            // Calculate next brightness value
+            if (direction === 'down') {
+              currentBrightness -= 2; // Decrease by 2% each step
+              if (currentBrightness <= 0) {
+                currentBrightness = 0;
+                direction = 'up'; // Switch to brightening
+                setDimmingDirection('up');
+                console.log('📉 Reached 0%, switching to brighten');
+              }
+            } else {
+              currentBrightness += 2; // Increase by 2% each step
+              if (currentBrightness >= 100) {
+                currentBrightness = 100;
+                direction = 'down'; // Switch back to dimming
+                setDimmingDirection('down');
+                console.log('📈 Reached 100%, switching to dim');
+              }
+            }
 
-      // Start more aggressive keep-alive mechanism
-      startKeepAlive(prefix);
+            // Convert percentage to 0-200 range (0xC8 = 200 = 100%)
+            const brightnessValue = Math.round((currentBrightness / 100) * 200);
+            const brightnessHex = brightnessValue.toString(16).padStart(2, '0').toUpperCase();
+
+            // Send set level command (Command 00 = Set Level)
+            const command = `19FEDB9F#${prefix}FF${brightnessHex}000000FFFF`;
+            await executeCommandWithRetry(command, 0, 0);
+
+            // CRITICAL: Force ON state at all brightness levels during dimming
+            // This prevents the button from turning off when brightness goes below 30%
+            setLocalIsOn(true);
+            setLocalBrightness(currentBrightness);
+            lastBrightnessRef.current = currentBrightness;
+
+            // Update state manager periodically but not too frequently
+            // Update every 5 steps (every 10% change) to keep state in sync
+            if (Math.round(currentBrightness) % 10 === 0 || currentBrightness === 0 || currentBrightness === 100) {
+              rvStateManager.updateLightState(lightId, true, currentBrightness);
+            }
+
+            // Wait before next step (50ms = ~20 steps per second)
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+          } catch (error) {
+            console.error('❌ Error in dimming loop:', error);
+            break;
+          }
+        }
+
+        // Clean up when loop exits
+        if (!rampingRef.current || !touchActiveRef.current) {
+          console.log('🛑 Dimming loop stopped');
+        }
+      };
+
+      // Start the loop
+      dimmingLoop();
 
     } catch (error) {
       setError(`Dimming failed: ${error.message}`);
-      console.error("❌ Error starting cycle dimming:", error);
+      console.error("❌ Error starting dimming:", error);
       stopDimming();
     }
   };
@@ -235,25 +275,18 @@ const SimpleHoldToDimLight = ({
     if (!rampingRef.current) return;
 
     try {
+      console.log(`🛑 Stopping dimming for ${lightId} at ${localBrightness.toFixed(1)}%`);
       rampingRef.current = false;
       touchActiveRef.current = false;
-      
-      if (monitoringIntervalRef.current) {
-        clearInterval(monitoringIntervalRef.current);
-        monitoringIntervalRef.current = null;
+
+      // Ensure the light stays ON at the final brightness level
+      const finalBrightness = localBrightness;
+      if (finalBrightness > 0) {
+        setLocalIsOn(true);
+        rvStateManager.updateLightState(lightId, true, finalBrightness);
+        lastBrightnessRef.current = finalBrightness;
       }
 
-      if (keepAliveIntervalRef.current) {
-        clearInterval(keepAliveIntervalRef.current);
-        keepAliveIntervalRef.current = null;
-      }
-
-      const prefix = lightPrefixMap[lightId];
-      if (prefix) {
-        const stopCommand = `19FEDB9F#${prefix}FF00040000FFFF`;
-        await executeCommandWithRetry(stopCommand, 1, 50);
-        console.log(`🛑 Stopped dimming for ${lightId}`);
-      }
     } catch (error) {
       console.error("❌ Error stopping dimming:", error);
     } finally {
@@ -262,99 +295,6 @@ const SimpleHoldToDimLight = ({
     }
   };
 
-  // IMPROVED monitoring function with better thresholds
-  const startMonitoring = () => {
-    let unchangedCount = 0;
-    let checkCount = 0;
-    const pressStartTime = pressStartTimeRef.current;
-
-    monitoringIntervalRef.current = setInterval(async () => {
-      if (!rampingRef.current) return;
-
-      try {
-        checkCount++;
-        const currentBrightness = localBrightness;
-        const lastBrightness = lastBrightnessRef.current;
-        const timeSinceStart = Date.now() - pressStartTime;
-
-        // FIXED: Lower thresholds for better dimming range (0% to 100%)
-        if (currentBrightness <= 1) {
-          console.log("📉 Reached minimum brightness (1%), stopping");
-          stopDimming();
-          return;
-        }
-        
-        if (currentBrightness >= 99) {
-          console.log("📈 Reached maximum brightness (99%), stopping");
-          stopDimming();
-          return;
-        }
-
-        // IMPROVED: More sensitive change detection
-        const brightnessChange = Math.abs(currentBrightness - lastBrightness);
-        
-        // More aggressive change threshold - should detect smaller changes
-        let changeThreshold = 0.3; // Much lower threshold
-        if (currentBrightness > 90 || currentBrightness < 10) {
-          changeThreshold = 0.2; // Even more sensitive at extremes
-        }
-        
-        if (brightnessChange < changeThreshold) {
-          unchangedCount++;
-          // FIXED: More lenient stuck detection (allow more time for changes)
-          const maxUnchangedCount = 15; // Increased from 8-12 to 15
-          
-          if (unchangedCount >= maxUnchangedCount) {
-            console.log(`⏸️ Brightness stuck at ${currentBrightness}% (change: ${brightnessChange}), stopping`);
-            stopDimming();
-            return;
-          }
-        } else {
-          unchangedCount = 0;
-          lastBrightnessRef.current = currentBrightness;
-          console.log(`📊 Brightness changing: ${lastBrightness}% → ${currentBrightness}% (Δ${brightnessChange.toFixed(1)}%)`);
-        }
-
-        // Increased safety timeout
-        if (timeSinceStart >= 20000) {
-          console.log("⏰ Dimming timeout (20s), stopping");
-          stopDimming();
-          return;
-        }
-
-      } catch (error) {
-        console.error("❌ Error monitoring dimming:", error);
-        stopDimming();
-      }
-    }, MONITORING_INTERVAL);
-  };
-
-  // IMPROVED keep-alive mechanism
-  const startKeepAlive = (prefix) => {
-    if (keepAliveIntervalRef.current) {
-      clearInterval(keepAliveIntervalRef.current);
-    }
-
-    keepAliveIntervalRef.current = setInterval(async () => {
-      // FIXED: More robust keep-alive conditions
-      if (rampingRef.current && isDimming) {
-        try {
-          console.log(`🔄 Keep-alive: Refreshing ramp command for ${lightId} (brightness: ${localBrightness}%)`);
-          const rampCommand = `19FEDB9F#${prefix}FF00150000FFFF`;
-          await executeCommandWithRetry(rampCommand, 0, 30); // No retries, faster execution
-        } catch (error) {
-          console.error("❌ Keep-alive ramp command failed:", error);
-          // Continue dimming even if keep-alive fails occasionally
-        }
-      } else {
-        // If we're not dimming anymore, stop keep-alive
-        if (keepAliveIntervalRef.current) {
-          clearInterval(keepAliveIntervalRef.current);
-          keepAliveIntervalRef.current = null;
-        }
-      }
-    }, KEEP_ALIVE_INTERVAL);
-  };
 
   // Combined button press handler
   const handleButtonPressIn = () => {

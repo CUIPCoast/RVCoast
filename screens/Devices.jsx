@@ -6,6 +6,7 @@ import useScreenSize from "../helper/useScreenSize.jsx";
 import AwningControlModal from "../components/AwningControlModal";
 import HeaterControlModal from "../components/HeaterControlModal";
 import AddDeviceModal from "../components/AddDeviceModal";
+import ScheduleLightsModal from "../components/ScheduleLightsModal";
 import { LightService, FanService, WaterService } from "../API/RVControlServices"; 
 import MasterLightControl from "../components/MasterLightControl.jsx";
 import { Feather as Icon } from '@expo/vector-icons';
@@ -86,11 +87,21 @@ const Devices = () => {
   const [isHeaterModalVisible, setHeaterModalVisible] = useState(false);
   const [isScheduleModalVisible, setScheduleModalVisible] = useState(false);
   const [isAddDeviceModalVisible, setAddDeviceModalVisible] = useState(false);
+  const [isScheduleLightsModalVisible, setScheduleLightsModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
   // Use RV State Management hooks
   const { lights, toggleLight, setLightBrightness: updateLightBrightness, turnAllLightsOn, turnAllLightsOff } = useRVLights();
   const { water, toggleWaterPump, toggleWaterHeater } = useRVWater();
+
+  // DEBUG: Log water state to console whenever it changes
+  useEffect(() => {
+    console.log('💧 WATER STATE CHANGED:', {
+      heaterOn: water.heaterOn,
+      pumpOn: water.pumpOn,
+      fullWaterObject: water
+    });
+  }, [water]);
 
   // Fan control states using RV state manager
   const [isBathroomFanOn, setBathroomFanOn] = useState(false);
@@ -408,24 +419,27 @@ const Devices = () => {
   // Water heater toggle with improved state management
 const handleWaterHeaterToggle = async () => {
   setIsLoading(true);
-  
+
   try {
-    // Get current state directly from the hook
+    // Get current FULL water state to preserve all properties
+    const currentWaterState = rvStateManager.getCategoryState('water');
     const currentState = water.heaterOn;
     const newState = !currentState;
-    
+
     console.log(`Water heater toggle: ${currentState} -> ${newState}`);
-    
+    console.log(`Current water state before update:`, currentWaterState);
+
     // Call the API first
     const result = await WaterService.toggleWaterHeater();
-    
+
     if (result.success) {
-      // Update RV state after successful API call
-      rvStateManager.updateWaterState({ 
+      // CRITICAL: Preserve pump state while updating heater state
+      rvStateManager.updateWaterState({
+        pumpOn: currentWaterState.pumpOn || false, // Preserve pump state
         heaterOn: newState,
         lastUpdated: new Date().toISOString()
       });
-      
+
       setStatusMessage(`Water heater ${newState ? 'turned on' : 'turned off'}`);
     } else {
       console.error('Failed to toggle water heater:', result.error);
@@ -443,24 +457,27 @@ const handleWaterHeaterToggle = async () => {
 
   const handleWaterPumpToggle = async () => {
   setIsLoading(true);
-  
+
   try {
-    // Get current state directly from the hook
+    // Get current FULL water state to preserve all properties
+    const currentWaterState = rvStateManager.getCategoryState('water');
     const currentState = water.pumpOn;
     const newState = !currentState;
-    
+
     console.log(`Water pump toggle: ${currentState} -> ${newState}`);
-    
+    console.log(`Current water state before update:`, currentWaterState);
+
     // Call the API first
     const result = await WaterService.toggleWaterPump();
-    
+
     if (result.success) {
-      // Update RV state after successful API call
-      rvStateManager.updateWaterState({ 
+      // CRITICAL: Preserve heater state while updating pump state
+      rvStateManager.updateWaterState({
         pumpOn: newState,
+        heaterOn: currentWaterState.heaterOn || false, // Preserve heater state
         lastUpdated: new Date().toISOString()
       });
-      
+
       setStatusMessage(`Water pump ${newState ? 'turned on' : 'turned off'}`);
     } else {
       console.error('Failed to toggle water pump:', result.error);
@@ -485,13 +502,13 @@ const handleWaterHeaterToggle = async () => {
       if (isOn) {
         // Turn on all lights using LightControlService
         const result = await LightControlService.allLightsOn();
-        
+
         if (result.success) {
-          // Update RV state manager for all lights
+          // Update RV state manager for all lights to 100% (matching what the service does)
           allLights.forEach(lightId => {
-            rvStateManager.updateLightState(lightId, true, 75); // Default to 75% brightness
+            rvStateManager.updateLightState(lightId, true, 100);
           });
-          
+
           setMasterLightOn(true);
           showStatusMessage('All lights turned ON');
         } else {
@@ -797,6 +814,9 @@ const handleWaterHeaterToggle = async () => {
         {/* Add Device Modal */}
         <AddDeviceModal isVisible={isAddDeviceModalVisible} onClose={() => setAddDeviceModalVisible(false)} />
 
+        {/* Schedule Lights Modal */}
+        <ScheduleLightsModal isVisible={isScheduleLightsModalVisible} onClose={() => setScheduleLightsModalVisible(false)} />
+
         {/* Status message */}
         {showStatus && (
           <View style={styles.statusContainer}>
@@ -806,6 +826,12 @@ const handleWaterHeaterToggle = async () => {
       </ScrollView>
       
       <View style={styles.buttonContainer} className="bg-brown py-5">
+        <TouchableOpacity
+          style={styles.whiteButton}
+          onPress={() => setScheduleLightsModalVisible(true)}
+        >
+          <Text style={styles.whiteButtonText}>Schedule Lights</Text>
+        </TouchableOpacity>
         <TouchableOpacity
           style={styles.orangeButton}
           onPress={() => setAddDeviceModalVisible(true)}
