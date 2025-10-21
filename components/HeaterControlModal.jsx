@@ -4,6 +4,8 @@ import { Color, FontFamily } from "../GlobalStyles";
 import { ClimateService } from "../API/RVControlServices";
 import { RVControlService } from "../API/rvAPI";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRVClimate } from "../API/RVStateManager/RVStateHooks";
+import rvStateManager from "../API/RVStateManager/RVStateManager";
 
 /**
  * Modal for controlling climate system fan speed settings
@@ -13,7 +15,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  * @param {Function} props.onClose Callback when modal is closed
  */
 const HeaterControlModal = ({ isVisible, onClose }) => {
-  // Fan speed states
+  // Use RV state management hook for climate data
+  const { climate, setFanSpeed: updateFanSpeed } = useRVClimate();
+
+  // Local UI states
   const [selectedFanSpeed, setSelectedFanSpeed] = useState(null);
   const [isAutoModeActive, setIsAutoModeActive] = useState(false);
 
@@ -23,32 +28,65 @@ const HeaterControlModal = ({ isVisible, onClose }) => {
   const [showStatus, setShowStatus] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
 
-  // Load saved states when component mounts
+  // Initialize from RV state when modal opens
   useEffect(() => {
     if (isVisible) {
       loadSavedStates();
     }
   }, [isVisible]);
 
-  // Load saved states from AsyncStorage
+  // Load saved states from RV state manager
   const loadSavedStates = async () => {
     try {
-      // Load fan speed state
-      const savedFanSpeed = await AsyncStorage.getItem('fanSpeed');
-      if (savedFanSpeed !== null) {
-        setSelectedFanSpeed(savedFanSpeed);
+      const currentClimateState = rvStateManager.getCategoryState('climate');
+
+      // Priority 1: Load from RV state manager
+      if (currentClimateState.fanSpeed) {
+        setSelectedFanSpeed(currentClimateState.fanSpeed);
       }
 
-      // Load auto mode state
-      const savedAutoMode = await AsyncStorage.getItem('autoModeState');
-      if (savedAutoMode !== null) {
-        setIsAutoModeActive(JSON.parse(savedAutoMode));
+      if (currentClimateState.autoMode !== undefined) {
+        setIsAutoModeActive(currentClimateState.autoMode);
+      }
+
+      // Priority 2: Fall back to AsyncStorage if RV state is empty
+      if (!currentClimateState.fanSpeed) {
+        const savedFanSpeed = await AsyncStorage.getItem('fanSpeed');
+        if (savedFanSpeed !== null) {
+          setSelectedFanSpeed(savedFanSpeed);
+          rvStateManager.updateClimateState({ fanSpeed: savedFanSpeed });
+        }
+      }
+
+      if (currentClimateState.autoMode === undefined) {
+        const savedAutoMode = await AsyncStorage.getItem('autoModeState');
+        if (savedAutoMode !== null) {
+          const autoMode = JSON.parse(savedAutoMode);
+          setIsAutoModeActive(autoMode);
+          rvStateManager.updateClimateState({ autoMode });
+        }
       }
     } catch (error) {
       console.error('Error loading saved states:', error);
       setErrorMessage('Failed to load saved settings');
     }
   };
+
+  // Subscribe to external state changes
+  useEffect(() => {
+    const unsubscribe = rvStateManager.subscribeToExternalChanges((newState) => {
+      if (newState.climate) {
+        if (newState.climate.fanSpeed !== undefined && newState.climate.fanSpeed !== selectedFanSpeed) {
+          setSelectedFanSpeed(newState.climate.fanSpeed);
+        }
+        if (newState.climate.autoMode !== undefined && newState.climate.autoMode !== isAutoModeActive) {
+          setIsAutoModeActive(newState.climate.autoMode);
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, [selectedFanSpeed, isAutoModeActive]);
 
   // Clear error message after 5 seconds
   useEffect(() => {
@@ -61,14 +99,22 @@ const HeaterControlModal = ({ isVisible, onClose }) => {
   }, [errorMessage]);
 
 
-  // Set fan speed
+  // Set fan speed with RV state management
   const setFanSpeed = async (speed) => {
     if (selectedFanSpeed === speed) return;
-    
+
     setIsLoading(true);
+    const previousSpeed = selectedFanSpeed;
+    const previousAutoMode = isAutoModeActive;
+
     try {
+      // Update RV state manager immediately for UI responsiveness
+      updateFanSpeed(speed);
+      setSelectedFanSpeed(speed);
+      setIsAutoModeActive(speed === 'Auto');
+
       let result;
-      
+
       switch (speed) {
         case 'High':
           result = await ClimateService.setHighFanSpeed();
@@ -89,34 +135,34 @@ const HeaterControlModal = ({ isVisible, onClose }) => {
           setIsLoading(false);
           return;
       }
-      
+
       if (result && result.success) {
-        // Update fan speed state
-        setSelectedFanSpeed(speed);
-        
-        // Update auto mode state
-        if (speed === 'Auto') {
-          setIsAutoModeActive(true);
-          await AsyncStorage.setItem('autoModeState', JSON.stringify(true));
-        } else {
-          setIsAutoModeActive(false);
-          await AsyncStorage.setItem('autoModeState', JSON.stringify(false));
-        }
-        
-        // Save the fan speed setting
+        // Save to AsyncStorage for backup
         await AsyncStorage.setItem('fanSpeed', speed);
-        
+        await AsyncStorage.setItem('autoModeState', JSON.stringify(speed === 'Auto'));
+
         // Show status message
         setStatusMessage(`Fan speed set to ${speed}`);
         setShowStatus(true);
         setTimeout(() => setShowStatus(false), 3000);
-        
+
         setErrorMessage(null);
       } else if (result) {
+        // Revert state on API failure
+        updateFanSpeed(previousSpeed);
+        setSelectedFanSpeed(previousSpeed);
+        setIsAutoModeActive(previousAutoMode);
+
         setErrorMessage(`Error setting fan speed: ${result.error}`);
       }
     } catch (error) {
       console.error(`Error setting fan speed to ${speed}:`, error);
+
+      // Revert state on error
+      updateFanSpeed(previousSpeed);
+      setSelectedFanSpeed(previousSpeed);
+      setIsAutoModeActive(previousAutoMode);
+
       setErrorMessage(`Error: ${error.message}`);
     } finally {
       setIsLoading(false);

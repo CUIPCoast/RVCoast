@@ -410,24 +410,25 @@ const Devices = () => {
   // Water heater toggle with improved state management
 const handleWaterHeaterToggle = async () => {
   setIsLoading(true);
-  
+
   try {
     // Get current state directly from the hook
     const currentState = water.heaterOn;
     const newState = !currentState;
-    
+
     console.log(`Water heater toggle: ${currentState} -> ${newState}`);
-    
+
     // Call the API first
     const result = await WaterService.toggleWaterHeater();
-    
+
     if (result.success) {
-      // Update RV state after successful API call
-      rvStateManager.updateWaterState({ 
+      // Update RV state after successful API call - preserve pumpOn state
+      rvStateManager.updateWaterState({
         heaterOn: newState,
+        pumpOn: water.pumpOn, // Preserve the pump state
         lastUpdated: new Date().toISOString()
       });
-      
+
       setStatusMessage(`Water heater ${newState ? 'turned on' : 'turned off'}`);
     } else {
       console.error('Failed to toggle water heater:', result.error);
@@ -445,24 +446,25 @@ const handleWaterHeaterToggle = async () => {
 
   const handleWaterPumpToggle = async () => {
   setIsLoading(true);
-  
+
   try {
     // Get current state directly from the hook
     const currentState = water.pumpOn;
     const newState = !currentState;
-    
+
     console.log(`Water pump toggle: ${currentState} -> ${newState}`);
-    
+
     // Call the API first
     const result = await WaterService.toggleWaterPump();
-    
+
     if (result.success) {
-      // Update RV state after successful API call
-      rvStateManager.updateWaterState({ 
+      // Update RV state after successful API call - preserve heaterOn state
+      rvStateManager.updateWaterState({
         pumpOn: newState,
+        heaterOn: water.heaterOn, // Preserve the heater state
         lastUpdated: new Date().toISOString()
       });
-      
+
       setStatusMessage(`Water pump ${newState ? 'turned on' : 'turned off'}`);
     } else {
       console.error('Failed to toggle water pump:', result.error);
@@ -702,9 +704,9 @@ const handleWaterHeaterToggle = async () => {
     } else if (selectedTab === TABS.BATHROOM) {
       return (
         <View className="">
-          <View style={[styles.fanControlsContainer,{ flexDirection: 'row', justifyContent: 'center', gap: 16 } ]}>
+          <View style={[styles.fanControlsContainer, { flexDirection: 'column', paddingHorizontal: 20 }]}>
         <FanButton
-          size={110}
+          compact={true}
           isOn={isBayVentFanOn}
           onPress={toggleBayVentFan}
           iconName="sun"
@@ -712,7 +714,7 @@ const handleWaterHeaterToggle = async () => {
           loading={isLoading}
         />
         <FanButton
-          size={110}
+          compact={true}
           isOn={isBathroomFanOn}
           onPress={toggleBathroomFan}
           iconName="wind"
@@ -1286,6 +1288,78 @@ waterStatusText: {
   fontSize: 12,
   fontFamily: FontFamily.latoRegular,
   fontWeight: '700',
+},
+
+// Mobile Fan Buttons - Circular Design
+mobileFanContainer: {
+  flexDirection: 'row',
+  justifyContent: 'center',
+  alignItems: 'center',
+  paddingHorizontal: 20,
+  paddingVertical: 20,
+  gap: 16,
+},
+mobileFanButton: {
+  width: 120,
+  height: 120,
+  borderRadius: 60,
+  justifyContent: 'center',
+  alignItems: 'center',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.3,
+  shadowRadius: 8,
+  elevation: 8,
+  borderWidth: 2,
+  position: 'relative',
+},
+mobileFanActive: {
+  backgroundColor: '#667eea',
+  borderColor: '#764ba2',
+},
+mobileFanInactive: {
+  backgroundColor: '#2c3e50',
+  borderColor: '#34495e',
+},
+mobileFanIconCircle: {
+  width: 64,
+  height: 64,
+  borderRadius: 32,
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginBottom: 8,
+  borderWidth: 1.5,
+},
+mobileIconActive: {
+  backgroundColor: 'rgba(255, 255, 255, 0.25)',
+  borderColor: 'rgba(255, 255, 255, 0.4)',
+},
+mobileIconInactive: {
+  backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  borderColor: 'rgba(255, 255, 255, 0.15)',
+},
+mobileFanLabel: {
+  fontSize: 13,
+  fontFamily: FontFamily.latoBold,
+  fontWeight: '700',
+  textAlign: 'center',
+  marginBottom: 4,
+  letterSpacing: 0.3,
+},
+mobileFanStatusDot: {
+  width: 8,
+  height: 8,
+  borderRadius: 4,
+  marginTop: 4,
+  shadowColor: '#4ade80',
+  shadowOpacity: 0.8,
+  shadowRadius: 4,
+  elevation: 3,
+},
+mobileLoadingIndicator: {
+  position: 'absolute',
+  top: 8,
+  right: 8,
 },
 
 });

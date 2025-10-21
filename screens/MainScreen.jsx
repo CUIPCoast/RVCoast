@@ -16,23 +16,30 @@ import RVConnectionModal from '../components/RVConnectionModal';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { VictronEnergyService } from "../API/VictronEnergyService";
+import { useRVWater } from '../API/RVStateManager/RVStateHooks';
+import rvStateManager from '../API/RVStateManager/RVStateManager';
 
 
 const MainScreen = () => {
     const { user } = useAuth();
     const isTablet = useScreenSize();
     const [showRVModal, setShowRVModal] = useState(false);
-    
+
+    // Use RV state management for water systems
+    const { water } = useRVWater();
+
     var currentDate = moment().format("MMMM Do, YYYY");
     var DayOfTheWeek = moment().format("dddd");
-    
+
     const [isModalVisible, setModalVisible] = useState(false);
     const [isOn, setIsOn] = useState(false);
     const [isOnGray, setIsOnGray] = useState(false);
-     const [victronData, setVictronData] = useState(null);
-    
-    const [isWaterHeaterOn, setWaterHeaterOn] = useState(false);
-    const [isWaterPumpOn, setWaterPumpOn] = useState(false);
+    const [victronData, setVictronData] = useState(null);
+
+    // Remove local state - now using RV state manager
+    // const [isWaterHeaterOn, setWaterHeaterOn] = useState(false);
+    // const [isWaterPumpOn, setWaterPumpOn] = useState(false);
+
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState(null);
     const [showErrors, setShowErrors] = useState(true);
@@ -80,17 +87,33 @@ const MainScreen = () => {
         return true;
     };
 
-    // Handle water pump toggle
+    // Handle water pump toggle with RV state management
     const handleWaterPumpToggle = async () => {
         if (!checkRVConnection()) return;
-        
+
         setIsLoading(true);
+        const newState = !water.pumpOn;
+
         try {
+            // Update RV state immediately for responsive UI
+            rvStateManager.updateWaterState({
+                pumpOn: newState,
+                heaterOn: water.heaterOn,
+                lastUpdated: new Date().toISOString()
+            });
+
             const result = await WaterService.toggleWaterPump();
             if (result.success) {
-                setWaterPumpOn(!isWaterPumpOn);
                 setErrorMessage(null);
+                console.log(`MainScreen: Water pump toggled to ${newState ? 'ON' : 'OFF'}`);
             } else {
+                // Revert on failure
+                rvStateManager.updateWaterState({
+                    pumpOn: !newState,
+                    heaterOn: water.heaterOn,
+                    lastUpdated: new Date().toISOString()
+                });
+
                 // Only show non-connection errors
                 if (!result.error.includes('connection') && !result.error.includes('network')) {
                     setErrorMessage(`Failed to toggle water pump: ${result.error}`);
@@ -98,6 +121,13 @@ const MainScreen = () => {
                 console.log('Water pump toggle failed (likely not connected to RV):', result.error);
             }
         } catch (error) {
+            // Revert on error
+            rvStateManager.updateWaterState({
+                pumpOn: !newState,
+                heaterOn: water.heaterOn,
+                lastUpdated: new Date().toISOString()
+            });
+
             // Only show errors that aren't connection-related
             if (!error.message.includes('connection') && !error.message.includes('network') && !error.message.includes('timeout')) {
                 setErrorMessage(`Error: ${error.message}`);
@@ -108,20 +138,36 @@ const MainScreen = () => {
         }
     };
     
-    // Handle water heater toggle - enhanced with state sync
+    // Handle water heater toggle with RV state management
     const handleWaterHeaterToggle = async () => {
         if (!checkRVConnection()) return;
-        
+
         setIsLoading(true);
+        const newState = !water.heaterOn;
+
         try {
+            // Update RV state immediately for responsive UI
+            rvStateManager.updateWaterState({
+                heaterOn: newState,
+                pumpOn: water.pumpOn,
+                lastUpdated: new Date().toISOString()
+            });
+
+            setIsOn(newState); // Sync with fresh water tank heater state
+
             const result = await WaterService.toggleWaterHeater();
             if (result.success) {
-                const newState = !isWaterHeaterOn;
-                setWaterHeaterOn(newState);
-                setIsOn(newState); // Sync with fresh water tank heater state
                 setErrorMessage(null);
                 console.log(`MainScreen: Water heater toggled to ${newState ? 'ON' : 'OFF'}`);
             } else {
+                // Revert on failure
+                rvStateManager.updateWaterState({
+                    heaterOn: !newState,
+                    pumpOn: water.pumpOn,
+                    lastUpdated: new Date().toISOString()
+                });
+                setIsOn(!newState);
+
                 // Only show non-connection errors
                 if (!result.error.includes('connection') && !result.error.includes('network')) {
                     setErrorMessage(`Failed to toggle water heater: ${result.error}`);
@@ -129,6 +175,14 @@ const MainScreen = () => {
                 console.log('Water heater toggle failed (likely not connected to RV):', result.error);
             }
         } catch (error) {
+            // Revert on error
+            rvStateManager.updateWaterState({
+                heaterOn: !newState,
+                pumpOn: water.pumpOn,
+                lastUpdated: new Date().toISOString()
+            });
+            setIsOn(!newState);
+
             // Only show errors that aren't connection-related
             if (!error.message.includes('connection') && !error.message.includes('network') && !error.message.includes('timeout')) {
                 setErrorMessage(`Error: ${error.message}`);
@@ -391,7 +445,7 @@ const MainScreen = () => {
                     ]}
                   >
                     <LinearGradient
-                      colors={isWaterHeaterOn 
+                      colors={water.heaterOn 
                         ? ["#FF6B6B", "#FF8E53", "#FF6B35"] 
                         : ["#2C2C34", "#3A3A42", "#2C2C34"]
                       }
@@ -402,31 +456,31 @@ const MainScreen = () => {
                       <View style={styles.buttonContent}>
                         <View style={[
                           styles.iconContainer,
-                          { backgroundColor: isWaterHeaterOn ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)' }
+                          { backgroundColor: water.heaterOn ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)' }
                         ]}>
                           <Ionicons
-                            name={isWaterHeaterOn ? "flame" : "flame-outline"}
+                            name={water.heaterOn ? "flame" : "flame-outline"}
                             size={20}
-                            color={isWaterHeaterOn ? "#FFF" : "#B0B0B0"}
+                            color={water.heaterOn ? "#FFF" : "#B0B0B0"}
                           />
                         </View>
                         <View style={styles.textContainer}>
                           <Text style={[
                             styles.buttonTitle,
-                            { color: isWaterHeaterOn ? "#FFF" : "#E0E0E0" }
+                            { color: water.heaterOn ? "#FFF" : "#E0E0E0" }
                           ]}>
                             Water Heater
                           </Text>
                           <Text style={[
                             styles.buttonSubtitle,
-                            { color: isWaterHeaterOn ? "rgba(255,255,255,0.8)" : "#888" }
+                            { color: water.heaterOn ? "rgba(255,255,255,0.8)" : "#888" }
                           ]}>
-                            {isWaterHeaterOn ? "Heating" : "Off"}
+                            {water.heaterOn ? "Heating" : "Off"}
                           </Text>
                         </View>
                         <View style={[
                           styles.statusIndicator,
-                          { backgroundColor: isWaterHeaterOn ? "#4CAF50" : "#666" }
+                          { backgroundColor: water.heaterOn ? "#4CAF50" : "#666" }
                         ]} />
                       </View>
                     </LinearGradient>
@@ -443,7 +497,7 @@ const MainScreen = () => {
                     ]}
                   >
                     <LinearGradient
-                      colors={isWaterPumpOn 
+                      colors={water.pumpOn 
                         ? ["#4FC3F7", "#29B6F6", "#0288D1"] 
                         : ["#2C2C34", "#3A3A42", "#2C2C34"]
                       }
@@ -454,31 +508,31 @@ const MainScreen = () => {
                       <View style={styles.buttonContent}>
                         <View style={[
                           styles.iconContainer,
-                          { backgroundColor: isWaterPumpOn ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)' }
+                          { backgroundColor: water.pumpOn ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)' }
                         ]}>
                           <Ionicons
-                            name={isWaterPumpOn ? "water" : "water-outline"}
+                            name={water.pumpOn ? "water" : "water-outline"}
                             size={20}
-                            color={isWaterPumpOn ? "#FFF" : "#B0B0B0"}
+                            color={water.pumpOn ? "#FFF" : "#B0B0B0"}
                           />
                         </View>
                         <View style={styles.textContainer}>
                           <Text style={[
                             styles.buttonTitle,
-                            { color: isWaterPumpOn ? "#FFF" : "#E0E0E0" }
+                            { color: water.pumpOn ? "#FFF" : "#E0E0E0" }
                           ]}>
                             Water Pump
                           </Text>
                           <Text style={[
                             styles.buttonSubtitle,
-                            { color: isWaterPumpOn ? "rgba(255,255,255,0.8)" : "#888" }
+                            { color: water.pumpOn ? "rgba(255,255,255,0.8)" : "#888" }
                           ]}>
-                            {isWaterPumpOn ? "Running" : "Off"}
+                            {water.pumpOn ? "Running" : "Off"}
                           </Text>
                         </View>
                         <View style={[
                           styles.statusIndicator,
-                          { backgroundColor: isWaterPumpOn ? "#4CAF50" : "#666" }
+                          { backgroundColor: water.pumpOn ? "#4CAF50" : "#666" }
                         ]} />
                       </View>
                     </LinearGradient>

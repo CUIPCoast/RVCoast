@@ -9,6 +9,7 @@ import {
 import { RadialSlider } from 'react-native-radial-slider';
 import { useScreenSize, handleCoolingToggle, handleToeKickToggle, handleTemperatureChange, dismissKeyboard } from "../helper";
 import { FontFamily } from "../GlobalStyles";
+import { Ionicons } from '@expo/vector-icons';
 
 // Import RV State Management hooks
 import { useRVClimate } from "../API/RVStateManager/RVStateHooks";
@@ -17,11 +18,20 @@ import rvStateManager from "../API/RVStateManager/RVStateManager";
 // Import temperature monitoring service
 import temperatureMonitoringService from "../Service/TemperatureMonitoringService";
 
+// Import climate services
+import { ClimateService } from '../API/RVControlServices';
+
+// Import HeaterControlModal for fan speed
+import HeaterControlModal from "../components/HeaterControlModal";
+
 const AirCon = ({ onClose }) => {
   const isTablet = useScreenSize();
-  
+
   // Use RV state management hook for climate data
-  const { climate } = useRVClimate();
+  const { climate, toggleFurnace, toggleNightMode, toggleDehumidifyMode } = useRVClimate();
+
+  // State for fan speed modal
+  const [isFanSpeedModalVisible, setFanSpeedModalVisible] = useState(false);
   
   // Get initial temperature from RV state BEFORE rendering to prevent flash
   const getInitialTemp = () => {
@@ -205,7 +215,7 @@ const AirCon = ({ onClose }) => {
   // Handle toe kick toggle with state management
   const handleToeKickPress = async () => {
     if (isProcessing) return;
-    
+
     try {
       await handleToeKickToggle(
         climate.toeKickOn,
@@ -218,6 +228,140 @@ const AirCon = ({ onClose }) => {
       );
     } catch (error) {
       // Error already handled in helper
+    }
+  };
+
+  // Handle furnace toggle
+  const handleFurnacePress = async () => {
+    if (isProcessing) return;
+
+    setIsProcessing(true);
+    const newState = !climate.heatingOn;
+
+    try {
+      // Update state immediately
+      rvStateManager.updateClimateState({
+        heatingOn: newState,
+        lastUpdated: new Date().toISOString()
+      });
+
+      const result = await ClimateService.toggleFurnace();
+
+      if (result.success) {
+        setStatusMessage(`Furnace ${newState ? 'turned on' : 'turned off'}`);
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+      } else {
+        // Revert on failure
+        rvStateManager.updateClimateState({
+          heatingOn: !newState,
+          lastUpdated: new Date().toISOString()
+        });
+        setStatusMessage('Failed to toggle furnace');
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+      }
+    } catch (error) {
+      // Revert on error
+      rvStateManager.updateClimateState({
+        heatingOn: !newState,
+        lastUpdated: new Date().toISOString()
+      });
+      setStatusMessage('Error toggling furnace');
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Handle night mode toggle
+  const handleNightModePress = async () => {
+    if (isProcessing) return;
+
+    setIsProcessing(true);
+    const newState = !climate.nightMode;
+
+    try {
+      // Update state immediately
+      rvStateManager.updateClimateState({
+        nightMode: newState,
+        lastUpdated: new Date().toISOString()
+      });
+
+      const result = await ClimateService.setNightMode();
+
+      if (result.success) {
+        await AsyncStorage.setItem('nightMode', JSON.stringify(newState));
+        setStatusMessage(`${newState ? 'Night' : 'Day'} mode enabled`);
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+      } else {
+        // Revert on failure
+        rvStateManager.updateClimateState({
+          nightMode: !newState,
+          lastUpdated: new Date().toISOString()
+        });
+        setStatusMessage('Failed to toggle mode');
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+      }
+    } catch (error) {
+      // Revert on error
+      rvStateManager.updateClimateState({
+        nightMode: !newState,
+        lastUpdated: new Date().toISOString()
+      });
+      setStatusMessage('Error toggling mode');
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Handle dehumidify toggle
+  const handleDehumidifyPress = async () => {
+    if (isProcessing) return;
+
+    setIsProcessing(true);
+    const newState = !climate.dehumidifyMode;
+
+    try {
+      // Update state immediately
+      rvStateManager.updateClimateState({
+        dehumidifyMode: newState,
+        lastUpdated: new Date().toISOString()
+      });
+
+      const result = await ClimateService.setDehumidifyMode();
+
+      if (result.success) {
+        await AsyncStorage.setItem('dehumidMode', JSON.stringify(newState));
+        setStatusMessage(`Dehumidify ${newState ? 'enabled' : 'disabled'}`);
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+      } else {
+        // Revert on failure
+        rvStateManager.updateClimateState({
+          dehumidifyMode: !newState,
+          lastUpdated: new Date().toISOString()
+        });
+        setStatusMessage('Failed to toggle dehumidify');
+        setShowStatus(true);
+        setTimeout(() => setShowStatus(false), 3000);
+      }
+    } catch (error) {
+      // Revert on error
+      rvStateManager.updateClimateState({
+        dehumidifyMode: !newState,
+        lastUpdated: new Date().toISOString()
+      });
+      setStatusMessage('Error toggling dehumidify');
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -426,31 +570,126 @@ const AirCon = ({ onClose }) => {
           unit={'°F'}
         />
         
-        {/* Cooling and Toe Kick Switch Buttons */}
+        {/* Climate Control Buttons - Row 1 */}
         <View style={styles.buttonsContainer}>
           <TouchableOpacity
             style={[
-              styles.button, 
+              styles.button,
               climate.coolingOn ? styles.activeButton : null,
               isProcessing ? styles.disabledButton : null
             ]}
             onPress={handleCoolingPress}
             disabled={isProcessing}
           >
-            <Text style={styles.buttonText}>Cooling</Text>
+            <Ionicons
+              name={climate.coolingOn ? "snow" : "snow-outline"}
+              size={18}
+              color={climate.coolingOn ? "#1a1a1a" : "#ffffff"}
+              style={{ marginRight: 6 }}
+            />
+            <Text style={[styles.buttonText, climate.coolingOn && styles.activeButtonText]}>Cooling</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[
-              styles.button, 
+              styles.button,
               climate.toeKickOn ? styles.activeButton : null,
               isProcessing ? styles.disabledButton : null
             ]}
             onPress={handleToeKickPress}
             disabled={isProcessing}
           >
-            <Text style={styles.buttonText}>Toe Kick</Text>
+            <Ionicons
+              name={climate.toeKickOn ? "flame" : "flame-outline"}
+              size={18}
+              color={climate.toeKickOn ? "#1a1a1a" : "#ffffff"}
+              style={{ marginRight: 6 }}
+            />
+            <Text style={[styles.buttonText, climate.toeKickOn && styles.activeButtonText]}>Toe Kick</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Climate Control Buttons - Row 2 */}
+        <View style={styles.buttonsContainer}>
+          <TouchableOpacity
+            style={[
+              styles.button,
+              climate.heatingOn ? styles.activeButton : null,
+              isProcessing ? styles.disabledButton : null
+            ]}
+            onPress={handleFurnacePress}
+            disabled={isProcessing}
+          >
+            <Ionicons
+              name={climate.heatingOn ? "bonfire" : "bonfire-outline"}
+              size={18}
+              color={climate.heatingOn ? "#1a1a1a" : "#ffffff"}
+              style={{ marginRight: 6 }}
+            />
+            <Text style={[styles.buttonText, climate.heatingOn && styles.activeButtonText]}>Furnace</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.button,
+              isProcessing ? styles.disabledButton : null
+            ]}
+            onPress={() => setFanSpeedModalVisible(true)}
+            disabled={isProcessing}
+          >
+            <Ionicons
+              name="options-outline"
+              size={18}
+              color="#ffffff"
+              style={{ marginRight: 6 }}
+            />
+            <Text style={styles.buttonText}>Fan Speed</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Climate Control Buttons - Row 3 */}
+        <View style={styles.buttonsContainer}>
+          <TouchableOpacity
+            style={[
+              styles.button,
+              climate.nightMode ? styles.activeButtonNight : null,
+              isProcessing ? styles.disabledButton : null
+            ]}
+            onPress={handleNightModePress}
+            disabled={isProcessing}
+          >
+            <Ionicons
+              name={climate.nightMode ? "moon" : "sunny-outline"}
+              size={18}
+              color={climate.nightMode ? "#1a1a1a" : "#ffffff"}
+              style={{ marginRight: 6 }}
+            />
+            <Text style={[styles.buttonText, climate.nightMode && styles.activeButtonText]}>
+              {climate.nightMode ? 'Night' : 'Day'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.button,
+              climate.dehumidifyMode ? styles.activeButtonDehumid : null,
+              isProcessing ? styles.disabledButton : null
+            ]}
+            onPress={handleDehumidifyPress}
+            disabled={isProcessing}
+          >
+            <Ionicons
+              name={climate.dehumidifyMode ? "water" : "water-outline"}
+              size={18}
+              color={climate.dehumidifyMode ? "#1a1a1a" : "#ffffff"}
+              style={{ marginRight: 6 }}
+            />
+            <Text style={[styles.buttonText, climate.dehumidifyMode && styles.activeButtonText]}>Dehumidify</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Fan Speed Modal */}
+        <HeaterControlModal
+          isVisible={isFanSpeedModalVisible}
+          onClose={() => setFanSpeedModalVisible(false)}
+        />
         
         {/* Status message */}
         {showStatus && (
@@ -592,8 +831,12 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   button: {
-    paddingHorizontal: 32,
-    paddingVertical: 18,
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
     borderRadius: 16,
     marginHorizontal: 6,
     backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.05)',
@@ -614,15 +857,37 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 8,
   },
+  activeButtonNight: {
+    backgroundColor: '#FFBA00',
+    borderColor: '#FFBA00',
+    shadowColor: '#FFBA00',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  activeButtonDehumid: {
+    backgroundColor: '#00B9E8',
+    borderColor: '#00B9E8',
+    shadowColor: '#00B9E8',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 8,
+  },
   disabledButton: {
     opacity: 0.5,
   },
   buttonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontFamily: FontFamily.latoBold,
     fontWeight: '600',
     color: isDarkMode ? Color.white0 : Color.colorDarkslategray_200,
     letterSpacing: 0.4,
+  },
+  activeButtonText: {
+    color: '#1a1a1a',
+    fontWeight: '700',
   },
   statusContainer: {
     position: 'absolute',

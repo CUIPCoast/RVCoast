@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity, View, Text, StyleSheet, Animated } from 'react-native';
+import { TouchableOpacity, View, Text, StyleSheet, Animated, ActivityIndicator } from 'react-native';
 import { Feather as Icon } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -10,6 +10,7 @@ export default function FanButton({
   iconName,
   label,
   loading = false,
+  compact = false, // New prop for horizontal mobile layout
 }) {
   const animatedValue = React.useRef(new Animated.Value(isOn ? 1 : 0)).current;
 
@@ -22,7 +23,96 @@ export default function FanButton({
     }).start();
   }, [isOn]);
 
-  // Scaled dimensions
+  // For compact mode (mobile horizontal layout)
+  if (compact) {
+    const scale = animatedValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: [1, 1.01],
+    });
+
+    return (
+      <Animated.View
+        style={[
+          styles.compactButtonContainer,
+          {
+            transform: [{ scale }],
+          },
+        ]}
+      >
+        <TouchableOpacity
+          style={[
+            styles.compactButton,
+            isOn ? styles.compactButtonActive : styles.compactButtonInactive,
+            loading && styles.disabled,
+          ]}
+          onPress={onPress}
+          disabled={loading}
+          activeOpacity={0.7}
+        >
+          <LinearGradient
+            colors={isOn ? ['#667eea', '#764ba2'] : ['#2c3e50', '#34495e']}
+            style={styles.compactGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+          >
+            {/* Icon Circle */}
+            <View style={[
+              styles.compactIconCircle,
+              isOn ? styles.compactIconCircleActive : styles.compactIconCircleInactive
+            ]}>
+              <Animated.View
+                style={{
+                  transform: [{
+                    rotate: animatedValue.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0deg', '180deg'],
+                    })
+                  }]
+                }}
+              >
+                <Icon
+                  name={iconName}
+                  size={24}
+                  color={isOn ? '#ffffff' : '#b0bec5'}
+                />
+              </Animated.View>
+            </View>
+
+            {/* Label and Status */}
+            <View style={styles.compactTextContainer}>
+              <Text style={[
+                styles.compactLabel,
+                { color: isOn ? '#ffffff' : '#b0bec5' }
+              ]}>
+                {label}
+              </Text>
+              <View style={styles.compactStatusRow}>
+                <View style={[
+                  styles.compactStatusDot,
+                  { backgroundColor: isOn ? '#4ade80' : '#64748b' }
+                ]} />
+                <Text style={[
+                  styles.compactStatusText,
+                  { color: isOn ? '#4ade80' : '#64748b' }
+                ]}>
+                  {isOn ? 'ON' : 'OFF'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Loading Indicator */}
+            {loading && (
+              <View style={styles.compactLoadingContainer}>
+                <ActivityIndicator size="small" color="#ffffff" />
+              </View>
+            )}
+          </LinearGradient>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  }
+
+  // Original square layout for tablet/larger screens
   const circleDiameter = size * 0.4;
   const iconSize = size * 0.18;
   const fontSize = size * 0.075;
@@ -76,13 +166,13 @@ export default function FanButton({
           },
         ]}
       />
-      
+
       <TouchableOpacity
         style={[
           styles.button,
-          { 
-            width: size, 
-            height: size, 
+          {
+            width: size,
+            height: size,
             borderRadius,
           },
           loading && styles.disabled,
@@ -102,7 +192,7 @@ export default function FanButton({
         >
           {/* Frosted glass overlay */}
           <View style={[styles.frostOverlay, isOn && styles.frostOverlayActive]} />
-          
+
           {/* Icon circle with glassmorphism effect */}
           <View
             style={[
@@ -138,10 +228,10 @@ export default function FanButton({
                   }
                 ]}
               >
-                <Icon 
-                  name={iconName} 
-                  size={iconSize} 
-                  color={isOn ? '#ffffff' : '#b0bec5'} 
+                <Icon
+                  name={iconName}
+                  size={iconSize}
+                  color={isOn ? '#ffffff' : '#b0bec5'}
                 />
               </Animated.View>
             </LinearGradient>
@@ -149,8 +239,8 @@ export default function FanButton({
 
           {/* Label with better typography */}
           <Text style={[
-            styles.label, 
-            { 
+            styles.label,
+            {
               fontSize,
               color: isOn ? '#ffffff' : '#b0bec5',
               fontWeight: isOn ? '700' : '600',
@@ -173,8 +263,8 @@ export default function FanButton({
               ]}
             />
             <Text style={[
-              styles.statusText, 
-              { 
+              styles.statusText,
+              {
                 fontSize: fontSize * 0.8,
                 color: isOn ? '#4ade80' : '#64748b',
                 marginLeft: size * 0.02,
@@ -197,6 +287,87 @@ export default function FanButton({
 }
 
 const styles = StyleSheet.create({
+  // Compact (Mobile) Styles
+  compactButtonContainer: {
+    width: '100%',
+    marginVertical: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  compactButton: {
+    width: '100%',
+    height: 70,
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1.5,
+  },
+  compactButtonActive: {
+    borderColor: 'rgba(102, 126, 234, 0.6)',
+  },
+  compactButtonInactive: {
+    borderColor: 'rgba(52, 73, 94, 0.4)',
+  },
+  compactGradient: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  compactIconCircle: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+    borderWidth: 1,
+  },
+  compactIconCircleActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  compactIconCircleInactive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  compactTextContainer: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  compactLabel: {
+    fontSize: 17,
+    fontWeight: '600',
+    marginBottom: 4,
+    letterSpacing: 0.3,
+  },
+  compactStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  compactStatusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    marginRight: 6,
+    shadowColor: '#4ade80',
+    shadowOpacity: 0.6,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  compactStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  compactLoadingContainer: {
+    marginLeft: 10,
+  },
+
+  // Original (Tablet/Large) Styles
   buttonContainer: {
     justifyContent: 'center',
     alignItems: 'center',

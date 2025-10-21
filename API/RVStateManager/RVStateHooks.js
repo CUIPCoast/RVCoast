@@ -96,35 +96,104 @@ export function useRVLights() {
   };
 }
 
-// Hook for climate control
+// Hook for climate control with comprehensive state management
 export function useRVClimate() {
   const climate = useRVCategoryState('climate');
-  
+
   const setTemperature = useCallback((temperature) => {
-    rvStateManager.updateClimateState({ temperature });
+    rvStateManager.updateClimateState({
+      temperature,
+      lastUpdated: new Date().toISOString()
+    });
   }, []);
-  
+
   const toggleCooling = useCallback(() => {
     const currentState = rvStateManager.getCategoryState('climate');
     const isCurrentlyOn = currentState.coolingOn || false;
-    
-    rvStateManager.updateClimateState({ coolingOn: !isCurrentlyOn });
+
+    rvStateManager.updateClimateState({
+      coolingOn: !isCurrentlyOn,
+      lastUpdated: new Date().toISOString()
+    });
   }, []);
-  
+
   const toggleHeating = useCallback(() => {
     const currentState = rvStateManager.getCategoryState('climate');
     const isCurrentlyOn = currentState.heatingOn || false;
-    
-    rvStateManager.updateClimateState({ heatingOn: !isCurrentlyOn });
+
+    rvStateManager.updateClimateState({
+      heatingOn: !isCurrentlyOn,
+      lastUpdated: new Date().toISOString()
+    });
   }, []);
-  
-  // Add other climate functions
-  
+
+  const toggleToeKick = useCallback(() => {
+    const currentState = rvStateManager.getCategoryState('climate');
+    const isCurrentlyOn = currentState.toeKickOn || false;
+
+    rvStateManager.updateClimateState({
+      toeKickOn: !isCurrentlyOn,
+      lastUpdated: new Date().toISOString()
+    });
+  }, []);
+
+  const toggleFurnace = useCallback(() => {
+    const currentState = rvStateManager.getCategoryState('climate');
+    const isCurrentlyOn = currentState.furnaceOn || false;
+
+    rvStateManager.updateClimateState({
+      furnaceOn: !isCurrentlyOn,
+      lastUpdated: new Date().toISOString()
+    });
+  }, []);
+
+  const setFanSpeed = useCallback((speed) => {
+    rvStateManager.updateClimateState({
+      fanSpeed: speed,
+      autoMode: speed === 'Auto',
+      lastUpdated: new Date().toISOString()
+    });
+  }, []);
+
+  const toggleNightMode = useCallback(() => {
+    const currentState = rvStateManager.getCategoryState('climate');
+    const isCurrentlyOn = currentState.nightMode || false;
+
+    rvStateManager.updateClimateState({
+      nightMode: !isCurrentlyOn,
+      lastUpdated: new Date().toISOString()
+    });
+  }, []);
+
+  const toggleDehumidifyMode = useCallback(() => {
+    const currentState = rvStateManager.getCategoryState('climate');
+    const isCurrentlyOn = currentState.dehumidifyMode || false;
+
+    rvStateManager.updateClimateState({
+      dehumidifyMode: !isCurrentlyOn,
+      lastUpdated: new Date().toISOString()
+    });
+  }, []);
+
+  const setAutoMode = useCallback((enabled) => {
+    rvStateManager.updateClimateState({
+      autoMode: enabled,
+      fanSpeed: enabled ? 'Auto' : climate.fanSpeed,
+      lastUpdated: new Date().toISOString()
+    });
+  }, [climate.fanSpeed]);
+
   return {
     climate,
     setTemperature,
     toggleCooling,
-    toggleHeating
+    toggleHeating,
+    toggleToeKick,
+    toggleFurnace,
+    setFanSpeed,
+    toggleNightMode,
+    toggleDehumidifyMode,
+    setAutoMode
   };
 }
 
