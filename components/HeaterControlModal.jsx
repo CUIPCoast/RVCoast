@@ -101,17 +101,30 @@ const HeaterControlModal = ({ isVisible, onClose }) => {
 
   // Set fan speed with RV state management
   const setFanSpeed = async (speed) => {
-    if (selectedFanSpeed === speed) return;
+    // Prevent clicking the same button
+    if (speed === 'Auto' && isAutoModeActive) return;
+    if (speed !== 'Auto' && selectedFanSpeed === speed && !isAutoModeActive) return;
 
     setIsLoading(true);
     const previousSpeed = selectedFanSpeed;
     const previousAutoMode = isAutoModeActive;
 
     try {
-      // Update RV state manager immediately for UI responsiveness
-      updateFanSpeed(speed);
-      setSelectedFanSpeed(speed);
-      setIsAutoModeActive(speed === 'Auto');
+      // Update local state immediately - clear old state first
+      if (speed === 'Auto') {
+        setIsAutoModeActive(true);
+        setSelectedFanSpeed(null); // Clear manual speed when auto is active
+      } else {
+        setIsAutoModeActive(false);
+        setSelectedFanSpeed(speed);
+      }
+
+      // Update RV state manager
+      rvStateManager.updateClimateState({
+        fanSpeed: speed,
+        autoMode: speed === 'Auto',
+        lastUpdated: new Date().toISOString()
+      });
 
       let result;
 
@@ -149,7 +162,11 @@ const HeaterControlModal = ({ isVisible, onClose }) => {
         setErrorMessage(null);
       } else if (result) {
         // Revert state on API failure
-        updateFanSpeed(previousSpeed);
+        rvStateManager.updateClimateState({
+          fanSpeed: previousSpeed,
+          autoMode: previousAutoMode,
+          lastUpdated: new Date().toISOString()
+        });
         setSelectedFanSpeed(previousSpeed);
         setIsAutoModeActive(previousAutoMode);
 
@@ -159,7 +176,11 @@ const HeaterControlModal = ({ isVisible, onClose }) => {
       console.error(`Error setting fan speed to ${speed}:`, error);
 
       // Revert state on error
-      updateFanSpeed(previousSpeed);
+      rvStateManager.updateClimateState({
+        fanSpeed: previousSpeed,
+        autoMode: previousAutoMode,
+        lastUpdated: new Date().toISOString()
+      });
       setSelectedFanSpeed(previousSpeed);
       setIsAutoModeActive(previousAutoMode);
 

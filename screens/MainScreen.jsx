@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { View, Text, Image, Switch, ScrollView, Pressable, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Col, Row, Grid } from "react-native-easy-grid";import System from './System';
 import moment from 'moment';
 import WaterTanks from "../components/WaterTanks.jsx"; // Enhanced version
 import TemperatureDisplay from "../components/TemperatureDisplay"; // New component
+import WaterButton from "../components/WaterButton.jsx"; // Water control buttons
 import useTemperature from "../hooks/useTemperature"; // New hook
 import {BatteryCard, SmallBatteryCard} from "../components/BatteryCard.jsx";
 import AwningControlModal from "../components/AwningControlModal";
@@ -16,7 +17,6 @@ import RVConnectionModal from '../components/RVConnectionModal';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { VictronEnergyService } from "../API/VictronEnergyService";
-import { useRVWater } from '../API/RVStateManager/RVStateHooks';
 import rvStateManager from '../API/RVStateManager/RVStateManager';
 
 
@@ -24,9 +24,6 @@ const MainScreen = () => {
     const { user } = useAuth();
     const isTablet = useScreenSize();
     const [showRVModal, setShowRVModal] = useState(false);
-
-    // Use RV state management for water systems
-    const { water } = useRVWater();
 
     var currentDate = moment().format("MMMM Do, YYYY");
     var DayOfTheWeek = moment().format("dddd");
@@ -36,9 +33,111 @@ const MainScreen = () => {
     const [isOnGray, setIsOnGray] = useState(false);
     const [victronData, setVictronData] = useState(null);
 
-    // Remove local state - now using RV state manager
-    // const [isWaterHeaterOn, setWaterHeaterOn] = useState(false);
-    // const [isWaterPumpOn, setWaterPumpOn] = useState(false);
+    // Water button states with RVStateManager for cross-screen sync
+    const [isWaterHeaterOn, setWaterHeaterOn] = useState(false);
+    const [isWaterPumpOn, setWaterPumpOn] = useState(false);
+
+    // Use refs to track previous values and prevent unnecessary effects
+    const prevWaterHeaterRef = useRef(isWaterHeaterOn);
+    const prevWaterPumpRef = useRef(isWaterPumpOn);
+    const isWaterInitializedRef = useRef(false);
+
+    // Initialize water states from AsyncStorage and RVStateManager on mount (similar to Vents.jsx pattern)
+    useEffect(() => {
+        const initializeWaterState = async () => {
+            try {
+                // First try to load from AsyncStorage
+                const savedWaterHeater = await AsyncStorage.getItem('waterHeaterState');
+                const savedWaterPump = await AsyncStorage.getItem('waterPumpState');
+
+                if (savedWaterHeater != null) {
+                    const state = JSON.parse(savedWaterHeater);
+                    setWaterHeaterOn(state);
+                    setIsOn(state); // Sync with fresh water tank heater state
+                    prevWaterHeaterRef.current = state;
+                    rvStateManager.updateState('water', {
+                        heaterOn: { isOn: state, lastUpdated: new Date().toISOString() }
+                    });
+                }
+                if (savedWaterPump != null) {
+                    const state = JSON.parse(savedWaterPump);
+                    setWaterPumpOn(state);
+                    prevWaterPumpRef.current = state;
+                    rvStateManager.updateState('water', {
+                        pumpOn: { isOn: state, lastUpdated: new Date().toISOString() }
+                    });
+                }
+
+                // Also check RVStateManager in case it has newer data
+                const waterState = rvStateManager.getCategoryState('water');
+                if (waterState.heaterOn?.isOn !== undefined && savedWaterHeater == null) {
+                    setWaterHeaterOn(waterState.heaterOn.isOn);
+                    setIsOn(waterState.heaterOn.isOn); // Sync with fresh water tank heater state
+                    prevWaterHeaterRef.current = waterState.heaterOn.isOn;
+                }
+                if (waterState.pumpOn?.isOn !== undefined && savedWaterPump == null) {
+                    setWaterPumpOn(waterState.pumpOn.isOn);
+                    prevWaterPumpRef.current = waterState.pumpOn.isOn;
+                }
+
+                isWaterInitializedRef.current = true;
+            } catch (error) {
+                console.error('Error initializing water state:', error);
+                isWaterInitializedRef.current = true;
+            }
+        };
+
+        initializeWaterState();
+    }, []);
+
+    // Subscribe to external water state changes (from Devices.jsx)
+    useEffect(() => {
+        const unsubscribe = rvStateManager.subscribeToExternalChanges((newState) => {
+            if (!isWaterInitializedRef.current) return; // Don't process until initialized
+
+            if (newState.water) {
+                // External water control changes handled silently
+                if (newState.water.heaterOn?.isOn !== undefined &&
+                    newState.water.heaterOn.isOn !== prevWaterHeaterRef.current) {
+                    console.log('MainScreen: External water heater change detected:', newState.water.heaterOn.isOn);
+                    setWaterHeaterOn(newState.water.heaterOn.isOn);
+                    prevWaterHeaterRef.current = newState.water.heaterOn.isOn;
+                    setIsOn(newState.water.heaterOn.isOn); // Sync with fresh water tank heater state
+                }
+
+                if (newState.water.pumpOn?.isOn !== undefined &&
+                    newState.water.pumpOn.isOn !== prevWaterPumpRef.current) {
+                    console.log('MainScreen: External water pump change detected:', newState.water.pumpOn.isOn);
+                    setWaterPumpOn(newState.water.pumpOn.isOn);
+                    prevWaterPumpRef.current = newState.water.pumpOn.isOn;
+                }
+            }
+        });
+
+        return unsubscribe;
+    }, []);
+
+    // Persist water state changes to AsyncStorage
+    useEffect(() => {
+        if (!isWaterInitializedRef.current) return; // Don't persist until initialized
+
+        const persistWaterState = async () => {
+            try {
+                await AsyncStorage.multiSet([
+                    ['waterHeaterState', JSON.stringify(isWaterHeaterOn)],
+                    ['waterPumpState', JSON.stringify(isWaterPumpOn)],
+                ]);
+            } catch (error) {
+                console.error('Error persisting water state:', error);
+            }
+        };
+
+        persistWaterState();
+
+        // Update refs to track current values
+        prevWaterHeaterRef.current = isWaterHeaterOn;
+        prevWaterPumpRef.current = isWaterPumpOn;
+    }, [isWaterHeaterOn, isWaterPumpOn]);
 
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState(null);
@@ -87,19 +186,25 @@ const MainScreen = () => {
         return true;
     };
 
-    // Handle water pump toggle with RV state management
+    // Handle water pump toggle with RVStateManager sync (similar to Vents.jsx toggleFan pattern)
     const handleWaterPumpToggle = async () => {
         if (!checkRVConnection()) return;
+        if (isLoading) return; // Prevent multiple concurrent requests
 
         setIsLoading(true);
-        const newState = !water.pumpOn;
+        const newState = !isWaterPumpOn;
 
         try {
-            // Update RV state immediately for responsive UI
-            rvStateManager.updateWaterState({
-                pumpOn: newState,
-                heaterOn: water.heaterOn,
-                lastUpdated: new Date().toISOString()
+            // Optimistic UI update
+            setWaterPumpOn(newState);
+            prevWaterPumpRef.current = newState;
+
+            // Update RV state manager for cross-screen sync
+            rvStateManager.updateState('water', {
+                pumpOn: {
+                    isOn: newState,
+                    lastUpdated: new Date().toISOString()
+                }
             });
 
             const result = await WaterService.toggleWaterPump();
@@ -107,11 +212,14 @@ const MainScreen = () => {
                 setErrorMessage(null);
                 console.log(`MainScreen: Water pump toggled to ${newState ? 'ON' : 'OFF'}`);
             } else {
-                // Revert on failure
-                rvStateManager.updateWaterState({
-                    pumpOn: !newState,
-                    heaterOn: water.heaterOn,
-                    lastUpdated: new Date().toISOString()
+                // Revert on error
+                setWaterPumpOn(!newState);
+                prevWaterPumpRef.current = !newState;
+                rvStateManager.updateState('water', {
+                    pumpOn: {
+                        isOn: !newState,
+                        lastUpdated: new Date().toISOString()
+                    }
                 });
 
                 // Only show non-connection errors
@@ -122,10 +230,14 @@ const MainScreen = () => {
             }
         } catch (error) {
             // Revert on error
-            rvStateManager.updateWaterState({
-                pumpOn: !newState,
-                heaterOn: water.heaterOn,
-                lastUpdated: new Date().toISOString()
+            const revertedState = !isWaterPumpOn;
+            setWaterPumpOn(revertedState);
+            prevWaterPumpRef.current = revertedState;
+            rvStateManager.updateState('water', {
+                pumpOn: {
+                    isOn: revertedState,
+                    lastUpdated: new Date().toISOString()
+                }
             });
 
             // Only show errors that aren't connection-related
@@ -138,35 +250,43 @@ const MainScreen = () => {
         }
     };
     
-    // Handle water heater toggle with RV state management
+    // Handle water heater toggle with RVStateManager sync (similar to Vents.jsx toggleFan pattern)
     const handleWaterHeaterToggle = async () => {
         if (!checkRVConnection()) return;
+        if (isLoading) return; // Prevent multiple concurrent requests
 
         setIsLoading(true);
-        const newState = !water.heaterOn;
+        const newState = !isWaterHeaterOn;
 
         try {
-            // Update RV state immediately for responsive UI
-            rvStateManager.updateWaterState({
-                heaterOn: newState,
-                pumpOn: water.pumpOn,
-                lastUpdated: new Date().toISOString()
-            });
-
+            // Optimistic UI update
+            setWaterHeaterOn(newState);
             setIsOn(newState); // Sync with fresh water tank heater state
+            prevWaterHeaterRef.current = newState;
+
+            // Update RV state manager for cross-screen sync
+            rvStateManager.updateState('water', {
+                heaterOn: {
+                    isOn: newState,
+                    lastUpdated: new Date().toISOString()
+                }
+            });
 
             const result = await WaterService.toggleWaterHeater();
             if (result.success) {
                 setErrorMessage(null);
                 console.log(`MainScreen: Water heater toggled to ${newState ? 'ON' : 'OFF'}`);
             } else {
-                // Revert on failure
-                rvStateManager.updateWaterState({
-                    heaterOn: !newState,
-                    pumpOn: water.pumpOn,
-                    lastUpdated: new Date().toISOString()
-                });
+                // Revert on error
+                setWaterHeaterOn(!newState);
                 setIsOn(!newState);
+                prevWaterHeaterRef.current = !newState;
+                rvStateManager.updateState('water', {
+                    heaterOn: {
+                        isOn: !newState,
+                        lastUpdated: new Date().toISOString()
+                    }
+                });
 
                 // Only show non-connection errors
                 if (!result.error.includes('connection') && !result.error.includes('network')) {
@@ -176,12 +296,16 @@ const MainScreen = () => {
             }
         } catch (error) {
             // Revert on error
-            rvStateManager.updateWaterState({
-                heaterOn: !newState,
-                pumpOn: water.pumpOn,
-                lastUpdated: new Date().toISOString()
+            const revertedState = !isWaterHeaterOn;
+            setWaterHeaterOn(revertedState);
+            setIsOn(revertedState);
+            prevWaterHeaterRef.current = revertedState;
+            rvStateManager.updateState('water', {
+                heaterOn: {
+                    isOn: revertedState,
+                    lastUpdated: new Date().toISOString()
+                }
             });
-            setIsOn(!newState);
 
             // Only show errors that aren't connection-related
             if (!error.message.includes('connection') && !error.message.includes('network') && !error.message.includes('timeout')) {
@@ -429,114 +553,32 @@ const MainScreen = () => {
 
                 <View className="flex-row justify-between items-start w-full mt-[-5] pb-2">
                 <View>
-                    <Text className="text-white mb-1" style={{fontFamily: FontFamily.latoBold}}>RV Tanks</Text>
-                    
-                    <View className="mt-5 space-y-2 mb-5">
-                    
-                  {/* Water Heater Button - Modern styling from first code */}
-                  <TouchableOpacity
-                    onPress={handleWaterHeaterToggle}
-                    disabled={isLoading}
-                    activeOpacity={0.8}
-                    style={[
-                      styles.modernButton,
-                      { marginBottom: 16 },
-                      isLoading && styles.buttonDisabled
-                    ]}
-                  >
-                    <LinearGradient
-                      colors={water.heaterOn 
-                        ? ["#FF6B6B", "#FF8E53", "#FF6B35"] 
-                        : ["#2C2C34", "#3A3A42", "#2C2C34"]
-                      }
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.modernGradientButton}
-                    >
-                      <View style={styles.buttonContent}>
-                        <View style={[
-                          styles.iconContainer,
-                          { backgroundColor: water.heaterOn ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)' }
-                        ]}>
-                          <Ionicons
-                            name={water.heaterOn ? "flame" : "flame-outline"}
-                            size={20}
-                            color={water.heaterOn ? "#FFF" : "#B0B0B0"}
-                          />
-                        </View>
-                        <View style={styles.textContainer}>
-                          <Text style={[
-                            styles.buttonTitle,
-                            { color: water.heaterOn ? "#FFF" : "#E0E0E0" }
-                          ]}>
-                            Water Heater
-                          </Text>
-                          <Text style={[
-                            styles.buttonSubtitle,
-                            { color: water.heaterOn ? "rgba(255,255,255,0.8)" : "#888" }
-                          ]}>
-                            {water.heaterOn ? "Heating" : "Off"}
-                          </Text>
-                        </View>
-                        <View style={[
-                          styles.statusIndicator,
-                          { backgroundColor: water.heaterOn ? "#4CAF50" : "#666" }
-                        ]} />
-                      </View>
-                    </LinearGradient>
-                  </TouchableOpacity>
+                    <Text className="text-white mb-3 text-lg" style={{fontFamily: FontFamily.latoBold}}>RV Tanks</Text>
 
-                  {/* Water Pump Button - Modern styling from first code */}
-                  <TouchableOpacity
-                    onPress={handleWaterPumpToggle}
-                    disabled={isLoading}
-                    activeOpacity={0.8}
-                    style={[
-                      styles.modernButton,
-                      isLoading && styles.buttonDisabled
-                    ]}
-                  >
-                    <LinearGradient
-                      colors={water.pumpOn 
-                        ? ["#4FC3F7", "#29B6F6", "#0288D1"] 
-                        : ["#2C2C34", "#3A3A42", "#2C2C34"]
-                      }
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.modernGradientButton}
-                    >
-                      <View style={styles.buttonContent}>
-                        <View style={[
-                          styles.iconContainer,
-                          { backgroundColor: water.pumpOn ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)' }
-                        ]}>
-                          <Ionicons
-                            name={water.pumpOn ? "water" : "water-outline"}
-                            size={20}
-                            color={water.pumpOn ? "#FFF" : "#B0B0B0"}
-                          />
-                        </View>
-                        <View style={styles.textContainer}>
-                          <Text style={[
-                            styles.buttonTitle,
-                            { color: water.pumpOn ? "#FFF" : "#E0E0E0" }
-                          ]}>
-                            Water Pump
-                          </Text>
-                          <Text style={[
-                            styles.buttonSubtitle,
-                            { color: water.pumpOn ? "rgba(255,255,255,0.8)" : "#888" }
-                          ]}>
-                            {water.pumpOn ? "Running" : "Off"}
-                          </Text>
-                        </View>
-                        <View style={[
-                          styles.statusIndicator,
-                          { backgroundColor: water.pumpOn ? "#4CAF50" : "#666" }
-                        ]} />
-                      </View>
-                    </LinearGradient>
-                  </TouchableOpacity>
+                    <Text className="text-white mb-2 text-sm" style={{fontFamily: FontFamily.latoRegular, opacity: 0.8}}>Water System</Text>
+                    <View className="mt-2 space-y-2 mb-5">
+
+                  <View style={{ width: 340, maxWidth: '100%' }}>
+  <WaterButton
+    type="heater"
+    isOn={isWaterHeaterOn}
+    onPress={handleWaterHeaterToggle}
+    loading={isLoading}
+    compact={false}              // tablet variant
+    style={{ alignSelf: 'stretch' }}
+    width={'70%'}
+  />
+  <WaterButton
+    type="pump"
+    isOn={isWaterPumpOn}
+    onPress={handleWaterPumpToggle}
+    loading={isLoading}
+    compact={false}
+    style={{ alignSelf: 'stretch' }}
+    width={'70%'}
+  />
+</View>
+
                     </View>
                 </View>
 
@@ -1022,6 +1064,7 @@ const styles = {
         alignItems: 'center',
         paddingHorizontal: 4,
         marginTop: 35,
+        right:105   ,
     },
     tanksSectionTitle: {
         color: 'white',
@@ -1035,7 +1078,7 @@ const styles = {
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        gap: 8,
+        
         flexWrap: 'wrap',
         maxWidth: '100%',
     },

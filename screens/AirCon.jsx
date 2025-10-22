@@ -21,18 +21,12 @@ import temperatureMonitoringService from "../Service/TemperatureMonitoringServic
 // Import climate services
 import { ClimateService } from '../API/RVControlServices';
 
-// Import HeaterControlModal for fan speed
-import HeaterControlModal from "../components/HeaterControlModal";
-
 const AirCon = ({ onClose }) => {
   const isTablet = useScreenSize();
 
   // Use RV state management hook for climate data
   const { climate, toggleFurnace, toggleNightMode, toggleDehumidifyMode } = useRVClimate();
 
-  // State for fan speed modal
-  const [isFanSpeedModalVisible, setFanSpeedModalVisible] = useState(false);
-  
   // Get initial temperature from RV state BEFORE rendering to prevent flash
   const getInitialTemp = () => {
     try {
@@ -610,6 +604,7 @@ const AirCon = ({ onClose }) => {
 
         {/* Climate Control Buttons - Row 2 */}
         <View style={styles.buttonsContainer}>
+          <View style={{ flex: 0.25 }} />
           <TouchableOpacity
             style={[
               styles.button,
@@ -627,22 +622,7 @@ const AirCon = ({ onClose }) => {
             />
             <Text style={[styles.buttonText, climate.heatingOn && styles.activeButtonText]}>Furnace</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.button,
-              isProcessing ? styles.disabledButton : null
-            ]}
-            onPress={() => setFanSpeedModalVisible(true)}
-            disabled={isProcessing}
-          >
-            <Ionicons
-              name="options-outline"
-              size={18}
-              color="#ffffff"
-              style={{ marginRight: 6 }}
-            />
-            <Text style={styles.buttonText}>Fan Speed</Text>
-          </TouchableOpacity>
+          <View style={{ flex: 0.25 }} />
         </View>
 
         {/* Climate Control Buttons - Row 3 */}
@@ -685,12 +665,6 @@ const AirCon = ({ onClose }) => {
           </TouchableOpacity>
         </View>
 
-        {/* Fan Speed Modal */}
-        <HeaterControlModal
-          isVisible={isFanSpeedModalVisible}
-          onClose={() => setFanSpeedModalVisible(false)}
-        />
-        
         {/* Status message */}
         {showStatus && (
           <View style={styles.statusContainer}>

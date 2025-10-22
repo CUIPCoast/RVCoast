@@ -326,20 +326,16 @@ class RVStateManager {
       if (instance === 44) { // Water pump (0x2C)
         const isOn = data[2] && parseInt(data[2], 16) > 0;
         console.log(`RVStateManager: Water pump ${isOn ? 'ON' : 'OFF'} from CAN`);
-        // CRITICAL: Preserve heater state when updating pump
-        const currentWaterState = this.getCategoryState('water');
+        // Only update pump state, don't touch heater
         this.updateWaterState({
-          pumpOn: isOn,
-          heaterOn: currentWaterState.heaterOn || false
+          pumpOn: isOn
         });
       } else if (instance === 43) { // Water heater (0x2B)
         const isOn = data[2] && parseInt(data[2], 16) > 0;
         console.log(`RVStateManager: Water heater ${isOn ? 'ON' : 'OFF'} from CAN`);
-        // CRITICAL: Preserve pump state when updating heater
-        const currentWaterState = this.getCategoryState('water');
+        // Only update heater state, don't touch pump
         this.updateWaterState({
-          heaterOn: isOn,
-          pumpOn: currentWaterState.pumpOn || false
+          heaterOn: isOn
         });
       } else {
         // Check for light commands
@@ -625,27 +621,42 @@ class RVStateManager {
   // Update a specific category of state
   updateState(category, data) {
     if (this.updatingState) return;
-    
+
     this.updatingState = true;
-    
-    // Update the state
-    this.state[category] = {
-      ...this.state[category],
+
+    // Ensure the category exists as an object
+    if (!this.state[category]) {
+      this.state[category] = {};
+    }
+
+    // Create a new merged state object for the category
+    const updatedCategoryState = {
+      ...(this.state[category] || {}),
       ...data
     };
-    
-    // Update timestamp
-    this.state.lastUpdate = new Date().toISOString();
-    
+
+    // Create a completely new state object to ensure React detects the change
+    this.state = {
+      ...this.state,
+      [category]: updatedCategoryState,
+      lastUpdate: new Date().toISOString()
+    };
+
+    console.log(`RVStateManager: updateState[${category}]`, this.state[category]);
+
     // Persist state to storage
     this.saveState();
-    
+
     // Broadcast change to other devices
-    this.broadcastStateChange(category, data);
-    
-    // Notify local listeners
-    this.events.emit('stateChange', { category, data, state: this.state });
-    
+    this.broadcastStateChange(category, updatedCategoryState);
+
+    // Notify local listeners with the new state
+    this.events.emit('stateChange', {
+      category,
+      data: updatedCategoryState,
+      state: this.state
+    });
+
     this.updatingState = false;
   }
   
@@ -669,7 +680,21 @@ class RVStateManager {
   
   // Update water system state
   updateWaterState(data) {
-    this.updateState('water', data);
+    // Get current water state to preserve existing properties
+    const currentWaterState = this.getCategoryState('water');
+
+    // Merge with new data
+    const mergedData = {
+      ...currentWaterState,
+      ...data
+    };
+
+    console.log('RVStateManager: updateWaterState called');
+    console.log('  Current water state:', currentWaterState);
+    console.log('  New data:', data);
+    console.log('  Merged data:', mergedData);
+
+    this.updateState('water', mergedData);
   }
   
   // Broadcast state change to other devices
@@ -727,7 +752,7 @@ class RVStateManager {
   
   // Get state for a specific category
   getCategoryState(category) {
-    return { ...this.state[category] };
+    return { ...(this.state[category] || {}) };
   }
   
   // Subscribe to state changes

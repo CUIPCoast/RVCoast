@@ -168,7 +168,7 @@ const System = () => {
           </GlowingCard>
 
           <View collapsable={false} key="victron-container">
-            <GlowingCard glowColor="#6CB4EE" style={styles.cardWrapper}>
+            <GlowingCard glowColor="#6CB4EE" >
               <Image
                 source={victronImageSource}
                 style={styles.blueCard}
@@ -683,3 +683,4 @@ pagerDotActive: {
 });
 
 export default System;
+

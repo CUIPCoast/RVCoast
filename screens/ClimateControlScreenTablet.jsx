@@ -173,24 +173,36 @@ const ClimateControlScreenTablet = () => {
           setLastTemp(roundedTemp);
           lastSentTempRef.current = roundedTemp;
         }
-        
+
         // External climate control changes handled silently
         if (newState.climate.coolingOn !== undefined && newState.climate.coolingOn !== isCoolToggled) {
           setIsCoolToggled(newState.climate.coolingOn);
         }
-        
+
         if (newState.climate.toeKickOn !== undefined && newState.climate.toeKickOn !== isToekickToggled) {
           setIsToekickToggled(newState.climate.toeKickOn);
         }
-        
+
         if (newState.climate.heatingOn !== undefined && newState.climate.heatingOn !== isFurnaceToggled) {
           setIsFurnaceToggled(newState.climate.heatingOn);
         }
+
+        // Fan speed synchronization from mobile
+        if (newState.climate.fanSpeed !== undefined && newState.climate.fanSpeed !== speed) {
+          console.log('ClimateControl: External fan speed change detected:', newState.climate.fanSpeed);
+          setSpeed(newState.climate.fanSpeed);
+        }
+
+        // Auto mode synchronization from mobile
+        if (newState.climate.autoMode !== undefined && newState.climate.autoMode !== isAutoModeActive) {
+          console.log('ClimateControl: External auto mode change detected:', newState.climate.autoMode);
+          setIsAutoModeActive(newState.climate.autoMode);
+        }
       }
     });
-    
+
     return unsubscribe;
-  }, [temp, isCoolToggled, isToekickToggled, isFurnaceToggled]);
+  }, [temp, isCoolToggled, isToekickToggled, isFurnaceToggled, speed, isAutoModeActive]);
 
   // Handle temperature change from RadialSlider with improved responsiveness
   const handleTempChange = (newTemp) => {
@@ -526,26 +538,35 @@ const ClimateControlScreenTablet = () => {
   };
 
   // Handle fan speed button press
-  const handleFanSpeedPress = async (speed) => {
+  const handleFanSpeedPress = async (speedValue) => {
+    // Prevent clicking the same button
+    if (speedValue === 'Auto' && isAutoModeActive) return;
+    if (speedValue !== 'Auto' && speed === speedValue && !isAutoModeActive) return;
+
     setIsLoading(true);
     const previousSpeed = speed;
-    
+    const previousAutoMode = isAutoModeActive;
+
     try {
-      rvStateManager.updateClimateState({ 
-        fanSpeed: speed,
-        autoMode: speed === "Auto",
-        lastUpdated: new Date().toISOString()
-      });
-      setSpeed(speed);
-      if (speed === "Auto") {
+      // Update local state immediately - clear old state first
+      if (speedValue === "Auto") {
         setIsAutoModeActive(true);
+        setSpeed(null); // Clear manual speed when auto is active
       } else {
         setIsAutoModeActive(false);
+        setSpeed(speedValue);
       }
-      
+
+      // Update RV state manager
+      rvStateManager.updateClimateState({
+        fanSpeed: speedValue,
+        autoMode: speedValue === "Auto",
+        lastUpdated: new Date().toISOString()
+      });
+
       let result;
-      
-      switch (speed) {
+
+      switch (speedValue) {
         case "Low":
           result = await setLowFanSpeed();
           break;
@@ -559,45 +580,47 @@ const ClimateControlScreenTablet = () => {
           result = await setAutoMode();
           break;
         default:
-          setErrorMessage(`Unknown fan speed: ${speed}`);
+          setErrorMessage(`Unknown fan speed: ${speedValue}`);
           setIsLoading(false);
           return;
       }
-      
+
       if (result && result.success) {
-        await AsyncStorage.setItem('fanSpeed', speed);
-        await AsyncStorage.setItem('autoModeState', JSON.stringify(speed === "Auto"));
-        
+        await AsyncStorage.setItem('fanSpeed', speedValue);
+        await AsyncStorage.setItem('autoModeState', JSON.stringify(speedValue === "Auto"));
+
         setErrorMessage(null);
-        
-        setStatusMessage(`Fan speed set to ${speed}`);
+
+        setStatusMessage(`Fan speed set to ${speedValue}`);
         setShowStatus(true);
         setTimeout(() => setShowStatus(false), 3000);
       } else if (result) {
-        rvStateManager.updateClimateState({ 
+        // Revert state on failure
+        rvStateManager.updateClimateState({
           fanSpeed: previousSpeed,
-          autoMode: previousSpeed === "Auto",
+          autoMode: previousAutoMode,
           lastUpdated: new Date().toISOString()
         });
         setSpeed(previousSpeed);
-        setIsAutoModeActive(previousSpeed === "Auto");
-        
+        setIsAutoModeActive(previousAutoMode);
+
         setErrorMessage(`Error setting fan speed: ${result.error}`);
-        setStatusMessage(`Failed to set fan speed to ${speed}`);
+        setStatusMessage(`Failed to set fan speed to ${speedValue}`);
         setShowStatus(true);
         setTimeout(() => setShowStatus(false), 3000);
       }
     } catch (error) {
-      rvStateManager.updateClimateState({ 
+      // Revert state on error
+      rvStateManager.updateClimateState({
         fanSpeed: previousSpeed,
-        autoMode: previousSpeed === "Auto",
+        autoMode: previousAutoMode,
         lastUpdated: new Date().toISOString()
       });
       setSpeed(previousSpeed);
-      setIsAutoModeActive(previousSpeed === "Auto");
-      
+      setIsAutoModeActive(previousAutoMode);
+
       setErrorMessage(`Unexpected error: ${error.message}`);
-      setStatusMessage(`Failed to set fan speed to ${speed}`);
+      setStatusMessage(`Failed to set fan speed to ${speedValue}`);
       setShowStatus(true);
       setTimeout(() => setShowStatus(false), 3000);
     } finally {
@@ -1087,30 +1110,30 @@ const ClimateControlScreenTablet = () => {
                             contentContainerStyle={styles.fanSpeedScrollContent}
                             showsVerticalScrollIndicator={false}
                           >
-                            <FanSpeedButton 
-                              speed="High" 
-                              onPress={() => handleFanSpeedPress("High")} 
+                            <FanSpeedButton
+                              speed="High"
+                              onPress={() => handleFanSpeedPress("High")}
                               isLoading={isLoading}
-                              isActive={speed === "High"}
+                              isActive={speed === "High" && !isAutoModeActive}
                             />
-                            
-                            <FanSpeedButton 
-                              speed="Med" 
-                              onPress={() => handleFanSpeedPress("Med")} 
+
+                            <FanSpeedButton
+                              speed="Med"
+                              onPress={() => handleFanSpeedPress("Med")}
                               isLoading={isLoading}
-                              isActive={speed === "Med"}
+                              isActive={speed === "Med" && !isAutoModeActive}
                             />
-                            
-                            <FanSpeedButton 
-                              speed="Low" 
-                              onPress={() => handleFanSpeedPress("Low")} 
+
+                            <FanSpeedButton
+                              speed="Low"
+                              onPress={() => handleFanSpeedPress("Low")}
                               isLoading={isLoading}
-                              isActive={speed === "Low"}
+                              isActive={speed === "Low" && !isAutoModeActive}
                             />
-                            
-                            <FanSpeedButton 
-                              speed="Auto" 
-                              onPress={() => handleFanSpeedPress("Auto")} 
+
+                            <FanSpeedButton
+                              speed="Auto"
+                              onPress={() => handleFanSpeedPress("Auto")}
                               isLoading={isLoading}
                               isActive={isAutoModeActive}
                             />

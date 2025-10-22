@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { StyleSheet, View, Text, Pressable, TouchableOpacity, Image, ScrollView, Modal, Button, ActivityIndicator, Animated } from "react-native";
 import SimpleHoldToDimLight from "../components/SimpleHoldToDimLight.jsx";
 
@@ -12,6 +12,7 @@ import MasterLightControl from "../components/MasterLightControl.jsx";
 import { Feather as Icon } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import FanButton from "../components/FanButton";
+import WaterButton from "../components/WaterButton";
 
 
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -92,32 +93,162 @@ const Devices = () => {
   
   // Use RV State Management hooks
   const { lights, toggleLight, setLightBrightness: updateLightBrightness, turnAllLightsOn, turnAllLightsOff } = useRVLights();
-  const { water, toggleWaterPump, toggleWaterHeater } = useRVWater();
 
-  // Fan control states using RV state manager
+  // Water button states with RVStateManager for cross-screen sync (similar to Vents.jsx pattern)
+  const [isWaterHeaterOn, setWaterHeaterOn] = useState(false);
+  const [isWaterPumpOn, setWaterPumpOn] = useState(false);
+
+  // Use refs to track previous values and prevent unnecessary effects
+  const prevWaterHeaterRef = useRef(false);
+  const prevWaterPumpRef = useRef(false);
+  const isWaterInitializedRef = useRef(false);
+
+  // Initialize water states from AsyncStorage and RVStateManager on mount (similar to Vents.jsx pattern)
+  useEffect(() => {
+    const initializeWaterState = async () => {
+      try {
+        // First try to load from AsyncStorage
+        const savedWaterHeater = await AsyncStorage.getItem('waterHeaterState');
+        const savedWaterPump = await AsyncStorage.getItem('waterPumpState');
+
+        if (savedWaterHeater != null) {
+          const state = JSON.parse(savedWaterHeater);
+          setWaterHeaterOn(state);
+          prevWaterHeaterRef.current = state;
+          rvStateManager.updateState('water', {
+            heaterOn: { isOn: state, lastUpdated: new Date().toISOString() }
+          });
+        }
+        if (savedWaterPump != null) {
+          const state = JSON.parse(savedWaterPump);
+          setWaterPumpOn(state);
+          prevWaterPumpRef.current = state;
+          rvStateManager.updateState('water', {
+            pumpOn: { isOn: state, lastUpdated: new Date().toISOString() }
+          });
+        }
+
+        // Also check RVStateManager in case it has newer data
+        const waterState = rvStateManager.getCategoryState('water');
+        if (waterState.heaterOn?.isOn !== undefined && savedWaterHeater == null) {
+          setWaterHeaterOn(waterState.heaterOn.isOn);
+          prevWaterHeaterRef.current = waterState.heaterOn.isOn;
+        }
+        if (waterState.pumpOn?.isOn !== undefined && savedWaterPump == null) {
+          setWaterPumpOn(waterState.pumpOn.isOn);
+          prevWaterPumpRef.current = waterState.pumpOn.isOn;
+        }
+
+        isWaterInitializedRef.current = true;
+      } catch (error) {
+        console.error('Error initializing water state:', error);
+        isWaterInitializedRef.current = true;
+      }
+    };
+
+    initializeWaterState();
+  }, []);
+
+  // Subscribe to external water state changes (from MainScreen.jsx)
+  useEffect(() => {
+    const unsubscribe = rvStateManager.subscribeToExternalChanges((newState) => {
+      if (!isWaterInitializedRef.current) return; // Don't process until initialized
+
+      if (newState.water) {
+        // External water control changes handled silently
+        if (newState.water.heaterOn?.isOn !== undefined &&
+            newState.water.heaterOn.isOn !== prevWaterHeaterRef.current) {
+          console.log('Devices: External water heater change detected:', newState.water.heaterOn.isOn);
+          setWaterHeaterOn(newState.water.heaterOn.isOn);
+          prevWaterHeaterRef.current = newState.water.heaterOn.isOn;
+        }
+
+        if (newState.water.pumpOn?.isOn !== undefined &&
+            newState.water.pumpOn.isOn !== prevWaterPumpRef.current) {
+          console.log('Devices: External water pump change detected:', newState.water.pumpOn.isOn);
+          setWaterPumpOn(newState.water.pumpOn.isOn);
+          prevWaterPumpRef.current = newState.water.pumpOn.isOn;
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, []);
+
+  // Persist water state changes to AsyncStorage
+  useEffect(() => {
+    if (!isWaterInitializedRef.current) return; // Don't persist until initialized
+
+    const persistWaterState = async () => {
+      try {
+        await AsyncStorage.multiSet([
+          ['waterHeaterState', JSON.stringify(isWaterHeaterOn)],
+          ['waterPumpState', JSON.stringify(isWaterPumpOn)],
+        ]);
+      } catch (error) {
+        console.error('Error persisting water state:', error);
+      }
+    };
+
+    persistWaterState();
+
+    // Update refs to track current values
+    prevWaterHeaterRef.current = isWaterHeaterOn;
+    prevWaterPumpRef.current = isWaterPumpOn;
+  }, [isWaterHeaterOn, isWaterPumpOn]);
+
+  // Fan control states with RVStateManager for cross-screen sync
   const [isBathroomFanOn, setBathroomFanOn] = useState(false);
   const [isBayVentFanOn, setBayVentFanOn] = useState(false);
 
-  // Initialize fan states from RV state manager
+  // Use refs to track previous values and prevent unnecessary effects
+  const prevBathroomFanRef = useRef(isBathroomFanOn);
+  const prevBayVentFanRef = useRef(isBayVentFanOn);
+  const isVentInitializedRef = useRef(false);
+
+  // Initialize vent fan states from RVStateManager on mount
   useEffect(() => {
-    const fanState = rvStateManager.getCategoryState('fans');
-    if (fanState.bathroomFan !== undefined) {
-      setBathroomFanOn(fanState.bathroomFan);
-    }
-    if (fanState.bayVentFan !== undefined) {
-      setBayVentFanOn(fanState.bayVentFan);
-    }
+    const initializeVentState = async () => {
+      try {
+        const fanState = rvStateManager.getCategoryState('fans');
+
+        if (fanState.bathroomFan?.isOn !== undefined) {
+          setBathroomFanOn(fanState.bathroomFan.isOn);
+          prevBathroomFanRef.current = fanState.bathroomFan.isOn;
+        }
+        if (fanState.bayVentFan?.isOn !== undefined) {
+          setBayVentFanOn(fanState.bayVentFan.isOn);
+          prevBayVentFanRef.current = fanState.bayVentFan.isOn;
+        }
+        isVentInitializedRef.current = true;
+      } catch (error) {
+        console.error('Error initializing vent fan state:', error);
+        isVentInitializedRef.current = true;
+      }
+    };
+
+    initializeVentState();
   }, []);
 
-  // Subscribe to fan state changes
+  // Subscribe to external vent fan state changes (from Vents.jsx)
   useEffect(() => {
-    const unsubscribe = rvStateManager.subscribe(({ category, state }) => {
-      if (category === 'fans') {
-        if (state.fans.bathroomFan !== undefined) {
-          setBathroomFanOn(state.fans.bathroomFan);
+    const unsubscribe = rvStateManager.subscribeToExternalChanges((newState) => {
+      if (!isVentInitializedRef.current) return; // Don't process until initialized
+
+      if (newState.fans) {
+        // External fan control changes handled silently
+        if (newState.fans.bathroomFan?.isOn !== undefined &&
+            newState.fans.bathroomFan.isOn !== prevBathroomFanRef.current) {
+          console.log('Devices: External bathroom fan change detected:', newState.fans.bathroomFan.isOn);
+          setBathroomFanOn(newState.fans.bathroomFan.isOn);
+          prevBathroomFanRef.current = newState.fans.bathroomFan.isOn;
         }
-        if (state.fans.bayVentFan !== undefined) {
-          setBayVentFanOn(state.fans.bayVentFan);
+
+        if (newState.fans.bayVentFan?.isOn !== undefined &&
+            newState.fans.bayVentFan.isOn !== prevBayVentFanRef.current) {
+          console.log('Devices: External bay vent fan change detected:', newState.fans.bayVentFan.isOn);
+          setBayVentFanOn(newState.fans.bayVentFan.isOn);
+          prevBayVentFanRef.current = newState.fans.bayVentFan.isOn;
         }
       }
     });
@@ -311,16 +442,23 @@ const Devices = () => {
   };
 
   // Handle bathroom fan toggle with API integration
+  // Handle bathroom fan toggle with RVStateManager sync
   const toggleBathroomFan = async () => {
     try {
       setIsLoading(true);
       const newState = !isBathroomFanOn;
 
-      // Update state first for immediate UI feedback
+      // Optimistic UI update
       setBathroomFanOn(newState);
+      prevBathroomFanRef.current = newState;
 
-      // Update RV state manager
-      rvStateManager.updateState('fans', { bathroomFan: newState });
+      // Update RV state manager for cross-screen sync
+      rvStateManager.updateState('fans', {
+        bathroomFan: {
+          isOn: newState,
+          lastUpdated: new Date().toISOString()
+        }
+      });
 
       const result = await FanService.toggleBathroomFan();
 
@@ -332,9 +470,15 @@ const Devices = () => {
       } else {
         console.error('Failed to toggle bathroom fan:', result.error);
 
-        // Revert state on error
+        // Revert on error
         setBathroomFanOn(!newState);
-        rvStateManager.updateState('fans', { bathroomFan: !newState });
+        prevBathroomFanRef.current = !newState;
+        rvStateManager.updateState('fans', {
+          bathroomFan: {
+            isOn: !newState,
+            lastUpdated: new Date().toISOString()
+          }
+        });
 
         // Show error message
         setStatusMessage('Failed to toggle bathroom fan');
@@ -344,10 +488,16 @@ const Devices = () => {
     } catch (error) {
       console.error('Error toggling bathroom fan:', error);
 
-      // Revert state on error
+      // Revert on error
       const revertedState = !isBathroomFanOn;
       setBathroomFanOn(revertedState);
-      rvStateManager.updateState('fans', { bathroomFan: revertedState });
+      prevBathroomFanRef.current = revertedState;
+      rvStateManager.updateState('fans', {
+        bathroomFan: {
+          isOn: revertedState,
+          lastUpdated: new Date().toISOString()
+        }
+      });
 
       // Show error message
       setStatusMessage(`Error: ${error.message}`);
@@ -358,17 +508,23 @@ const Devices = () => {
     }
   };
   
-  // Handle bay vent fan toggle with API integration
+  // Handle bay vent fan toggle with RVStateManager sync
   const toggleBayVentFan = async () => {
     try {
       setIsLoading(true);
       const newState = !isBayVentFanOn;
 
-      // Update state first for immediate UI feedback
+      // Optimistic UI update
       setBayVentFanOn(newState);
+      prevBayVentFanRef.current = newState;
 
-      // Update RV state manager
-      rvStateManager.updateState('fans', { bayVentFan: newState });
+      // Update RV state manager for cross-screen sync
+      rvStateManager.updateState('fans', {
+        bayVentFan: {
+          isOn: newState,
+          lastUpdated: new Date().toISOString()
+        }
+      });
 
       const result = await FanService.toggleBayVentFan();
 
@@ -380,9 +536,15 @@ const Devices = () => {
       } else {
         console.error('Failed to toggle bay vent fan:', result.error);
 
-        // Revert state on error
+        // Revert on error
         setBayVentFanOn(!newState);
-        rvStateManager.updateState('fans', { bayVentFan: !newState });
+        prevBayVentFanRef.current = !newState;
+        rvStateManager.updateState('fans', {
+          bayVentFan: {
+            isOn: !newState,
+            lastUpdated: new Date().toISOString()
+          }
+        });
 
         // Show error message
         setStatusMessage('Failed to toggle bay vent fan');
@@ -392,10 +554,16 @@ const Devices = () => {
     } catch (error) {
       console.error('Error toggling bay vent fan:', error);
 
-      // Revert state on error
+      // Revert on error
       const revertedState = !isBayVentFanOn;
       setBayVentFanOn(revertedState);
-      rvStateManager.updateState('fans', { bayVentFan: revertedState });
+      prevBayVentFanRef.current = revertedState;
+      rvStateManager.updateState('fans', {
+        bayVentFan: {
+          isOn: revertedState,
+          lastUpdated: new Date().toISOString()
+        }
+      });
 
       // Show error message
       setStatusMessage(`Error: ${error.message}`);
@@ -406,79 +574,125 @@ const Devices = () => {
     }
   };
   
-  // Water heater toggle with RV state management
-  // Water heater toggle with improved state management
-const handleWaterHeaterToggle = async () => {
-  setIsLoading(true);
+  // Water heater toggle with RVStateManager sync (similar to Vents.jsx toggleFan pattern)
+  const handleWaterHeaterToggle = async () => {
+    if (isLoading) return; // Prevent multiple concurrent requests
 
-  try {
-    // Get current state directly from the hook
-    const currentState = water.heaterOn;
-    const newState = !currentState;
+    setIsLoading(true);
+    const newState = !isWaterHeaterOn;
 
-    console.log(`Water heater toggle: ${currentState} -> ${newState}`);
+    try {
+      // Optimistic UI update
+      setWaterHeaterOn(newState);
+      prevWaterHeaterRef.current = newState;
 
-    // Call the API first
-    const result = await WaterService.toggleWaterHeater();
-
-    if (result.success) {
-      // Update RV state after successful API call - preserve pumpOn state
-      rvStateManager.updateWaterState({
-        heaterOn: newState,
-        pumpOn: water.pumpOn, // Preserve the pump state
-        lastUpdated: new Date().toISOString()
+      // Update RV state manager for cross-screen sync
+      rvStateManager.updateState('water', {
+        heaterOn: {
+          isOn: newState,
+          lastUpdated: new Date().toISOString()
+        }
       });
 
-      setStatusMessage(`Water heater ${newState ? 'turned on' : 'turned off'}`);
-    } else {
-      console.error('Failed to toggle water heater:', result.error);
-      setStatusMessage('Failed to toggle water heater');
-    }
-  } catch (e) {
-    console.error('Error toggling water heater:', e);
-    setStatusMessage(`Error: ${e.message}`);
-  } finally {
-    setShowStatus(true);
-    setTimeout(() => setShowStatus(false), 3000);
-    setIsLoading(false);
-  }
-};
+      // Call the API
+      const result = await WaterService.toggleWaterHeater();
 
+      if (result.success) {
+        setStatusMessage(`Water heater ${newState ? 'turned on' : 'turned off'}`);
+      } else {
+        // Revert on error
+        setWaterHeaterOn(!newState);
+        prevWaterHeaterRef.current = !newState;
+        rvStateManager.updateState('water', {
+          heaterOn: {
+            isOn: !newState,
+            lastUpdated: new Date().toISOString()
+          }
+        });
+
+        console.error('Failed to toggle water heater:', result.error);
+        setStatusMessage('Failed to toggle water heater');
+      }
+    } catch (e) {
+      // Revert on error
+      const revertedState = !isWaterHeaterOn;
+      setWaterHeaterOn(revertedState);
+      prevWaterHeaterRef.current = revertedState;
+      rvStateManager.updateState('water', {
+        heaterOn: {
+          isOn: revertedState,
+          lastUpdated: new Date().toISOString()
+        }
+      });
+
+      console.error('Error toggling water heater:', e);
+      setStatusMessage(`Error: ${e.message}`);
+    } finally {
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
+      setIsLoading(false);
+    }
+  };
+
+  // Water pump toggle with RVStateManager sync (similar to Vents.jsx toggleFan pattern)
   const handleWaterPumpToggle = async () => {
-  setIsLoading(true);
+    if (isLoading) return; // Prevent multiple concurrent requests
 
-  try {
-    // Get current state directly from the hook
-    const currentState = water.pumpOn;
-    const newState = !currentState;
+    setIsLoading(true);
+    const newState = !isWaterPumpOn;
 
-    console.log(`Water pump toggle: ${currentState} -> ${newState}`);
+    try {
+      // Optimistic UI update
+      setWaterPumpOn(newState);
+      prevWaterPumpRef.current = newState;
 
-    // Call the API first
-    const result = await WaterService.toggleWaterPump();
-
-    if (result.success) {
-      // Update RV state after successful API call - preserve heaterOn state
-      rvStateManager.updateWaterState({
-        pumpOn: newState,
-        heaterOn: water.heaterOn, // Preserve the heater state
-        lastUpdated: new Date().toISOString()
+      // Update RV state manager for cross-screen sync
+      rvStateManager.updateState('water', {
+        pumpOn: {
+          isOn: newState,
+          lastUpdated: new Date().toISOString()
+        }
       });
 
-      setStatusMessage(`Water pump ${newState ? 'turned on' : 'turned off'}`);
-    } else {
-      console.error('Failed to toggle water pump:', result.error);
-      setStatusMessage('Failed to toggle water pump');
+      // Call the API
+      const result = await WaterService.toggleWaterPump();
+
+      if (result.success) {
+        setStatusMessage(`Water pump ${newState ? 'turned on' : 'turned off'}`);
+      } else {
+        // Revert on error
+        setWaterPumpOn(!newState);
+        prevWaterPumpRef.current = !newState;
+        rvStateManager.updateState('water', {
+          pumpOn: {
+            isOn: !newState,
+            lastUpdated: new Date().toISOString()
+          }
+        });
+
+        console.error('Failed to toggle water pump:', result.error);
+        setStatusMessage('Failed to toggle water pump');
+      }
+    } catch (e) {
+      // Revert on error
+      const revertedState = !isWaterPumpOn;
+      setWaterPumpOn(revertedState);
+      prevWaterPumpRef.current = revertedState;
+      rvStateManager.updateState('water', {
+        pumpOn: {
+          isOn: revertedState,
+          lastUpdated: new Date().toISOString()
+        }
+      });
+
+      console.error('Error toggling water pump:', e);
+      setStatusMessage(`Error: ${e.message}`);
+    } finally {
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
+      setIsLoading(false);
     }
-  } catch (e) {
-    console.error('Error toggling water pump:', e);
-    setStatusMessage(`Error: ${e.message}`);
-  } finally {
-    setShowStatus(true);
-    setTimeout(() => setShowStatus(false), 3000);
-    setIsLoading(false);
-  }
-};
+  };
 
   // Master light toggle handler - updated to use LightControlService like LightScreenTablet
   const handleMasterLightToggle = async (isOn) => {
@@ -590,85 +804,21 @@ const handleWaterHeaterToggle = async () => {
       return (
         <>
         {/* ───── Water Controls (Bedroom Tab) ───── */}
-         <View style={styles.fanControlsContainer}>
-            <TouchableOpacity
-              style={[
-                styles.modernWaterButton,
-                water.heaterOn
-                  ? styles.waterButtonActive
-                  : styles.waterButtonInactive,
-                isLoading && styles.disabledButton,
-              ]}
-              onPress={handleWaterHeaterToggle}
-              disabled={isLoading}
-            >
-             <View style={styles.waterIconContainer}>
-              <View
-                style={[
-                  styles.waterIconCircle,
-                  water.heaterOn
-                    ? styles.waterIconCircleActive
-                    : styles.waterIconCircleInactive,
-                ]}
-              >
-                <Ionicons
-                  name="water"
-                  size={28}
-                  color={water.heaterOn ? '#FFF' : '#666'}
-                />
-              </View>
-             </View>
-
-             <Text style={[styles.waterButtonLabel, { color: water.heaterOn ? '#FFF' : '#CCC' }]}>
-               Water Heater
-             </Text>
-             <View style={[
-               styles.waterStatusIndicator, 
-               water.heaterOn ? styles.waterStatusActive : styles.waterStatusInactive
-             ]}>
-               <Text style={[styles.waterStatusText, { color: water.heaterOn ? '#FFF' : '#888' }]}>
-                 {water.heaterOn ? 'ON' : 'OFF'}
-               </Text>
-             </View>
-           </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[
-                styles.modernWaterButton,
-                water.pumpOn
-                  ? styles.waterButtonActive
-                  : styles.waterButtonInactive,
-                isLoading && styles.disabledButton,
-              ]}
-              onPress={handleWaterPumpToggle}
-              disabled={isLoading}
-            >
-             <View style={styles.waterIconContainer}>
-               <View style={[
-                 styles.waterIconCircle,
-                 water.pumpOn
-                   ? styles.waterIconCircleActive
-                   : styles.waterIconCircleInactive
-               ]}>
-                 <Ionicons
-                   name="sync"
-                   size={28}
-                   color={water.pumpOn ? '#FFF' : '#666'}
-                 />
-               </View>
-             </View>
-             <Text style={[styles.waterButtonLabel, { color: water.pumpOn ? '#FFF' : '#CCC' }]}>
-               Water Pump
-             </Text>
-             <View style={[
-               styles.waterStatusIndicator, 
-               water.pumpOn ? styles.waterStatusActive : styles.waterStatusInactive
-             ]}>
-               <Text style={[styles.waterStatusText, { color: water.pumpOn ? '#FFF' : '#888' }]}>
-                 {water.pumpOn ? 'ON' : 'OFF'}
-               </Text>
-             </View>
-            </TouchableOpacity>
+         <View style={[styles.fanControlsContainer, { flexDirection: 'column', paddingHorizontal: 20 }]}>
+           <WaterButton
+             type="heater"
+             isOn={isWaterHeaterOn}
+             onPress={handleWaterHeaterToggle}
+             loading={isLoading}
+             compact={true}
+           />
+           <WaterButton
+             type="pump"
+             isOn={isWaterPumpOn}
+             onPress={handleWaterPumpToggle}
+             loading={isLoading}
+             compact={true}
+           />
          </View>
          
          <MasterLightControl 

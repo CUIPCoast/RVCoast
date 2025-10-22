@@ -21,22 +21,29 @@ export function useRVState() {
 
 // Hook to subscribe to a specific category of state
 export function useRVCategoryState(category) {
-  const [categoryState, setCategoryState] = useState(
+  const [categoryState, setCategoryState] = useState(() =>
     rvStateManager.getCategoryState(category)
   );
-  
+
   useEffect(() => {
     // Subscribe to state changes
     const unsubscribe = rvStateManager.subscribe(({ category: changedCategory, state }) => {
       // Only update if our category changed
       if (category === changedCategory) {
-        setCategoryState(state[category]);
+        const newCategoryState = state[category] || {};
+        console.log(`useRVCategoryState[${category}]: State update received`, newCategoryState);
+        // Force a new reference to ensure React detects the change
+        setCategoryState({ ...newCategoryState });
       }
     });
-    
+
+    // Also get initial state in case we missed updates
+    const currentState = rvStateManager.getCategoryState(category);
+    setCategoryState({ ...currentState });
+
     return unsubscribe;
   }, [category]);
-  
+
   return categoryState;
 }
 
