@@ -128,15 +128,20 @@ const ScheduleLightsModal = ({ isVisible, onClose }) => {
         // Calculate time until execution - FIXED
         const now = new Date();
 
-        // Create a date object for today with the selected time
+        // Create a date object with today's date and the selected time
         const scheduleDateTime = new Date();
         scheduleDateTime.setHours(scheduleTime.getHours());
         scheduleDateTime.setMinutes(scheduleTime.getMinutes());
         scheduleDateTime.setSeconds(0);
         scheduleDateTime.setMilliseconds(0);
 
+        console.log('🕐 Current time:', now.toLocaleTimeString());
+        console.log('📅 Schedule time from picker:', scheduleTime.toLocaleTimeString());
+        console.log('🎯 Calculated schedule datetime:', scheduleDateTime.toLocaleTimeString());
+
         // Calculate difference in milliseconds
         let timeDiff = scheduleDateTime.getTime() - now.getTime();
+        console.log('⏱️ Time difference (ms):', timeDiff, '(minutes:', Math.floor(timeDiff / 60000), ')');
 
         // If the time has already passed today, it will execute tomorrow
         const isTomorrow = timeDiff < 0;

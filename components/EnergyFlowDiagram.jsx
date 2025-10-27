@@ -112,8 +112,8 @@ const EnergyFlowDiagram = ({ energyData }) => {
             ry="5"
             fill={isBatteryCharging ? "#4CAF50" : "#FFC107"}
           />
-          <SvgText x="150" y="170" textAnchor="middle" fill="black" fontWeight="bold" fontSize="10">{battery.soc}%</SvgText>
-          <SvgText x="150" y="185" textAnchor="middle" fill="black" fontSize="9">{battery.voltage}V {battery.current}A</SvgText>
+          <SvgText x="145" y="170" textAnchor="middle" fill="black" fontWeight="bold" fontSize="10">{battery.soc.toFixed(2)}%</SvgText>
+          <SvgText x="140" y="185" textAnchor="middle" fill="black" fontSize="9">{battery.voltage}V {battery.current}A</SvgText>
 
           {/* Lines */}
           <Line x1="90" y1="30" x2="120" y2="80" stroke="#4CAF50" strokeWidth="2" />

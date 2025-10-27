@@ -167,17 +167,14 @@ const System = () => {
             </View>
           </GlowingCard>
 
-          <View collapsable={false} key="victron-container">
-            <GlowingCard glowColor="#6CB4EE" >
-              <Image
-                source={victronImageSource}
-                style={styles.blueCard}
-                resizeMode="cover"
-                fadeDuration={0}
-                defaultSource={victronImageSource}
-              />
-            </GlowingCard>
-          </View>
+          <GlowingCard glowColor="#6CB4EE" >
+            <Image
+              source={victronImageSource}
+              style={styles.blueCard}
+              resizeMode="cover"
+              fadeDuration={0}
+            />
+          </GlowingCard>
 
           <GlowingCard glowColor="#228B22" style={styles.cardWrapper}>
             <View style={styles.greenCard}>
@@ -222,16 +219,14 @@ const System = () => {
             </View>
           </GlowingCard>
 
-          <View collapsable={false} key="pvcharger-container">
-            <GlowingCard glowColor="#FFBF00" style={styles.cardWrapper}>
-              <PVChargerCard
-                power={victronData ? formatPower(victronData.pvCharger.power) : '0.00W'}
-                imageSource={smartSolarImageSource}
-                cardOffset={{ top: 110, left: -100 }}
-                imageOffset={{ top: 160, left: -174 }}
-              />
-            </GlowingCard>
-          </View>
+          <GlowingCard glowColor="#FFBF00" style={styles.cardWrapper}>
+            <PVChargerCard
+              power={victronData ? formatPower(victronData.pvCharger.power) : '0.00W'}
+              imageSource={smartSolarImageSource}
+              cardOffset={{ top: 110, left: -100 }}
+              imageOffset={{ top: 160, left: -174 }}
+            />
+          </GlowingCard>
         </View>
 
         {/* ————————————— CONNECTION LINES ————————————— */}

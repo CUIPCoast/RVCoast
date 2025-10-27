@@ -82,10 +82,10 @@ const AirCon = ({ onClose }) => {
     
     // Subscribe to temperature change events
     temperatureMonitoringService.on('temperatureChange', handleTemperatureUpdate);
-    
-    // Get initial temperature
+
+    // Get initial temperature (but only if we don't already have one from state)
     const currentTemp = temperatureMonitoringService.getCurrentTemperature();
-    if (currentTemp.fahrenheit) {
+    if (currentTemp.fahrenheit && temp === initialTemp) {
       console.log('AirCon: Initial temperature from RV-C:', currentTemp.fahrenheit);
       const roundedTemp = Math.round(currentTemp.fahrenheit);
       setTemp(roundedTemp);
@@ -168,14 +168,17 @@ const AirCon = ({ onClose }) => {
   useEffect(() => {
     const unsubscribe = rvStateManager.subscribeToExternalChanges((newState) => {
       if (newState.climate && newState.climate.temperature !== undefined) {
-        // Only update if not actively sliding and temperature is different
-        if (!isSlidingRef.current && newState.climate.temperature !== temp) {
+        // Only update if not actively sliding, different from our ref, and different from display
+        // This prevents race conditions where our own changes trigger external updates
+        if (!isSlidingRef.current &&
+            newState.climate.temperature !== lastSentTempRef.current &&
+            newState.climate.temperature !== temp) {
           const roundedTemp = Math.round(newState.climate.temperature);
-          console.log('AirCon: External temperature change detected:', roundedTemp);
+          console.log('AirCon: External temperature change detected:', roundedTemp, '(current:', temp, ')');
           setTemp(roundedTemp);
           setLastTemp(roundedTemp);
           lastSentTempRef.current = roundedTemp;
-          
+
           // Show notification of external change
           setStatusMessage(`Temperature updated to ${roundedTemp}°F`);
           setShowStatus(true);
@@ -183,7 +186,7 @@ const AirCon = ({ onClose }) => {
         }
       }
     });
-    
+
     return unsubscribe;
   }, [temp]);
 
@@ -362,23 +365,26 @@ const AirCon = ({ onClose }) => {
   // Handle temperature change from slider with improved responsiveness
   const handleTempChange = (newTemp) => {
     console.log('AirCon: Slider changed to:', newTemp);
-    
+
+    // Round to prevent floating point jitter
+    const roundedTemp = Math.round(newTemp);
+
     // Mark that we're actively sliding
     isSlidingRef.current = true;
-    
-    // Update local state immediately for smooth UI
-    setTemp(newTemp);
-    
+
+    // Update local state immediately for smooth UI - use rounded value
+    setTemp(roundedTemp);
+
     // Clear any pending timeout
     if (tempChangeTimeoutRef.current) {
       clearTimeout(tempChangeTimeoutRef.current);
     }
-    
-    // Set a timeout to mark sliding as complete
+
+    // Set a timeout to mark sliding as complete - increased to 2.5 seconds to prevent race conditions
     tempChangeTimeoutRef.current = setTimeout(() => {
       isSlidingRef.current = false;
       console.log('AirCon: Slider interaction complete');
-    }, 500);
+    }, 2500);
   };
   
   // Send temperature changes to API with debouncing - FIXED to always save to RV state
@@ -452,9 +458,10 @@ const AirCon = ({ onClose }) => {
       <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
         <View style={tabletStyles.container}>
           <RadialSlider
-            value={temp}
+            value={Math.round(temp)}
             min={60}
             max={85}
+            step={1}
             thumbColor={"#FFFFFF"}
             thumbBorderColor={"#848482"}
             sliderTrackColor={"#E5E5E5"}
@@ -536,9 +543,10 @@ const AirCon = ({ onClose }) => {
 
         {/* Radial Slider for Temperature Control */}
         <RadialSlider
-          value={temp}
+          value={Math.round(temp)}
           min={60}
           max={85}
+          step={1}
           thumbColor={"#FFFFFF"}
           thumbBorderColor={"#848482"}
           sliderTrackColor={"#E5E5E5"}

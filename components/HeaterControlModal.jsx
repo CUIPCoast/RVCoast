@@ -110,12 +110,12 @@ const HeaterControlModal = ({ isVisible, onClose }) => {
     const previousAutoMode = isAutoModeActive;
 
     try {
-      // Update local state immediately - clear old state first
+      // Update local state immediately
       if (speed === 'Auto') {
         setIsAutoModeActive(true);
-        setSelectedFanSpeed(null); // Clear manual speed when auto is active
+        setSelectedFanSpeed('Auto'); // Store "Auto" instead of null for proper comparisons
       } else {
-        setIsAutoModeActive(false);
+        setIsAutoModeActive(false); // Clear auto mode when setting manual speed
         setSelectedFanSpeed(speed);
       }
 

@@ -166,9 +166,13 @@ const ClimateControlScreenTablet = () => {
     const unsubscribe = rvStateManager.subscribeToExternalChanges((newState) => {
       if (newState.climate) {
         // Update temperature when external changes occur - but only if not sliding
-        if (newState.climate.temperature !== undefined && !isSlidingRef.current && newState.climate.temperature !== temp) {
+        // Also check if the change is actually different from our current ref value (not our own change)
+        if (newState.climate.temperature !== undefined &&
+            !isSlidingRef.current &&
+            newState.climate.temperature !== lastSentTempRef.current &&
+            newState.climate.temperature !== temp) {
           const roundedTemp = Math.round(newState.climate.temperature);
-          console.log('ClimateControl: External temperature change detected:', roundedTemp);
+          console.log('ClimateControl: External temperature change detected:', roundedTemp, '(current:', temp, ')');
           setTemp(roundedTemp);
           setLastTemp(roundedTemp);
           lastSentTempRef.current = roundedTemp;
@@ -207,23 +211,23 @@ const ClimateControlScreenTablet = () => {
   // Handle temperature change from RadialSlider with improved responsiveness
   const handleTempChange = (newTemp) => {
     console.log('ClimateControl: Slider changed to:', newTemp);
-    
+
     // Mark that we're actively sliding
     isSlidingRef.current = true;
-    
+
     // Update local state immediately for smooth UI
     setTemp(newTemp);
-    
+
     // Clear any pending timeout
     if (tempChangeTimeoutRef.current) {
       clearTimeout(tempChangeTimeoutRef.current);
     }
-    
-    // Set a timeout to mark sliding as complete
+
+    // Set a timeout to mark sliding as complete - increased to 2 seconds to prevent race conditions
     tempChangeTimeoutRef.current = setTimeout(() => {
       isSlidingRef.current = false;
       console.log('ClimateControl: Slider interaction complete');
-    }, 500);
+    }, 2000);
   };
   
   // Temperature change implementation - FIXED to always save to RV state
@@ -548,12 +552,12 @@ const ClimateControlScreenTablet = () => {
     const previousAutoMode = isAutoModeActive;
 
     try {
-      // Update local state immediately - clear old state first
+      // Update local state immediately
       if (speedValue === "Auto") {
         setIsAutoModeActive(true);
-        setSpeed(null); // Clear manual speed when auto is active
+        setSpeed("Auto"); // Store "Auto" instead of null for proper comparisons
       } else {
-        setIsAutoModeActive(false);
+        setIsAutoModeActive(false); // Clear auto mode when setting manual speed
         setSpeed(speedValue);
       }
 

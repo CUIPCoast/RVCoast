@@ -451,7 +451,7 @@ const AwningControlModal = ({ isVisible, onClose }) => {
     // Calculate remaining animation time based on current position
     const currentValue = awningExtension._value || 0;
     const remainingDistance = 1 - currentValue;
-    const baseDuration = 4000;
+    const baseDuration = 10000; // 10 seconds for full extension - slow like real awnings
     const animationDuration = baseDuration * remainingDistance;
     
     // Main extension animation
@@ -528,7 +528,7 @@ const AwningControlModal = ({ isVisible, onClose }) => {
     // Calculate remaining animation time based on current position
     const currentValue = awningExtension._value || 0;
     const remainingDistance = currentValue;
-    const baseDuration = 3500;
+    const baseDuration = 8000; // 8 seconds for full retraction - slow like real awnings
     const animationDuration = baseDuration * remainingDistance;
     
     // Main retraction animation
@@ -649,7 +649,112 @@ const AwningControlModal = ({ isVisible, onClose }) => {
         <View style={styles.modalContent}>
           <Text style={styles.modalTitle}>Awning Control</Text>
 
+          {/* RV + Awning Animation */}
+          <View style={styles.animationContainer}>
+            {/* Sky Background */}
+            <View style={styles.sky} />
 
+            {/* Ground */}
+            <View style={styles.ground} />
+
+            {/* Ground Shadow (under awning) */}
+            <Animated.View
+              style={[
+                styles.groundShadow,
+                {
+                  opacity: shadowOpacity,
+                  transform: [
+                    {
+                      scaleX: awningExtension.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.1, 1]
+                      })
+                    }
+                  ]
+                }
+              ]}
+            />
+
+            {/* RV Body */}
+            <Animated.View
+              style={[
+                styles.rv,
+                {
+                  transform: [
+                    { translateX: motorVibration }
+                  ]
+                }
+              ]}
+            >
+              {/* RV Roof Vent */}
+              <View style={styles.rvVent} />
+
+              {/* RV Window */}
+              <View style={styles.rvWindow} />
+
+              {/* Motor Housing on side */}
+              <View style={styles.motorHousing} />
+            </Animated.View>
+
+            {/* Awning Mount Point */}
+            <View style={styles.awningMount} />
+
+            {/* Awning Fabric */}
+            <Animated.View
+              style={[
+                styles.awningFabric,
+                {
+                  width: awningExtension.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, 120]
+                  }),
+                  height: 5,
+                  transform: [
+                    { translateY: fabricWave }
+                  ]
+                }
+              ]}
+            />
+
+            {/* Awning Support Arm */}
+            <Animated.View
+              style={[
+                styles.awningArm,
+                {
+                  width: supportPosts.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, 120]
+                  }),
+                }
+              ]}
+            />
+
+            
+
+            {/* Status Indicator */}
+            <View style={styles.statusIndicator}>
+              <Text style={styles.animationStatus}>
+                {awningState.isExtending ? 'Extending...' :
+                 awningState.isRetracting ? 'Retracting...' :
+                 awningState.position > 0.5 ? 'Extended' : 'Retracted'}
+              </Text>
+
+              {/* Progress Bar */}
+              <View style={styles.progressContainer}>
+                <Animated.View
+                  style={[
+                    styles.progressBar,
+                    {
+                      width: awningExtension.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0%', '100%']
+                      })
+                    }
+                  ]}
+                />
+              </View>
+            </View>
+          </View>
 
           {/* Control Buttons - No loading states, instant response */}
           <View style={styles.buttonRow}>
@@ -764,13 +869,23 @@ const styles = StyleSheet.create({
     height: 200,
     marginBottom: 25,
     position: 'relative',
-    backgroundColor: '#F0F8FF',
+    backgroundColor: '#F5F5F5',
     borderRadius: 15,
     overflow: 'hidden',
     borderWidth: 2,
-    borderColor: '#4682B4',
+    borderColor: '#666666',
   },
-  
+
+  // Sky Background
+  sky: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 60,
+    backgroundColor: '#E8E8E8',
+  },
+
   // Ground
   ground: {
     position: 'absolute',
@@ -778,7 +893,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 60,
-    backgroundColor: '#242124',
+    backgroundColor: '#3A3A3A',
   },
   
   // Shadow
@@ -807,13 +922,13 @@ const styles = StyleSheet.create({
   rvWindow: {
     width: 30,
     height: 25,
-    backgroundColor: '#ADD8E6',
+    backgroundColor: '#D3D3D3',
     borderRadius: 4,
     position: 'absolute',
     top: 15,
     right: 10,
     borderWidth: 1,
-    borderColor: '#4682B4',
+    borderColor: '#808080',
   },
   rvVent: {
     width: 35,
@@ -872,7 +987,19 @@ const styles = StyleSheet.create({
     borderColor: '#808080',
     transformOrigin: 'left center',
   },
-  
+
+  // Support post (vertical pole at end of awning)
+  supportPost: {
+    width: 6,
+    height: 95,
+    backgroundColor: '#A9A9A9',
+    position: 'absolute',
+    bottom: 60,
+    borderRadius: 3,
+    borderWidth: 1,
+    borderColor: '#808080',
+  },
+
   // Status indicator
   statusIndicator: {
     position: 'absolute',

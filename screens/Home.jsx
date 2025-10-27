@@ -27,6 +27,7 @@ import AirCon from "./AirCon";
 import ToggleSwitch from "../components/ToggleSwitch.jsx";
 import { useRVClimate, useRVWater } from "../API/RVStateManager/RVStateHooks";
 import { Feather, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { get } from "react-native/Libraries/TurboModule/TurboModuleRegistry";
 
 const { width, height } = Dimensions.get('window');
 
@@ -167,7 +168,11 @@ const Home = () => {
           {/* Top Section - Greeting and Time */}
           <View style={styles.topOverlaySection}>
             <View style={styles.greetingContainer}>
-              <Text style={styles.greetingText}>{getGreeting()}</Text>
+              <Text style={styles.greetingText}>{`
+  ${getGreeting()},
+  Bryan.
+`}</Text>
+              
               <Text style={styles.timeText}>
                 {currentTime.toLocaleTimeString('en-US', {
                   hour: 'numeric',
@@ -401,6 +406,7 @@ const styles = StyleSheet.create({
 
   greetingContainer: {
     gap: 4,
+    bottom: 30,
   },
 
   greetingText: {
@@ -422,6 +428,8 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
+    bottom:30,
+    left:10,
   },
 
   quickWeatherContainer: {
