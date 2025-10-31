@@ -12,116 +12,61 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState({
+    id: 1,
+    username: 'Brian@Aero',
+    email: 'owner@coastapp.com',
+    firstName: 'Brian',
+    lastName: 'Fuente',
+    profileImage: require("../assets/brian.photo.jpg"), // Can be a URI or require() path
+    rvConnection: null,
+    createdAt: new Date().toISOString(),
+  });
   const [isLoading, setIsLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    checkAuthStatus();
+    loadUserData();
   }, []);
 
-  const checkAuthStatus = async () => {
+  const loadUserData = async () => {
     try {
       const userData = await AsyncStorage.getItem('userData');
-      const token = await AsyncStorage.getItem('authToken');
-      
-      if (userData && token) {
-        setUser(JSON.parse(userData));
-        setIsAuthenticated(true);
+      if (userData) {
+        const parsedData = JSON.parse(userData);
+        // Override old data with current default values, but keep RV connection
+        const mergedUser = {
+          ...parsedData,
+          id: 1,
+          username: 'Brian@Aero',
+          email: 'owner@coastapp.com',
+          firstName: 'Brian',
+          lastName: 'Fuente',
+          profileImage: require("../assets/brian.photo.jpg"),
+          // Keep the RV connection from stored data if it exists
+          rvConnection: parsedData.rvConnection || null,
+        };
+        setUser(mergedUser);
+        // Save the updated data back to storage
+        await AsyncStorage.setItem('userData', JSON.stringify(mergedUser));
       } else {
-        // Check for shared user data from remote mobile login
-        const sharedUserData = await AsyncStorage.getItem('sharedUserData');
-        if (sharedUserData) {
-          const parsedData = JSON.parse(sharedUserData);
-          setUser(parsedData);
-          // Don't set isAuthenticated for tablet - it has direct access regardless
-        }
+        // No stored data, save the default user
+        const defaultUser = {
+          id: 1,
+          username: 'Brian@Aero',
+          email: 'owner@coastapp.com',
+          firstName: 'Brian',
+          lastName: 'Fuente',
+          profileImage: require("../assets/brian.photo.jpg"),
+          rvConnection: null,
+          createdAt: new Date().toISOString(),
+        };
+        await AsyncStorage.setItem('userData', JSON.stringify(defaultUser));
+        setUser(defaultUser);
       }
     } catch (error) {
-      console.error('Error checking auth status:', error);
+      console.error('Error loading user data:', error);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const login = async (credentials) => {
-    try {
-      setIsLoading(true);
-      
-      // In a real app, this would be an API call
-      // For now, we'll simulate authentication
-      const mockUser = {
-        id: Date.now(),
-        username: credentials.username,
-        email: `${credentials.username}@coastapp.com`,
-        rvConnection: null,
-        createdAt: new Date().toISOString(),
-      };
-
-      // Store user data and token
-      await AsyncStorage.setItem('userData', JSON.stringify(mockUser));
-      await AsyncStorage.setItem('authToken', `token_${Date.now()}`);
-      
-      // Also store as shared data for tablet sync
-      await AsyncStorage.setItem('sharedUserData', JSON.stringify(mockUser));
-      
-      setUser(mockUser);
-      setIsAuthenticated(true);
-      
-      return { success: true, user: mockUser };
-    } catch (error) {
-      console.error('Login error:', error);
-      return { success: false, error: error.message };
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const signup = async (userData) => {
-    try {
-      setIsLoading(true);
-      
-      // In a real app, this would be an API call
-      const newUser = {
-        id: Date.now(),
-        username: userData.username,
-        email: userData.email,
-        firstName: userData.firstName,
-        lastName: userData.lastName,
-        rvConnection: null,
-        createdAt: new Date().toISOString(),
-      };
-
-      // Store user data and token
-      await AsyncStorage.setItem('userData', JSON.stringify(newUser));
-      await AsyncStorage.setItem('authToken', `token_${Date.now()}`);
-      
-      // Also store as shared data for tablet sync
-      await AsyncStorage.setItem('sharedUserData', JSON.stringify(newUser));
-      
-      setUser(newUser);
-      setIsAuthenticated(true);
-      
-      return { success: true, user: newUser };
-    } catch (error) {
-      console.error('Signup error:', error);
-      return { success: false, error: error.message };
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const logout = async () => {
-    try {
-      await AsyncStorage.removeItem('userData');
-      await AsyncStorage.removeItem('authToken');
-      await AsyncStorage.removeItem('rvConnection');
-      await AsyncStorage.removeItem('sharedUserData');
-      
-      setUser(null);
-      setIsAuthenticated(false);
-    } catch (error) {
-      console.error('Logout error:', error);
     }
   };
 
@@ -179,7 +124,7 @@ export const AuthProvider = ({ children }) => {
 
       await AsyncStorage.setItem('userData', JSON.stringify(updatedUser));
       setUser(updatedUser);
-      
+
       return { success: true, user: updatedUser };
     } catch (error) {
       console.error('Profile update error:', error);
@@ -187,16 +132,31 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const updateProfileImage = async (imageUri) => {
+    try {
+      const updatedUser = {
+        ...user,
+        profileImage: imageUri,
+        updatedAt: new Date().toISOString(),
+      };
+
+      await AsyncStorage.setItem('userData', JSON.stringify(updatedUser));
+      setUser(updatedUser);
+
+      return { success: true };
+    } catch (error) {
+      console.error('Profile image update error:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
   const value = {
     user,
     isLoading,
-    isAuthenticated,
-    login,
-    signup,
-    logout,
     connectToRV,
     disconnectFromRV,
     updateProfile,
+    updateProfileImage,
   };
 
   return (

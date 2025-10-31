@@ -3,16 +3,13 @@ import { StatusBar } from "expo-status-bar";
 import { View, ActivityIndicator, LogBox } from "react-native";
 import RootNavigator from "../navigation/RootNavigator";
 import TabletNavigator from "../navigation/TabletNavigator";
-import { NavigationContainer } from "@react-navigation/native";
 import { AuthProvider, useAuth } from "../components/AuthContext";
-import AuthScreen from "../components/AuthScreen";
 import { useScreenSize } from "../helper";
-
 
 LogBox.ignoreAllLogs();
 
 const AppContent = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isLoading } = useAuth();
   const isTablet = useScreenSize();
 
   if (isLoading) {
@@ -23,24 +20,15 @@ const AppContent = () => {
     );
   }
 
-  // Tablet has direct access to RV components (no authentication required)
-  // Mobile requires authentication for remote access
-  if (!isTablet && !isAuthenticated) {
-    return <AuthScreen />;
-  }
-
-  // Return tablet or mobile navigator without additional NavigationContainer
-  // since TabletNavigator and RootNavigator handle their own containers
+  // Return tablet or mobile navigator
   return isTablet ? <TabletNavigator /> : <RootNavigator />;
 };
 
 export default function App() {
   return (
-    
-      <AuthProvider>
-        <StatusBar hidden />
-        <AppContent />
-      </AuthProvider>
-    
+    <AuthProvider>
+      <StatusBar hidden />
+      <AppContent />
+    </AuthProvider>
   );
 }

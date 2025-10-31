@@ -10,7 +10,7 @@ import AnimatedMobileTabs from "../AnimatedMobileTabs";
 // Define the TabNavigator component
 const TabNavigator = () => {
   const isTablet = useScreenSize();
-  
+
   // If the screen is a tablet, render MainScreen (which shows tablet navigation)
   if (isTablet) {
     console.log(isTablet);

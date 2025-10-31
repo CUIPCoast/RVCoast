@@ -1,22 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, SectionList, Image, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import GroupComponent from '../components/GroupComponent';
 import ToggleSwitch from '../components/ToggleSwitch.jsx';
 import RVConnectionModal from '../components/RVConnectionModal';
+import Profile from './Profile';
 import { Color, Gap, FontSize, FontFamily, isDarkMode } from '../GlobalStyles';
 import { useScreenSize, handleSettingsToggle, handleSettingsItemPress } from '../helper';
 import { useAuth } from '../components/AuthContext';
 import moment from 'moment';
-import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-
-
 
 const Settings = () => {
   const isTablet = useScreenSize();
   const isDark = isDarkMode;
-  const { user, logout, disconnectFromRV } = useAuth();
+  const { user, disconnectFromRV } = useAuth();
   const [showRVModal, setShowRVModal] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const [toggles, setToggles] = useState({
     pushNotifications: false,
     notifyMessages: true,
@@ -26,25 +26,35 @@ const Settings = () => {
     wifiEnable: true,
   });
 
+  // Load toggle states from AsyncStorage on mount
+  useEffect(() => {
+    const loadToggles = async () => {
+      try {
+        const savedToggles = await AsyncStorage.getItem('settingsToggles');
+        if (savedToggles) {
+          setToggles(JSON.parse(savedToggles));
+        }
+      } catch (error) {
+        console.error('Failed to load toggle states:', error);
+      }
+    };
+    loadToggles();
+  }, []);
+
+  // Save toggle states to AsyncStorage whenever they change
+  useEffect(() => {
+    const saveToggles = async () => {
+      try {
+        await AsyncStorage.setItem('settingsToggles', JSON.stringify(toggles));
+      } catch (error) {
+        console.error('Failed to save toggle states:', error);
+      }
+    };
+    saveToggles();
+  }, [toggles]);
+
   const onToggle = key => {
     handleSettingsToggle(key, toggles, setToggles);
-  };
-
-  const handleSignOut = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Sign Out', 
-          style: 'destructive',
-          onPress: async () => {
-            await logout();
-          }
-        },
-      ]
-    );
   };
 
   const handleDisconnectRV = () => {
@@ -72,8 +82,6 @@ const Settings = () => {
       title: 'Account',
       data: [
         { key: 'profile', label: 'Profile', type: 'link' },
-        { key: 'changePassword', label: 'Change Password', type: 'link' },
-        { key: 'signOut', label: 'Sign Out', type: 'action' },
       ],
     },
     {
@@ -125,12 +133,6 @@ const Settings = () => {
       ],
     },
     {
-      title: 'Feature Specific Settings',
-      data: [
-        { key: 'featureSettings', label: 'Open Feature Settings', type: 'link' },
-      ],
-    },
-    {
       title: 'About',
       data: [
         { key: 'about', label: 'About This App', type: 'link' },
@@ -139,14 +141,14 @@ const Settings = () => {
   ];
 
   const handleItemPress = (item) => {
-    if (item.key === 'signOut') {
-      handleSignOut();
+    if (item.key === 'profile') {
+      setShowProfile(true);
     } else if (item.key === 'rvConnect') {
       setShowRVModal(true);
     } else if (item.key === 'rvDisconnect') {
       handleDisconnectRV();
     } else {
-      handleSettingsItemPress(item, Alert.alert, router);
+      handleSettingsItemPress(item, Alert.alert);
     }
   };
 
@@ -186,6 +188,11 @@ const Settings = () => {
     </View>
   );
 
+  // Show Profile if requested
+  if (showProfile) {
+    return <Profile onClose={() => setShowProfile(false)} />;
+  }
+
   if (isTablet) {
     const day = moment().format('dddd');
     const date = moment().format('MMMM Do, YYYY');
@@ -211,18 +218,33 @@ const Settings = () => {
           {/* User Profile Section */}
           <View style={[styles.tabletProfileCard, { backgroundColor: isDark ? '#1B1B1B' : Color.colorWhite }]}>
             <View style={styles.tabletProfileContent}>
-              <View style={styles.tabletProfileAvatar}>
-                <Text style={[styles.tabletProfileInitials, { color: isDark ? Color.colorBlack : Color.colorWhite }]}>
-                  {user?.firstName && user?.lastName 
-                    ? `${user.firstName[0]}${user.lastName[0]}` 
-                    : user?.username ? user.username.substring(0, 2).toUpperCase() : 'GU'}
-                </Text>
-              </View>
+              <TouchableOpacity
+                style={[styles.tabletProfileAvatar, { backgroundColor: user?.profileImage ? 'transparent' : Color.colorGray_200 }]}
+                onPress={() => setShowProfile(true)}
+              >
+                {user?.profileImage ? (
+                  <Image
+                    source={typeof user.profileImage === 'string' && user.profileImage.startsWith('http')
+                      ? { uri: user.profileImage }
+                      : typeof user.profileImage === 'string'
+                      ? { uri: user.profileImage }
+                      : user.profileImage
+                    }
+                    style={styles.tabletProfileImage}
+                  />
+                ) : (
+                  <Text style={[styles.tabletProfileInitials, { color: isDark ? Color.colorBlack : Color.colorWhite }]}>
+                    {user?.firstName && user?.lastName
+                      ? `${user.firstName[0]}${user.lastName[0]}`
+                      : user?.username ? user.username.substring(0, 2).toUpperCase() : 'GU'}
+                  </Text>
+                )}
+              </TouchableOpacity>
               <View style={styles.tabletProfileInfo}>
                 <Text style={[styles.tabletProfileName, { color: isDark ? Color.colorWhitesmoke_100 : Color.colorGray_200 }]}>
                   {user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.username || 'Guest User'}
                 </Text>
-                <Text style={[styles.tabletProfileEmail, { color: isDark ? Color.colorGray_100 : Color.colorGray_100 }]}>
+                <Text style={[styles.tabletProfileEmail, { color: isDark ? "#999" : Color.colorGray_100 }]}>
                   {user?.email || 'guest@coastapp.com'}
                 </Text>
                 {user?.rvConnection && (
@@ -234,9 +256,12 @@ const Settings = () => {
                   </View>
                 )}
               </View>
-              <TouchableOpacity style={styles.tabletProfileEditButton}>
+              <TouchableOpacity
+                style={styles.tabletProfileEditButton}
+                onPress={() => setShowProfile(true)}
+              >
                 <Text style={[styles.tabletProfileEditText, { color: isDark ? Color.colorWhitesmoke_100 : Color.colorGray_200 }]}>
-                  Edit
+                  View Profile
                 </Text>
               </TouchableOpacity>
             </View>
@@ -489,6 +514,12 @@ const styles = StyleSheet.create({
     backgroundColor: Color.colorGray_200,
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
+  },
+  tabletProfileImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
   },
   tabletProfileInitials: {
     fontSize: FontSize.size_5xl,

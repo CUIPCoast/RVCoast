@@ -25,6 +25,10 @@ import { FontFamily } from "../GlobalStyles";
 
 const { width: screenWidth } = Dimensions.get('window');
 
+// Static image sources - defined once outside component, never changes
+const victronImageSource = require('../assets/victron.png');
+const smartSolarImageSource = require('../assets/smartsolar.png');
+
 const System = () => {
   const isTablet = useScreenSize();
   const [victronData, setVictronData] = useState(null);
@@ -133,10 +137,6 @@ const System = () => {
     const newIndex = Math.round(x / screenWidth);
     if (newIndex !== tabIndex) setTabIndex(newIndex);
   };
-
-  // ✨ Static image sources - defined once, never changes
-  const victronImageSource = require('../assets/victron.png');
-  const smartSolarImageSource = require('../assets/smartsolar.png');
 
   // ✨ NEW: Overview page extracted so it's tidy inside the pager
   const OverviewPage = () => (

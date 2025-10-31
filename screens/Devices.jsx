@@ -9,7 +9,7 @@ import AddDeviceModal from "../components/AddDeviceModal";
 import ScheduleLightsModal from "../components/ScheduleLightsModal";
 import { LightService, FanService, WaterService } from "../API/RVControlServices"; 
 import MasterLightControl from "../components/MasterLightControl.jsx";
-import { Feather as Icon } from '@expo/vector-icons';
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import FanButton from "../components/FanButton";
 import WaterButton from "../components/WaterButton";
