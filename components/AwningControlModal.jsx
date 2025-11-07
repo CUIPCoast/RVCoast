@@ -489,20 +489,14 @@ const AwningControlModal = ({ isVisible, onClose }) => {
           motorVibrationAnimation.current.stop();
         }
         motorVibration.setValue(0);
-
+        
         // Start gentle fabric wave when fully extended
-        createFabricWaveAnimation().start();
-
-        // Update state to reflect completion - awning is now stopped at fully extended position
-        setAwningState(prev => ({
-          ...prev,
-          position: 1,
-          isExtending: false,
-          isRetracting: false,
-          isStopped: true
-        }));
-
-        updateStatus('Awning fully extended', 3000);
+        if (awningState.isExtending) {
+          createFabricWaveAnimation().start();
+        }
+        
+        // Update position state
+        setAwningState(prev => ({ ...prev, position: 1 }));
       }
     });
   };
@@ -571,17 +565,9 @@ const AwningControlModal = ({ isVisible, onClose }) => {
           motorVibrationAnimation.current.stop();
         }
         motorVibration.setValue(0);
-
-        // Update state to reflect completion - awning is now stopped at fully retracted position
-        setAwningState(prev => ({
-          ...prev,
-          position: 0,
-          isExtending: false,
-          isRetracting: false,
-          isStopped: true
-        }));
-
-        updateStatus('Awning fully retracted', 3000);
+        
+        // Update position state
+        setAwningState(prev => ({ ...prev, position: 0 }));
       }
     });
   };
@@ -611,31 +597,35 @@ const AwningControlModal = ({ isVisible, onClose }) => {
     fabricWave.setValue(0);
   };
 
-  // Handle modal open/close
+  // Reset when modal closes
   useEffect(() => {
-    if (isVisible) {
-      // When modal opens, set animation to match current awning position
-      awningExtension.setValue(awningState.position);
-      shadowOpacity.setValue(awningState.position);
-      supportPosts.setValue(awningState.position);
-
-      // If awning is fully extended and not moving, show fabric wave
-      if (awningState.position === 1 && awningState.isStopped) {
-        createFabricWaveAnimation().start();
-      }
-    } else {
-      // When modal closes, stop animations but maintain state
+    if (!isVisible) {
+      // Stop all animations
       stopAnimation();
-
+      
+      // Reset all states
+      setAwningState({
+        isExtending: false,
+        isRetracting: false,
+        isStopped: true,
+        position: 0,
+        lastCommand: null,
+        lastCommandTime: null
+      });
+      
       setShowStatus(false);
-
+      
       // Clear status timeout
       if (statusTimeout.current) {
         clearTimeout(statusTimeout.current);
       }
-
-      // Note: We're NOT resetting position here - it should maintain the actual awning state
-      // The CAN bus listener will update the position if it changes
+      
+      // Reset all animated values to initial state
+      awningExtension.setValue(0);
+      fabricWave.setValue(0);
+      motorVibration.setValue(0);
+      shadowOpacity.setValue(0);
+      supportPosts.setValue(0);
     }
   }, [isVisible]);
 
