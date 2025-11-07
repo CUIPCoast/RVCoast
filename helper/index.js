@@ -5,7 +5,8 @@
 export {
   getWeatherIcon,
   fetchHourlyWeather,
-  formatWeatherItem
+  formatWeatherItem,
+  fetchCurrentWeather
 } from './weather/weatherHelpers.js';
 
 // Climate control helpers

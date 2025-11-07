@@ -12,12 +12,13 @@ import AirCon from "./AirCon.jsx";
 import { FontFamily } from "../GlobalStyles";
 import { WaterService } from '../API/RVControlServices.js';
 import { useAuth } from '../components/AuthContext';
-import { useScreenSize } from '../helper';
+import { useScreenSize, fetchCurrentWeather } from '../helper';
 import RVConnectionModal from '../components/RVConnectionModal';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { VictronEnergyService } from "../API/VictronEnergyService";
 import rvStateManager from '../API/RVStateManager/RVStateManager';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 const MainScreen = () => {
@@ -145,6 +146,10 @@ const MainScreen = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [batteryLevel, setBatteryLevel] = useState(12.5);
     const [energyError, setEnergyError] = useState(null);
+
+    // Weather state
+    const [weatherData, setWeatherData] = useState(null);
+    const [weatherError, setWeatherError] = useState(null);
 
     // Add temperature monitoring
     const { 
@@ -353,6 +358,27 @@ const MainScreen = () => {
         return () => clearInterval(intervalId);
       }, []);
 
+    // Fetch weather data when component mounts
+    useEffect(() => {
+        const fetchWeather = async () => {
+            try {
+                const data = await fetchCurrentWeather("Chattanooga");
+                setWeatherData(data);
+                setWeatherError(null);
+            } catch (error) {
+                console.error("Failed to load weather data:", error);
+                setWeatherError("Could not load weather data");
+            }
+        };
+
+        fetchWeather();
+
+        // Refresh weather data every 10 minutes
+        const weatherIntervalId = setInterval(fetchWeather, 600000);
+
+        return () => clearInterval(weatherIntervalId);
+    }, []);
+
     // Helper function to format power values specifically
   const formatPower = (value) => {
     if (value === null || value === undefined) return '--';
@@ -500,31 +526,35 @@ const MainScreen = () => {
                                             <Ionicons name="partly-sunny" size={18} color="#FFB267" />
                                             <Text style={styles.weatherTitle}>Current Weather</Text>
                                         </View>
-                                        <View style={styles.weatherContent}>
-                                            <View style={styles.weatherRow}>
-                                                <Ionicons name="thermometer" size={14} color="#4FC3F7" />
-                                                <Text style={styles.weatherText}>72°F</Text>
+                                        {weatherData ? (
+                                            <View style={styles.weatherContent}>
+                                                <View style={styles.weatherRow}>
+                                                    <Ionicons name="thermometer" size={14} color="#4FC3F7" />
+                                                    <Text style={styles.weatherText}>{weatherData.temperature}°F</Text>
+                                                </View>
+                                                <View style={styles.weatherRow}>
+                                                    <Ionicons name="water" size={14} color="#29B6F6" />
+                                                    <Text style={styles.weatherText}>{weatherData.humidity}% Humidity</Text>
+                                                </View>
+                                                <View style={styles.weatherRow}>
+                                                    <Ionicons name="speedometer" size={14} color="#A5A5A5" />
+                                                    <Text style={styles.weatherText}>{weatherData.pressure} hPa</Text>
+                                                </View>
+                                                <View style={styles.weatherRow}>
+                                                    <Ionicons name="leaf" size={14} color="#10B981" />
+                                                    <Text style={styles.weatherText}>{weatherData.windSpeed} mph {weatherData.windDirection}</Text>
+                                                </View>
                                             </View>
-                                            <View style={styles.weatherRow}>
-                                                <Ionicons name="water" size={14} color="#29B6F6" />
-                                                <Text style={styles.weatherText}>65% Humidity</Text>
+                                        ) : weatherError ? (
+                                            <View style={styles.weatherContent}>
+                                                <Text style={styles.weatherText}>Weather unavailable</Text>
                                             </View>
-                                            <View style={styles.weatherRow}>
-                                                <Ionicons name="speedometer" size={14} color="#A5A5A5" />
-                                                <Text style={styles.weatherText}>1013 hPa</Text>
+                                        ) : (
+                                            <View style={styles.weatherContent}>
+                                                <ActivityIndicator size="small" color="#4FC3F7" />
                                             </View>
-                                            <View style={styles.weatherRow}>
-                                                <Ionicons name="leaf" size={14} color="#10B981" />
-                                                <Text style={styles.weatherText}>5 mph SW</Text>
-                                            </View>
-                                        </View>
+                                        )}
                                     </View>
-                                    
-                                    {user && (
-                                        <Text style={styles.welcomeText}>
-                                            Remote user: {user.firstName || user.username}
-                                        </Text>
-                                    )}
                                 </View>
                             </View>
                       

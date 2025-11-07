@@ -451,7 +451,7 @@ const AwningControlModal = ({ isVisible, onClose }) => {
     // Calculate remaining animation time based on current position
     const currentValue = awningExtension._value || 0;
     const remainingDistance = 1 - currentValue;
-    const baseDuration = 10000; // 10 seconds for full extension - slow like real awnings
+    const baseDuration = 48000; // 48 seconds for full extension - matches real awning timing
     const animationDuration = baseDuration * remainingDistance;
     
     // Main extension animation
@@ -489,14 +489,20 @@ const AwningControlModal = ({ isVisible, onClose }) => {
           motorVibrationAnimation.current.stop();
         }
         motorVibration.setValue(0);
-        
+
         // Start gentle fabric wave when fully extended
-        if (awningState.isExtending) {
-          createFabricWaveAnimation().start();
-        }
-        
-        // Update position state
-        setAwningState(prev => ({ ...prev, position: 1 }));
+        createFabricWaveAnimation().start();
+
+        // Update state to reflect completion - awning is now stopped at fully extended position
+        setAwningState(prev => ({
+          ...prev,
+          position: 1,
+          isExtending: false,
+          isRetracting: false,
+          isStopped: true
+        }));
+
+        updateStatus('Awning fully extended', 3000);
       }
     });
   };
@@ -528,7 +534,7 @@ const AwningControlModal = ({ isVisible, onClose }) => {
     // Calculate remaining animation time based on current position
     const currentValue = awningExtension._value || 0;
     const remainingDistance = currentValue;
-    const baseDuration = 8000; // 8 seconds for full retraction - slow like real awnings
+    const baseDuration = 48000; // 48 seconds for full retraction - matches real awning timing
     const animationDuration = baseDuration * remainingDistance;
     
     // Main retraction animation
@@ -565,9 +571,17 @@ const AwningControlModal = ({ isVisible, onClose }) => {
           motorVibrationAnimation.current.stop();
         }
         motorVibration.setValue(0);
-        
-        // Update position state
-        setAwningState(prev => ({ ...prev, position: 0 }));
+
+        // Update state to reflect completion - awning is now stopped at fully retracted position
+        setAwningState(prev => ({
+          ...prev,
+          position: 0,
+          isExtending: false,
+          isRetracting: false,
+          isStopped: true
+        }));
+
+        updateStatus('Awning fully retracted', 3000);
       }
     });
   };
@@ -597,35 +611,31 @@ const AwningControlModal = ({ isVisible, onClose }) => {
     fabricWave.setValue(0);
   };
 
-  // Reset when modal closes
+  // Handle modal open/close
   useEffect(() => {
-    if (!isVisible) {
-      // Stop all animations
+    if (isVisible) {
+      // When modal opens, set animation to match current awning position
+      awningExtension.setValue(awningState.position);
+      shadowOpacity.setValue(awningState.position);
+      supportPosts.setValue(awningState.position);
+
+      // If awning is fully extended and not moving, show fabric wave
+      if (awningState.position === 1 && awningState.isStopped) {
+        createFabricWaveAnimation().start();
+      }
+    } else {
+      // When modal closes, stop animations but maintain state
       stopAnimation();
-      
-      // Reset all states
-      setAwningState({
-        isExtending: false,
-        isRetracting: false,
-        isStopped: true,
-        position: 0,
-        lastCommand: null,
-        lastCommandTime: null
-      });
-      
+
       setShowStatus(false);
-      
+
       // Clear status timeout
       if (statusTimeout.current) {
         clearTimeout(statusTimeout.current);
       }
-      
-      // Reset all animated values to initial state
-      awningExtension.setValue(0);
-      fabricWave.setValue(0);
-      motorVibration.setValue(0);
-      shadowOpacity.setValue(0);
-      supportPosts.setValue(0);
+
+      // Note: We're NOT resetting position here - it should maintain the actual awning state
+      // The CAN bus listener will update the position if it changes
     }
   }, [isVisible]);
 

@@ -4,7 +4,6 @@ import { View } from "react-native";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import AnimatedTabletTabs from "./AnimatedTabletTabs";
-import { NavigationProvider, useNavigation } from "./NavigationContext";
 
 // Splash screens
 import TabletSplashScreen from "../components/TabletSplashScreenAdvanced";
@@ -17,7 +16,6 @@ import Settings from '../screens/Settings';
 import Vents from '../screens/Vents';
 import LightScreenTablet from '../screens/LightScreenTablet';
 import ClimateControl from '../screens/ClimateControlScreenTablet';
-import Profile from '../screens/Profile';
 
 const TabletNavigator = () => {
   const [showAnimatedSplash, setShowAnimatedSplash] = useState(true);
@@ -57,40 +55,22 @@ const TabletNavigator = () => {
     }
   };
 
-  // Tablet Tab Content Component
-  const TabletTabContent = () => {
-    const { currentScreen } = useNavigation();
-
-    // Define the same six routes as TabletTabs, with components + Ionicons icon names
-    const ROUTES = [
-      { name: 'Home',            icon: 'home-outline',              component: MainScreen },
-      { name: 'System',          icon: 'stats-chart-outline',       component: LightScreenTablet }, 
-      { name: 'Air Conditioning',icon: 'snow-outline',              component: ClimateControl },
-      { name: 'Vents',           icon: 'cloud-outline',             component: Vents },
-      { name: 'Victron',         icon: 'battery-charging-outline',  component: System },            
-      { name: 'Settings',        icon: 'settings-outline',          component: Settings },
-    ];
-
-    // If a screen is pushed (like Profile), show it instead of tabs
-    if (currentScreen) {
-      if (currentScreen.screen === 'Profile') {
-        return <Profile />;
-      }
-    }
-
-    return (
-      <AnimatedTabletTabs
-        tabs={ROUTES}
-        initialTab="Home"
-        // onTabChange={(name) => console.log('Active tab:', name)}
-      />
-    );
-  };
+  // Define the same six routes as TabletTabs, with components + Ionicons icon names
+  const ROUTES = [
+    { name: 'Home',            icon: 'home-outline',              component: MainScreen },
+    { name: 'System',          icon: 'stats-chart-outline',       component: LightScreenTablet }, // matches your TabletTabs mapping
+    { name: 'Air Conditioning',icon: 'snow-outline',              component: ClimateControl },
+    { name: 'Vents',           icon: 'cloud-outline',             component: Vents },
+    { name: 'Victron',         icon: 'battery-charging-outline',  component: System },            // matches your TabletTabs mapping
+    { name: 'Settings',        icon: 'settings-outline',          component: Settings },
+  ];
 
   const MainAppContent = () => (
-    <NavigationProvider>
-      <TabletTabContent />
-    </NavigationProvider>
+    <AnimatedTabletTabs
+      tabs={ROUTES}
+      initialTab="Home"
+      // onTabChange={(name) => console.log('Active tab:', name)}
+    />
   );
 
   if (showAnimatedSplash) {
