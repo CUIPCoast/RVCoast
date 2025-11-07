@@ -1,5 +1,5 @@
 import React from "react";
-import Home from "../../screens/Home";
+import Home from "../../screens/home";
 import Devices from "../../screens/Devices";
 import Settings from "../../screens/Settings";
 import System from "../../screens/System";

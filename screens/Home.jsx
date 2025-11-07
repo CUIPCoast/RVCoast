@@ -28,6 +28,7 @@ import ToggleSwitch from "../components/ToggleSwitch.jsx";
 import { useRVClimate, useRVWater } from "../API/RVStateManager/RVStateHooks";
 import { Feather, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { get } from "react-native/Libraries/TurboModule/TurboModuleRegistry";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
 
@@ -46,6 +47,33 @@ const Home = () => {
   // Get RV state
   const { climate } = useRVClimate();
   const { water } = useRVWater();
+
+  // Load energy mode state from AsyncStorage on mount
+  useEffect(() => {
+    const loadEnergyMode = async () => {
+      try {
+        const savedEnergyMode = await AsyncStorage.getItem('energyModeState');
+        if (savedEnergyMode !== null) {
+          setIsEnergyMode(JSON.parse(savedEnergyMode));
+        }
+      } catch (error) {
+        console.error('Error loading energy mode state:', error);
+      }
+    };
+    loadEnergyMode();
+  }, []);
+
+  // Save energy mode state to AsyncStorage when it changes
+  useEffect(() => {
+    const saveEnergyMode = async () => {
+      try {
+        await AsyncStorage.setItem('energyModeState', JSON.stringify(isEnergyMode));
+      } catch (error) {
+        console.error('Error saving energy mode state:', error);
+      }
+    };
+    saveEnergyMode();
+  }, [isEnergyMode]);
 
   const animateButtonPress = (callback) => {
     Animated.sequence([
@@ -215,18 +243,18 @@ const Home = () => {
               <View style={styles.statusItem}>
                 <View style={[
                   styles.statusIconContainer,
-                  water?.pumpOn ? styles.statusActive : styles.statusInactive
+                  water?.pumpOn?.isOn ? styles.statusActive : styles.statusInactive
                 ]}>
                   <Ionicons
                     name="water"
                     size={18}
-                    color={water?.pumpOn ? '#3b82f6' : 'rgba(255,255,255,0.6)'}
+                    color={water?.pumpOn?.isOn ? '#3b82f6' : 'rgba(255,255,255,0.6)'}
                   />
                 </View>
                 <Text style={styles.statusLabel}>Pump</Text>
                 <View style={[
                   styles.statusDot,
-                  water?.pumpOn ? styles.dotActive : styles.dotInactive
+                  water?.pumpOn?.isOn ? styles.dotActive : styles.dotInactive
                 ]} />
               </View>
 
@@ -234,18 +262,18 @@ const Home = () => {
               <View style={styles.statusItem}>
                 <View style={[
                   styles.statusIconContainer,
-                  water?.heaterOn ? styles.statusActive : styles.statusInactive
+                  water?.heaterOn?.isOn ? styles.statusActive : styles.statusInactive
                 ]}>
                   <MaterialCommunityIcons
                     name="water-boiler"
                     size={18}
-                    color={water?.heaterOn ? '#ef4444' : 'rgba(255,255,255,0.6)'}
+                    color={water?.heaterOn?.isOn ? '#ef4444' : 'rgba(255,255,255,0.6)'}
                   />
                 </View>
                 <Text style={styles.statusLabel}>W.Heater</Text>
                 <View style={[
                   styles.statusDot,
-                  water?.heaterOn ? styles.dotActive : styles.dotInactive
+                  water?.heaterOn?.isOn ? styles.dotActive : styles.dotInactive
                 ]} />
               </View>
 
