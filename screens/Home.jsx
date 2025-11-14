@@ -22,7 +22,7 @@ import {
   Padding,
   isDarkMode
 } from "../GlobalStyles";
-import { useScreenSize, getWeatherIcon, fetchHourlyWeather, formatWeatherItem } from "../helper";
+import { useScreenSize, getWeatherIcon, fetchHourlyWeather, formatWeatherItem, wp, hp, fs, spacing, br } from "../helper";
 import AirCon from "./AirCon";
 import ToggleSwitch from "../components/ToggleSwitch.jsx";
 import { useRVClimate, useRVWater } from "../API/RVStateManager/RVStateHooks";
@@ -422,23 +422,23 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'ios' ? 50 : 40,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? hp(50) : hp(40),
+    paddingBottom: hp(20),
+    paddingHorizontal: wp(20),
     backgroundColor: 'rgba(0, 0, 0, 0.25)', // Subtle dark overlay for text readability
   },
 
   topOverlaySection: {
-    gap: 16,
+    gap: spacing(16),
   },
 
   greetingContainer: {
-    gap: 4,
-    bottom: 30,
+    gap: spacing(4),
+    bottom: hp(30),
   },
 
   greetingText: {
-    fontSize: 32,
+    fontSize: fs(32),
     fontFamily: FontFamily.latoBold,
     fontWeight: '800',
     color: '#ffffff',
@@ -449,36 +449,36 @@ const styles = StyleSheet.create({
   },
 
   timeText: {
-    fontSize: 18,
+    fontSize: fs(18),
     fontFamily: FontFamily.latoRegular,
     color: 'rgba(255, 255, 255, 0.9)',
     letterSpacing: 0.5,
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
-    bottom:30,
-    left:10,
+    bottom: hp(30),
+    left: wp(10),
   },
 
   quickWeatherContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 16,
-    gap: 12,
+    paddingVertical: hp(10),
+    paddingHorizontal: wp(16),
+    borderRadius: br(16),
+    gap: spacing(12),
     alignSelf: 'flex-start',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
 
   quickWeatherInfo: {
-    gap: 2,
+    gap: spacing(2),
   },
 
   quickWeatherTemp: {
-    fontSize: 20,
+    fontSize: fs(20),
     fontFamily: FontFamily.latoBold,
     fontWeight: '700',
     color: '#ffffff',
@@ -486,7 +486,7 @@ const styles = StyleSheet.create({
   },
 
   quickWeatherCondition: {
-    fontSize: 12,
+    fontSize: fs(12),
     fontFamily: FontFamily.latoRegular,
     color: 'rgba(255, 255, 255, 0.85)',
     letterSpacing: 0.3,
@@ -494,19 +494,19 @@ const styles = StyleSheet.create({
 
   bottomOverlaySection: {
     backgroundColor: 'rgba(26, 26, 26, 0.85)',
-    borderRadius: 20,
-    padding: 18,
+    borderRadius: br(20),
+    padding: spacing(18),
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.15)',
-    bottom:40,
+    bottom: hp(40),
   },
 
   systemStatusTitle: {
-    fontSize: 14,
+    fontSize: fs(14),
     fontFamily: FontFamily.latoBold,
     fontWeight: '700',
     color: 'rgba(255, 255, 255, 0.7)',
-    marginBottom: 14,
+    marginBottom: hp(14),
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
@@ -514,19 +514,19 @@ const styles = StyleSheet.create({
   statusIndicators: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 8,
+    gap: spacing(8),
   },
 
   statusItem: {
     flex: 1,
     alignItems: 'center',
-    gap: 8,
+    gap: spacing(8),
   },
 
   statusIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: wp(44),
+    height: wp(44),
+    borderRadius: wp(22),
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
@@ -543,7 +543,7 @@ const styles = StyleSheet.create({
   },
 
   statusLabel: {
-    fontSize: 11,
+    fontSize: fs(11),
     fontFamily: FontFamily.latoRegular,
     fontWeight: '600',
     color: 'rgba(255, 255, 255, 0.7)',
@@ -551,9 +551,9 @@ const styles = StyleSheet.create({
   },
 
   statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: wp(6),
+    height: wp(6),
+    borderRadius: wp(3),
   },
 
   dotActive: {
@@ -571,21 +571,21 @@ const styles = StyleSheet.create({
   contentContainer: {
     flex: 1,
     justifyContent: 'flex-end',
-    paddingHorizontal: 20,
-    paddingBottom: 24,
+    paddingHorizontal: wp(20),
+    paddingBottom: hp(24),
     zIndex: 2,
   },
 
   // Weather Section - Modernized
   weatherContainer: {
     backgroundColor: isDarkMode ? 'rgba(40, 40, 40, 0.95)' : 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: br(20),
+    padding: spacing(16),
+    marginBottom: hp(16),
     backdropFilter: 'blur(10px)',
     borderWidth: 1,
     borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
-    maxHeight: 170,
+    maxHeight: hp(170),
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -601,56 +601,56 @@ const styles = StyleSheet.create({
 
   weatherTitle: {
     color: isDarkMode ? Color.colorWhitesmoke_100 : Color.colorDarkslategray_200,
-    fontSize: 16,
+    fontSize: fs(16),
     fontFamily: FontFamily.latoBold,
     letterSpacing: 0.3,
-    marginBottom: 12,
+    marginBottom: hp(12),
   },
 
   weatherList: {
-    paddingVertical: 2,
+    paddingVertical: hp(2),
   },
 
   weatherItemContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 10,
-    marginRight: 10,
+    padding: spacing(10),
+    marginRight: wp(10),
     backgroundColor: isDarkMode ? 'rgba(50, 50, 50, 0.6)' : 'rgba(245, 245, 245, 0.8)',
-    borderRadius: 14,
-    minWidth: 68,
+    borderRadius: br(14),
+    minWidth: wp(68),
     borderWidth: 1,
     borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
   },
 
   weatherHour: {
     color: isDarkMode ? Color.colorWhitesmoke_100 : Color.colorDarkslategray_200,
-    fontSize: 11,
+    fontSize: fs(11),
     fontFamily: FontFamily.latoRegular,
-    marginBottom: 4,
+    marginBottom: hp(4),
     opacity: 0.8,
   },
 
   weatherIcon: {
-    fontSize: 24,
-    marginVertical: 6,
+    fontSize: fs(24),
+    marginVertical: hp(6),
   },
 
   weatherTemp: {
     color: isDarkMode ? Color.colorWhitesmoke_100 : Color.colorDarkslategray_200,
-    fontSize: 13,
+    fontSize: fs(13),
     fontFamily: FontFamily.latoBold,
-    marginTop: 4,
+    marginTop: hp(4),
   },
 
   weatherPlaceholder: {
-    padding: 16,
+    padding: spacing(16),
     alignItems: 'center',
   },
 
   weatherPlaceholderText: {
     color: isDarkMode ? Color.colorWhitesmoke_100 : Color.colorDarkslategray_200,
-    fontSize: 13,
+    fontSize: fs(13),
     fontFamily: FontFamily.latoRegular,
     opacity: 0.5,
   },
@@ -659,15 +659,15 @@ const styles = StyleSheet.create({
   cardsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 20,
-    gap: 14,
+    marginBottom: hp(20),
+    gap: spacing(14),
   },
 
   cardCommon: {
     flex: 1,
     backgroundColor: isDarkMode ? 'rgba(40, 40, 40, 0.95)' : 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 20,
-    padding: 18,
+    borderRadius: br(20),
+    padding: spacing(18),
     borderWidth: 1,
     borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
     ...Platform.select({
@@ -686,28 +686,28 @@ const styles = StyleSheet.create({
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: hp(10),
   },
 
   humidityIcon: {
-    height: 28,
-    width: 28,
-    marginRight: 10,
+    height: wp(28),
+    width: wp(28),
+    marginRight: wp(10),
     tintColor: isDarkMode ? Color.colorWhitesmoke_100 : Color.colorDarkslategray_200,
   },
 
   cardValue: {
     color: isDarkMode ? Color.colorWhitesmoke_100 : Color.colorDarkslategray_200,
-    fontSize: 34,
+    fontSize: fs(34),
     fontFamily: FontFamily.latoBold,
     letterSpacing: -0.5,
   },
 
   cardLabel: {
     color: isDarkMode ? Color.colorWhitesmoke_100 : Color.colorDarkslategray_200,
-    fontSize: 13,
+    fontSize: fs(13),
     fontFamily: FontFamily.latoRegular,
-    marginBottom: 14,
+    marginBottom: hp(14),
     opacity: 0.7,
     letterSpacing: 0.2,
   },
@@ -715,7 +715,7 @@ const styles = StyleSheet.create({
   dividerLine: {
     borderTopWidth: 1,
     borderTopColor: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
-    marginBottom: 14,
+    marginBottom: hp(14),
   },
 
   energyModeContainer: {
@@ -726,16 +726,16 @@ const styles = StyleSheet.create({
 
   energyModeLabel: {
     color: isDarkMode ? Color.colorWhitesmoke_100 : Color.colorDarkslategray_200,
-    fontSize: 14,
+    fontSize: fs(14),
     fontFamily: FontFamily.latoRegular,
     letterSpacing: 0.2,
   },
 
   acControlButton: {
     backgroundColor: Color.colorSandybrown,
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
+    borderRadius: br(14),
+    paddingVertical: hp(14),
+    paddingHorizontal: wp(20),
     alignItems: 'center',
     justifyContent: 'center',
     ...Platform.select({
@@ -753,7 +753,7 @@ const styles = StyleSheet.create({
 
   acButtonText: {
     color: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
-    fontSize: 15,
+    fontSize: fs(15),
     fontFamily: FontFamily.latoBold,
     letterSpacing: 0.3,
   },
@@ -768,10 +768,10 @@ const styles = StyleSheet.create({
 
   airConContainer: {
     width: width * 0.92,
-    maxWidth: 420,
+    maxWidth: wp(420),
     height: height * 0.65,
-    maxHeight: 520,
-    borderRadius: 24,
+    maxHeight: hp(520),
+    borderRadius: br(24),
     overflow: 'hidden',
     ...Platform.select({
       ios: {

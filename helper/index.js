@@ -61,3 +61,31 @@ export { default as useScreenSize } from './useScreenSize.jsx';
 
 // Device detection helper
 export { default as deviceDetection } from './deviceDetection.js';
+
+// Responsive utilities for dynamic sizing (mobile only)
+export {
+  default as responsiveUtils,
+  wp,
+  hp,
+  fs,
+  spacing,
+  ms,
+  br,
+  percentWidth,
+  percentHeight,
+  iconSize,
+  buttonHeight,
+  isTablet,
+  getDeviceInfo
+} from './responsiveUtils.js';
+
+// Responsive styles (mobile only)
+export {
+  default as ResponsiveStyles,
+  ResponsiveFontSize,
+  ResponsiveBorder,
+  ResponsiveGap,
+  ResponsivePadding,
+  ResponsiveDimensions,
+  ResponsiveLayout
+} from './responsiveStyles.js';
