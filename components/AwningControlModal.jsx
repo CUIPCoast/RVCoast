@@ -215,12 +215,12 @@ const AwningControlModal = ({ isVisible, onClose }) => {
    */
   const resumeProgress = (state) => {
     console.log('Resuming progress from state:', state);
-    
+
     // Calculate how much time has passed since the operation started
     const now = Date.now();
     const elapsed = now - state.startTime;
     const duration = state.isExtending ? EXTEND_DURATION : RETRACT_DURATION;
-    
+
     // Calculate what the current progress should be based on elapsed time
     let currentProgress;
     if (state.isExtending) {
@@ -230,12 +230,12 @@ const AwningControlModal = ({ isVisible, onClose }) => {
       const progressDelta = (elapsed / duration) * 100;
       currentProgress = Math.max(0, state.pausedAt - progressDelta);
     }
-    
+
     // Check if operation should have already completed
     if ((state.isExtending && currentProgress >= 100) || (state.isRetracting && currentProgress <= 0)) {
       // Operation completed while modal was closed
       console.log('Operation completed while modal was closed');
-      
+
       AwningStateManager.setState({
         progress: state.isExtending ? 100 : 0,
         isExtending: false,
@@ -244,32 +244,43 @@ const AwningControlModal = ({ isVisible, onClose }) => {
         startTime: null,
         pausedAt: state.isExtending ? 100 : 0
       });
-      
+
       setProgress(state.isExtending ? 100 : 0);
       setIsExtending(false);
       setIsRetracting(false);
       setIsStopped(true);
       progressAnim.setValue(state.isExtending ? 100 : 0);
-      
+
       updateStatus(
         state.isExtending ? 'Awning fully extended' : 'Awning fully retracted',
         3000
       );
-      
+
       return;
     }
-    
-    // Update current progress
-    AwningStateManager.setState({ progress: currentProgress });
+
+    // Update current progress AND ensure state is properly synced
+    AwningStateManager.setState({
+      progress: currentProgress,
+      isExtending: state.isExtending,
+      isRetracting: state.isRetracting,
+      isStopped: false,
+      startTime: state.startTime,
+      pausedAt: state.pausedAt
+    });
+
     setProgress(currentProgress);
+    setIsExtending(state.isExtending);
+    setIsRetracting(state.isRetracting);
+    setIsStopped(false);
     progressAnim.setValue(currentProgress);
-    
+
     // Start the interval to continue tracking
     if (progressInterval.current) {
       clearInterval(progressInterval.current);
     }
     progressInterval.current = setInterval(updateProgress, 100);
-    
+
     console.log(`Progress resumed at ${currentProgress.toFixed(1)}%`);
   };
 
@@ -365,14 +376,9 @@ const AwningControlModal = ({ isVisible, onClose }) => {
     if (isVisible) {
       try {
         canBusListener.current = createAwningCANListener();
-        
+
         canBusListener.current.on('awningStateChange', (state) => {
-          const timeSinceLastCommand = AwningStateManager.lastCommandTime ? 
-            Date.now() - AwningStateManager.lastCommandTime : Infinity;
-          
-          if (timeSinceLastCommand > 1000) {
-            handleAwningStateChange(state);
-          }
+          handleAwningStateChange(state);
         });
         
         canBusListener.current.on('connected', () => {
@@ -405,7 +411,24 @@ const AwningControlModal = ({ isVisible, onClose }) => {
    */
   const handleAwningStateChange = (state) => {
     console.log('CAN: Awning state change detected:', state);
-    
+
+    // Get time since last command
+    const timeSinceLastCommand = AwningStateManager.lastCommandTime ?
+      Date.now() - AwningStateManager.lastCommandTime : Infinity;
+
+    // Ignore CAN updates for 1 second after any user command to prevent interference
+    if (timeSinceLastCommand < 1000) {
+      console.log('CAN: Ignoring state change - waiting for command to settle');
+      return;
+    }
+
+    // If user recently stopped, ignore CAN updates trying to restart movement for longer
+    // This prevents the awning from auto-restarting when modal reopens
+    if (AwningStateManager.lastCommand === 'stop' && timeSinceLastCommand < 10000) {
+      console.log('CAN: Ignoring state change - user recently stopped awning');
+      return;
+    }
+
     if (state.isExtending && !AwningStateManager.isExtending) {
       updateStatus('CAN: Extending detected', 0);
       startProgress('extend');
