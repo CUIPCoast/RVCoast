@@ -4,7 +4,8 @@ import { StyleSheet, View, Text, Image, TouchableOpacity, TouchableWithoutFeedba
 import { Color, isDarkMode } from "../GlobalStyles";
 import useScreenSize from "../helper/useScreenSize.jsx";
 import { Col, Row, Grid } from "react-native-easy-grid";
-import { RadialSlider } from 'react-native-radial-slider';
+import ToggleTile from '../components/ToggleTile';
+import ThermostatDial from '../components/ThermostatDial';
 import moment from 'moment';
 import { ClimateService } from '../API/RVControlServices.js';
 import { RVControlService } from "../API/rvAPI";
@@ -61,6 +62,9 @@ const ClimateControlScreenTablet = () => {
   const isSlidingRef = useRef(false);
   const tempChangeTimeoutRef = useRef(null);
   const lastSentTempRef = useRef(initialTemp);
+  // Mirrors `temp` so the slider callback can tell real drags from echoes.
+  const tempRef = useRef(initialTemp);
+  tempRef.current = temp;
   
   var now = moment().format();
   var currentDate = moment().format("MMMM Do, YYYY");
@@ -192,8 +196,11 @@ const ClimateControlScreenTablet = () => {
     return unsubscribe;
   }, [temp, isCoolToggled, isToekickToggled, isFurnaceToggled]);
 
-  // Handle temperature change from RadialSlider with improved responsiveness
+  // Handle temperature change from the thermostat dial
   const handleTempChange = (newTemp) => {
+    // Guard against echoes of our own value (onChange should only be user input).
+    if (newTemp === tempRef.current) return;
+    tempRef.current = newTemp;
     console.log('ClimateControl: Slider changed to:', newTemp);
     
     // Mark that we're actively sliding
@@ -858,64 +865,15 @@ const ClimateControlScreenTablet = () => {
                 }}
               />
               <View style={styles.container}>
-                <RadialSlider
+                <ThermostatDial
+                  size={240}
                   value={temp}
-                  min={60}
-                  max={85}
-                  thumbColor={"#FFFFFF"}
-                  thumbBorderColor={"#848482"}
-                  sliderTrackColor={"#E5E5E5"}
-                  linearGradient={[
-                    { offset: '0%', color: '#ffaca6' },
-                    { offset: '100%', color: '#FF8200' },
-                  ]}
                   onChange={handleTempChange}
-                  onComplete={() => {
-                    console.log('ClimateControl: Slider interaction complete');
+                  onChangeEnd={() => {
                     isSlidingRef.current = false;
                   }}
-                  subTitle={'Degrees'}
-                  subTitleStyle={{
-                    color: isDarkMode ? 'white' : 'black',
-                    paddingBottom: 15,
-                    fontSize: 20,
-                  }}
-                  unitStyle={{
-                    color: isDarkMode ? 'white' : 'black',
-                    paddingTop: 5,
-                  }}
-                  valueStyle={{
-                    color: isDarkMode ? 'white' : 'black',
-                    paddingTop: 5,
-                    fontSize: 48,
-                  }}
-                  style={{
-                    backgroundColor: '#1B1B1B', 
-                  }}
-                  buttonContainerStyle={{
-                    color: "FFFFFF",
-                  }}
-                  leftIconStyle={{
-                    backgroundColor: 'white',
-                    borderRadius: 10,
-                    marginRight: 10,
-                    top: 40,
-                    height: 40,
-                    width: 50,
-                    paddingLeft: 4,
-                  }}
-                  rightIconStyle={{
-                    backgroundColor: 'white',
-                    borderRadius: 10,
-                    marginLeft: 10,
-                    top: 40,
-                    height: 40,
-                    width: 50,
-                    paddingLeft: 5,
-                  }}
-                  isHideTailText={true}
-                  unit={'°F'}
                 />
+
               </View>
             </Col>
             
@@ -987,84 +945,32 @@ const ClimateControlScreenTablet = () => {
                         flex: 0.75, 
                         justifyContent: "flex-start"
                       }}>
-                        {features.map((feature, index) => {
+                        {features.map((feature) => {
                           const isActive = (feature.label === "Cool" && isCoolToggled) ||
                                           (feature.label === "Toe Kick" && isToekickToggled) ||
                                           (feature.label === "Furnace" && isFurnaceToggled);
-                          
-                          const getGradientColors = (label, active) => {
-                            if (!active) return ["#2C2C34", "#3A3A42", "#2C2C34"];
-                            
-                            switch (label) {
-                              case "Cool":
-                                return ["#4FC3F7", "#29B6F6", "#0288D1"];
-                              case "Toe Kick":
-                                return ["#FF9800", "#FFB74D", "#FF8F00"];
-                              case "Furnace":
-                                return ["#FF6B6B", "#FF8E53", "#FF6B35"];
-                              default:
-                                return ["#2C2C34", "#3A3A42", "#2C2C34"];
-                            }
-                          };
-                          
-                          const getIconName = (label, active) => {
-                            switch (label) {
-                              case "Cool":
-                                return active ? "snow" : "snow-outline";
-                              case "Toe Kick":
-                                return active ? "flame" : "flame-outline";
-                              case "Furnace":
-                                return active ? "bonfire" : "bonfire-outline";
-                              default:
-                                return "help-outline";
-                            }
-                          };
-                          
+                          const tile = {
+                            "Cool": { label: "Cooling", icon: "snowflake", onText: "On" },
+                            "Toe Kick": { label: "Toe Kick", icon: "radiator", onText: "Heating" },
+                            "Furnace": { label: "Furnace", icon: "fire", onText: "On" },
+                          }[feature.label];
+
                           return (
-                            <TouchableOpacity
-                              key={index}
+                            <ToggleTile
+                              key={feature.label}
+                              size="row"
+                              label={tile.label}
+                              icon={tile.icon}
+                              isOn={isActive}
                               onPress={() => handleButtonPress(feature.label)}
                               disabled={isLoading}
-                              activeOpacity={0.8}
-                              style={[
-                                styles.modernButton,
-                                isLoading && { opacity: 0.6 }
-                              ]}
-                            >
-                              <LinearGradient
-                                colors={getGradientColors(feature.label, isActive)}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={styles.modernGradientButton}
-                              >
-                                <View style={styles.modernButtonContent}>
-                                  <View style={[
-                                    styles.modernIconContainer,
-                                    { backgroundColor: isActive ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)' }
-                                  ]}>
-                                    <Ionicons
-                                      name={getIconName(feature.label, isActive)}
-                                      size={20}
-                                      color={isActive ? "#FFF" : "#B0B0B0"}
-                                    />
-                                  </View>
-                                  <View style={styles.modernTextContainer}>
-                                    <Text style={[
-                                      styles.modernButtonTitle,
-                                      { color: isActive ? "#FFF" : "#E0E0E0" }
-                                    ]}>
-                                      {feature.label}
-                                    </Text>
-                                  </View>
-                                  <View style={[
-                                    styles.modernStatusIndicator,
-                                    { backgroundColor: isActive ? "#4CAF50" : "#666" }
-                                  ]} />
-                                </View>
-                              </LinearGradient>
-                            </TouchableOpacity>
+                              onText={tile.onText}
+                              offText="Off"
+                              style={{ marginBottom: 10 }}
+                            />
                           );
                         })}
+
                       </View>
                       
                       {/* Right column: Fan Speed container */}

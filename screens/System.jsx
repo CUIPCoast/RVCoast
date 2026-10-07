@@ -619,7 +619,7 @@ const styles = StyleSheet.create({
   // Map, errors - Modernized
   mapSection: { marginBottom: 24, marginTop: 8 },
   mapTitle: { color: '#FFFFFF', fontSize: 20, fontFamily: FontFamily.latoBold, fontWeight: '700', marginBottom: 16, letterSpacing: 0.3 },
-  mapContainer: { borderRadius: 16, overflow: 'hidden', height: 220, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 6 },
+  mapContainer: { borderRadius: 16, overflow: 'hidden', height: 260, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 6 },
   errorContainer: { backgroundColor: '#F44336', borderRadius: 16, padding: 20, marginBottom: 24, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.2)', shadowColor: '#F44336', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
   errorText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600', textAlign: 'center', marginBottom: 14, fontFamily: FontFamily.latoRegular, letterSpacing: 0.2 },
   retryButton: { backgroundColor: '#FFFFFF', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4, elevation: 3 },

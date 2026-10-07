@@ -8,8 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import rvStateManager from '../API/RVStateManager/RVStateManager';
 import { FontFamily } from "../GlobalStyles";
 
-// Import our new scalable button
-import FanButton from '../components/FanButton';
+import ToggleTile from '../components/ToggleTile';
 
 const Vents = () => {
   const [isBathroomFanOn, setBathroomFanOn] = useState(false);
@@ -145,22 +144,22 @@ const Vents = () => {
   };
 
   const renderControls = () => (
-    <View style={styles.fanControlsContainer}>
-      <FanButton
-        size={240}
+    <View style={[styles.fanControlsContainer, !isTablet && styles.fanControlsMobile]}>
+      <ToggleTile
+        size={isTablet ? 'large' : 'compact'}
         isOn={isBayVentFanOn}
         onPress={() => toggleFan('bay')}
-        iconName="sun"
+        icon="hvac"
         label="Bay Vent"
-        loading={isLoading}
+        disabled={isLoading}
       />
-      <FanButton
-        size={240}
+      <ToggleTile
+        size={isTablet ? 'large' : 'compact'}
         isOn={isBathroomFanOn}
         onPress={() => toggleFan('bath')}
-        iconName="wind"
+        icon="fan"
         label="Bath Fan"
-        loading={isLoading}
+        disabled={isLoading}
       />
     </View>
   );
@@ -214,13 +213,16 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center', padding: 20 },
   headerText: { color: '#FFF', fontSize: 24, fontWeight: '600', fontFamily: FontFamily.latoBold },
   centered: { justifyContent: 'center', alignItems: 'center' },
-  fanControlsContainer: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-around',
-    alignItems: 'center', 
-    marginVertical: 20, 
-    paddingHorizontal: 10,
-    width: '50%',
+  fanControlsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: 20,
+    gap: 32,
+  },
+  fanControlsMobile: {
+    width: '100%',
+    gap: 12,
   },
   mobileStatusContainer: { position: 'absolute', bottom: 50, backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 5, alignSelf: 'center', zIndex: 1000 },
   statusText: { color: '#FFF', fontSize: 12, fontWeight: '700', fontFamily: FontFamily.latoBold },

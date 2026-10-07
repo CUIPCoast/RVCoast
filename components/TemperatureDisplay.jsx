@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
+import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from "react-native";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import useTemperature from "../hooks/useTemperature";
 import useScreenSize from "../helper/useScreenSize";
+import { FontFamily } from "../GlobalStyles";
+
+const ACCENT = '#FFB267';
 
 /**
  * Real-time Temperature Display Component
@@ -72,116 +76,71 @@ const TemperatureDisplay = ({
   };
 
   if (isTablet) {
+    const statusLabel = isLoading ? 'Connecting' : isConnected ? 'Live' : error ? 'Error' : 'Offline';
+    const statusColor = isLoading ? ACCENT : isConnected ? '#4ADE80' : error ? '#FF6B6B' : '#9E9696';
+
     return (
-      <View style={[{ alignItems: 'center', padding: 16 }, style]}>
-        {/* Main temperature display */}
-        <TouchableOpacity 
+      <View style={[tabletStyles.card, style]}>
+        <TouchableOpacity
           onPress={handlePress}
-          activeOpacity={0.7}
-          style={{
-            alignItems: 'center',
-            backgroundColor: isConnected ? 'rgba(16, 185, 129, 0.1)' : 'rgba(107, 114, 128, 0.1)',
-            borderRadius: 12,
-            padding: 16,
-            borderWidth: 1,
-            borderColor: isConnected ? '#10B981' : '#6B7280',
-          }}
+          activeOpacity={0.75}
+          style={tabletStyles.body}
+          accessibilityRole="button"
+          accessibilityLabel={`Ambient temperature ${error ? 'unavailable' : formattedTemperature}, ${statusLabel}`}
+          accessibilityHint={onTemperaturePress ? undefined : 'Switches between Fahrenheit and Celsius'}
         >
-          {/* Connection status and loading indicator */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-            {isLoading ? (
-              <ActivityIndicator size="small" color="#F59E0B" style={{ marginRight: 8 }} />
-            ) : (
-              <Text style={{ 
-                color: connectionIndicator.color, 
-                fontSize: 16, 
-                marginRight: 8 
-              }}>
-                {connectionIndicator.icon}
-              </Text>
-            )}
-            <Text className="text-gray-400 text-sm">
-              Ambient Temperature
-            </Text>
+          {/* Header */}
+          <View style={tabletStyles.header}>
+            <View style={tabletStyles.iconCircle}>
+              <MaterialCommunityIcons name="thermometer" size={18} color={ACCENT} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={tabletStyles.title} numberOfLines={1}>Ambient</Text>
+              <View style={tabletStyles.statusRow}>
+                {isLoading ? (
+                  <ActivityIndicator size="small" color={ACCENT} style={{ transform: [{ scale: 0.6 }], marginRight: 2 }} />
+                ) : (
+                  <View style={[tabletStyles.statusDot, { backgroundColor: statusColor }]} />
+                )}
+                <Text style={[tabletStyles.statusText, { color: statusColor }]}>{statusLabel}</Text>
+              </View>
+            </View>
           </View>
 
           {/* Temperature value */}
-          <Text className="text-white text-4xl font-bold">
+          <Text style={tabletStyles.value} numberOfLines={1} adjustsFontSizeToFit>
             {error ? '--' : formattedTemperature}
           </Text>
 
-          {/* Last update time */}
-          {connectionStatus.lastUpdate && (
-            <Text className="text-gray-400 text-xs mt-2">
-              Updated {getTimeSinceUpdate()}
-            </Text>
+          {/* Setpoints if requested */}
+          {showSetpoints && !error && (
+            <View style={tabletStyles.setpoints}>
+              <Text style={tabletStyles.setpointText}>
+                Heat {setpoints.heat !== null ? `${setpoints.heat.toFixed(0)}${setpoints.unit}` : '--'}
+              </Text>
+              <Text style={tabletStyles.setpointText}>
+                Cool {setpoints.cool !== null ? `${setpoints.cool.toFixed(0)}${setpoints.unit}` : '--'}
+              </Text>
+            </View>
           )}
 
-          {/* Error message */}
-          {error && (
-            <Text className="text-red-400 text-sm mt-2 text-center">
-              {error}
+          {/* Footer */}
+          {error ? (
+            <TouchableOpacity
+              onPress={refresh}
+              style={tabletStyles.retry}
+              accessibilityRole="button"
+              accessibilityLabel="Retry temperature connection"
+            >
+              <Ionicons name="refresh" size={14} color={ACCENT} />
+              <Text style={tabletStyles.retryText}>Retry</Text>
+            </TouchableOpacity>
+          ) : (
+            <Text style={tabletStyles.updated} numberOfLines={1}>
+              {connectionStatus.lastUpdate ? `Updated ${getTimeSinceUpdate()}` : 'Waiting for data'}
             </Text>
           )}
         </TouchableOpacity>
-
-        {/* Setpoint temperatures if requested */}
-        {showSetpoints && (
-          <View style={{ marginTop: 16, width: '100%' }}>
-            <Text className="text-gray-400 text-sm mb-2 text-center">
-              Setpoints
-            </Text>
-            
-            <View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
-              {/* Heat setpoint */}
-              <View style={{ alignItems: 'center' }}>
-                <Text className="text-orange-400 text-sm">Heat</Text>
-                <Text className="text-white text-lg">
-                  {setpoints.heat !== null ? 
-                    `${setpoints.heat.toFixed(1)}${setpoints.unit}` : 
-                    '--'
-                  }
-                </Text>
-              </View>
-
-              {/* Cool setpoint */}
-              <View style={{ alignItems: 'center' }}>
-                <Text className="text-blue-400 text-sm">Cool</Text>
-                <Text className="text-white text-lg">
-                  {setpoints.cool !== null ? 
-                    `${setpoints.cool.toFixed(1)}${setpoints.unit}` : 
-                    '--'
-                  }
-                </Text>
-              </View>
-            </View>
-
-            {/* Operating mode */}
-            {setpoints.operatingMode && (
-              <Text className="text-gray-400 text-sm text-center mt-2">
-                Mode: {setpoints.operatingMode} | Fan: {setpoints.fanMode}
-              </Text>
-            )}
-          </View>
-        )}
-
-        {/* Refresh button for troubleshooting */}
-        {error && (
-          <TouchableOpacity 
-            onPress={refresh}
-            style={{
-              marginTop: 12,
-              backgroundColor: 'rgba(59, 130, 246, 0.1)',
-              borderRadius: 6,
-              paddingHorizontal: 12,
-              paddingVertical: 6,
-              borderWidth: 1,
-              borderColor: '#3B82F6'
-            }}
-          >
-            <Text className="text-blue-400 text-sm">Retry Connection</Text>
-          </TouchableOpacity>
-        )}
       </View>
     );
   }
@@ -242,5 +201,88 @@ const TemperatureDisplay = ({
     </View>
   );
 };
+
+const tabletStyles = StyleSheet.create({
+  card: {
+    backgroundColor: '#211D1D',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 178, 103, 0.18)',
+  },
+  body: {
+    flex: 1,
+    padding: 14,
+    justifyContent: 'space-between',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  iconCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255, 178, 103, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  title: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontFamily: FontFamily.latoBold,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 1,
+  },
+  statusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    marginRight: 5,
+  },
+  statusText: {
+    fontSize: 12,
+    fontFamily: FontFamily.latoRegular,
+  },
+  value: {
+    color: '#FFFFFF',
+    fontSize: 40,
+    fontFamily: FontFamily.latoBold,
+    marginTop: 6,
+  },
+  setpoints: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  setpointText: {
+    color: '#C9C1C1',
+    fontSize: 12,
+    fontFamily: FontFamily.latoRegular,
+  },
+  updated: {
+    color: '#9E9696',
+    fontSize: 12,
+    fontFamily: FontFamily.latoRegular,
+  },
+  retry: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    minHeight: 32,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 178, 103, 0.5)',
+  },
+  retryText: {
+    color: ACCENT,
+    fontSize: 13,
+    fontFamily: FontFamily.latoBold,
+    marginLeft: 6,
+  },
+});
 
 export default TemperatureDisplay;

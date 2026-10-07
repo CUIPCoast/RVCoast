@@ -37,9 +37,11 @@ export const toggleState = (currentState, setState) => {
  * Handle setting item press for Settings screen
  * @param {Object} item - Setting item
  * @param {function} showAlert - Alert function (from react-native Alert)
- * @param {Object} router - Router object for navigation
+ *
+ * The app only has the `index` route (tabs are rendered by our own navigators),
+ * so items must not router.push to screens that don't exist; that crashes.
  */
-export const handleSettingsItemPress = (item, showAlert, router) => {
+export const handleSettingsItemPress = (item, showAlert) => {
   const { key, label } = item;
   
   switch (key) {
@@ -62,9 +64,7 @@ export const handleSettingsItemPress = (item, showAlert, router) => {
       showAlert('Wi-Fi Status', 'Currently connected to: Home_Network');
       break;
     case 'featureSettings':
-      if (router && router.push) {
-        router.push('/feature-settings');
-      }
+      showAlert('Feature Settings', 'This would open feature-specific settings.');
       break;
     case 'batteryThresholds':
       showAlert('Battery Thresholds', 'This would open settings for configuring battery alerts.');

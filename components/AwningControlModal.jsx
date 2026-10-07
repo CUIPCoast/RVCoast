@@ -4,6 +4,9 @@ import { Color } from '../GlobalStyles';
 import { AwningService } from '../API/RVControlServices';
 import { createAwningCANListener } from '../Service/AwningCANListener';
 import { FontFamily } from "../GlobalStyles";
+import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import useScreenSize from '../helper/useScreenSize.jsx';
 /**
  * Enhanced Awning Control Modal with fluid command switching and CAN bus status detection
  * 
@@ -12,6 +15,8 @@ import { FontFamily } from "../GlobalStyles";
  * @param {Function} props.onClose Callback when modal is closed
  */
 const AwningControlModal = ({ isVisible, onClose }) => {
+  const isTablet = useScreenSize();
+  const insets = useSafeAreaInsets();
   // Core state
   const [statusMessage, setStatusMessage] = useState('Awning Ready');
   const [showStatus, setShowStatus] = useState(true);
@@ -638,70 +643,143 @@ const AwningControlModal = ({ isVisible, onClose }) => {
     };
   }, []);
 
+  // ——— Bottom sheet on phones, centered card on tablets ———
+  const isMoving = awningState.isExtending || awningState.isRetracting;
+  const motionLabel = awningState.isExtending
+    ? 'Extending'
+    : awningState.isRetracting
+      ? 'Retracting'
+      : awningState.position >= 1
+        ? 'Extended'
+        : awningState.position <= 0
+          ? 'Retracted'
+          : 'Stopped';
+  const fabricWidth = awningExtension.interpolate({ inputRange: [0, 1], outputRange: ['0%', '58%'] });
+  const progressWidth = awningExtension.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
+  const postHeight = supportPosts.interpolate({ inputRange: [0, 1], outputRange: [0, 80] });
+  const fabricTilt = fabricWave.interpolate({ inputRange: [-1, 1], outputRange: ['-1deg', '1deg'] });
+  const fabricShake = motorVibration.interpolate({ inputRange: [-3, 3], outputRange: [-0.5, 0.5] });
+
+  const controls = [
+    { command: 'retract', label: 'Retract', icon: 'arrow-collapse-left', active: awningState.isRetracting },
+    { command: 'stop', label: 'Stop', icon: 'stop', active: awningState.isStopped, danger: true },
+    { command: 'extend', label: 'Extend', icon: 'arrow-expand-right', active: awningState.isExtending },
+  ];
+
   return (
     <Modal
       visible={isVisible}
-      transparent={true}
-      animationType="slide"
+      transparent
+      animationType={isTablet ? 'fade' : 'slide'}
+      supportedOrientations={['portrait', 'landscape']}
       onRequestClose={onClose}
     >
-      <View style={styles.modalContainer}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Awning Control</Text>
+      <View style={[styles.backdrop, isTablet && styles.backdropTablet]}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="Close awning controls"
+        />
+        <View
+          style={[
+            styles.sheet,
+            isTablet ? styles.sheetTablet : { paddingBottom: insets.bottom + 20 },
+          ]}
+        >
+          {!isTablet && <View style={styles.grabber} />}
 
-
-
-          {/* Control Buttons - No loading states, instant response */}
-          <View style={styles.buttonRow}>
+          {/* Header */}
+          <View style={styles.header}>
+            <View style={styles.headerIcon}>
+              <MaterialCommunityIcons name="rv-truck" size={22} color="#FFB267" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.title}>Awning</Text>
+              <View style={styles.stateRow}>
+                <View style={[styles.stateDot, { backgroundColor: isMoving ? '#FFB267' : '#6B6363' }]} />
+                <Text style={styles.stateText}>{motionLabel}</Text>
+              </View>
+            </View>
             <TouchableOpacity
-              style={[
-                styles.actionButton,
-                awningState.isExtending && styles.activeButton
-              ]}
-              onPress={() => executeFluidCommand('extend')}
+              style={styles.closeIcon}
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
             >
-              <Text style={styles.buttonText}>Extend</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.actionButton,
-                styles.stopButton,
-                awningState.isStopped && styles.activeButton
-              ]}
-              onPress={() => executeFluidCommand('stop')}
-            >
-              <Text style={styles.buttonText}>Stop</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.actionButton,
-                awningState.isRetracting && styles.activeButton
-              ]}
-              onPress={() => executeFluidCommand('retract')}
-            >
-              <Text style={styles.buttonText}>Retract</Text>
+              <Ionicons name="close" size={22} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
 
-          {/* Status Message */}
-          {showStatus && (
-            <View style={styles.statusContainer}>
-              <Text style={styles.statusText}>{statusMessage}</Text>
-              <Text style={styles.statusSubText}>
-                CAN Bus: {canBusListener.current ? 'Monitoring' : 'Offline'}
-              </Text>
+          {/* Awning visual */}
+          <View style={styles.scene}>
+            <View style={styles.sceneGround} />
+            <View style={styles.rvBody}>
+              <View style={styles.rvWindow} />
+              <View style={styles.rvDoor} />
             </View>
-          )}
+            <View style={styles.rollerTube} />
+            <Animated.View
+              style={[
+                styles.fabric,
+                { width: fabricWidth, transform: [{ rotate: fabricTilt }, { translateY: fabricShake }] },
+              ]}
+            >
+              <View style={styles.fabricStripe} />
+              <Animated.View style={[styles.post, { height: postHeight }]} />
+            </Animated.View>
+            <Animated.View style={[styles.shade, { width: fabricWidth, opacity: shadowOpacity }]} />
+          </View>
 
-          {/* Close Button */}
-          <TouchableOpacity 
-            style={styles.closeButton}
-            onPress={onClose}
-          >
-            <Text style={styles.closeButtonText}>Close</Text>
-          </TouchableOpacity>
+          <View style={styles.progressTrack}>
+            <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
+          </View>
+          <View style={styles.progressLabels}>
+            <Text style={styles.progressLabel}>Retracted</Text>
+            <Text style={styles.progressLabel}>Extended</Text>
+          </View>
+
+          {/* Controls */}
+          <View style={styles.controls}>
+            {controls.map(({ command, label, icon, active, danger }) => {
+              const activeColor = danger ? '#FF6B6B' : '#FFB267';
+              return (
+                <TouchableOpacity
+                  key={command}
+                  style={[
+                    styles.control,
+                    isTablet && styles.controlTablet,
+                    active && { backgroundColor: activeColor, borderColor: activeColor },
+                  ]}
+                  onPress={() => executeFluidCommand(command)}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${label} awning`}
+                  accessibilityState={{ selected: active }}
+                >
+                  <MaterialCommunityIcons
+                    name={icon}
+                    size={isTablet ? 34 : 28}
+                    color={active ? '#1B1B1B' : danger ? '#FF6B6B' : '#FFFFFF'}
+                  />
+                  <Text style={[styles.controlLabel, { color: active ? '#1B1B1B' : '#FFFFFF' }]}>
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Status */}
+          <View style={styles.statusBar}>
+            <Ionicons name="information-circle-outline" size={16} color="#9E9696" />
+            <Text style={styles.statusMessage} numberOfLines={1}>
+              {showStatus ? statusMessage : 'Awning ready'}
+            </Text>
+            <Text style={styles.canStatus}>
+              CAN {canBusListener.current ? 'online' : 'offline'}
+            </Text>
+          </View>
         </View>
       </View>
     </Modal>
@@ -709,277 +787,244 @@ const AwningControlModal = ({ isVisible, onClose }) => {
 };
 
 const styles = StyleSheet.create({
-  modalContainer: {
+  backdrop: {
     flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  backdropTablet: {
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  modalContent: {
-    width: '90%',
-    maxWidth: 500,
-    backgroundColor: Color.colorGray_200,
-    borderRadius: 20,
-    padding: 25,
-    alignItems: 'center',
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontFamily: FontFamily.latoRegular,
-    fontWeight: 'bold',
-    color: Color.white0,
-    marginBottom: 20,
-  },
-  
-  // Demo toggle
-  demoToggle: {
-    backgroundColor: '#4A90E2',
-    paddingVertical: 8,
-    paddingHorizontal: 15,
-    borderRadius: 20,
-    marginBottom: 15,
+  sheetTablet: {
+    width: 600,
+    maxWidth: '90%',
+    borderRadius: 28,
     borderWidth: 1,
-    borderColor: '#357ABD',
+    paddingHorizontal: 28,
+    paddingTop: 24,
+    paddingBottom: 28,
   },
-  demoToggleActive: {
-    backgroundColor: '#2ECC71',
-    borderColor: '#27AE60',
+  controlTablet: {
+    height: 112,
+    borderRadius: 22,
   },
-  demoToggleText: {
-    color: Color.white0,
-    fontSize: 14,
-    fontFamily: FontFamily.latoRegular,
-    fontWeight: 'bold',
-    textAlign: 'center',
+  sheet: {
+    backgroundColor: '#211D1D',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderColor: 'rgba(255, 178, 103, 0.15)',
   },
-  
-  // Animation container
-  animationContainer: {
-    width: '100%',
-    height: 200,
-    marginBottom: 25,
-    position: 'relative',
-    backgroundColor: '#F0F8FF',
-    borderRadius: 15,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: '#4682B4',
-  },
-  
-  // Ground
-  ground: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 60,
-    backgroundColor: '#242124',
-  },
-  
-  // Shadow
-  groundShadow: {
-    position: 'absolute',
-    bottom: 55,
-    left: 80,
-    width: 60,
-    height: 8,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    borderRadius: 10,
-  },
-  
-  // RV
-  rv: {
-    width: 80,
-    height: 120,
-    backgroundColor: '#1B1B1B',
-    borderRadius: 8,
-    position: 'absolute',
-    left: 20,
-    bottom: 60,
-    borderWidth: 2,
-    borderColor: '#A9A9A9',
-  },
-  rvWindow: {
-    width: 30,
-    height: 25,
-    backgroundColor: '#ADD8E6',
-    borderRadius: 4,
-    position: 'absolute',
-    top: 15,
-    right: 10,
-    borderWidth: 1,
-    borderColor: '#4682B4',
-  },
-  rvVent: {
-    width: 35,
+  grabber: {
+    alignSelf: 'center',
+    width: 40,
     height: 5,
-    backgroundColor: '#696969',
     borderRadius: 3,
-    position: 'absolute',
-    top: 5,
-    right: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    marginBottom: 16,
   },
-  motorHousing: {
-    width: 12,
-    height: 8,
-    backgroundColor: '#2F2F2F',
-    borderRadius: 2,
-    position: 'absolute',
-    top: 50,
-    right: -6,
-    borderWidth: 1,
-    borderColor: '#000',
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 18,
   },
-  
-  // Awning mount
-  awningMount: {
+  headerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 178, 103, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  title: {
+    color: Color.white0,
+    fontSize: 22,
+    fontFamily: FontFamily.latoBold,
+    fontWeight: '700',
+  },
+  stateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  stateDot: {
     width: 8,
     height: 8,
-    backgroundColor: '#2F2F2F',
     borderRadius: 4,
-    position: 'absolute',
-    left: 100,
-    top: 110,
-    borderWidth: 1,
-    borderColor: '#000',
+    marginRight: 6,
   },
-  
-  // Awning fabric
-  awningFabric: {
-    backgroundColor: '#111111',
-    position: 'absolute',
-    left: 100,
-    bottom: 160,
-    borderRadius: 2,
-    borderWidth: 1,
-    borderColor: '#353839',
-  },
-  
-  // Awning arm
-  awningArm: {
-    height: 4,
-    backgroundColor: '#A9A9A9',
-    position: 'absolute',
-    left: 100,
-    bottom: 158,
-    borderRadius: 2,
-    borderWidth: 1,
-    borderColor: '#808080',
-    transformOrigin: 'left center',
-  },
-  
-  // Status indicator
-  statusIndicator: {
-    position: 'absolute',
-    bottom: 10,
-    left: 10,
-    right: 10,
-    alignItems: 'center',
-  },
-  animationStatus: {
-    fontSize: 12,
-    color: '#2F2F2F',
-    fontWeight: 'bold',
-    textAlign: 'center',
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  progressContainer: {
-    width: 200,
-    height: 4,
-    backgroundColor: 'rgba(255,255,255,0.4)',
-    borderRadius: 2,
-    marginTop: 5,
-    overflow: 'hidden',
-  },
-  progressBar: {
-    height: '100%',
-    backgroundColor: '#FF8200',
-    borderRadius: 2,
-  },
-  
-  // Buttons
-  buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-    marginBottom: 20,
-  },
-  actionButton: {
-    flex: 1,
-    backgroundColor: Color.white0,
-    paddingVertical: 15,
-    borderRadius: 12,
-    marginHorizontal: 5,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    // Remove any disabled styling - buttons are always responsive
-  },
-  activeButton: {
-    backgroundColor: '#FFB267',
-    borderColor: '#FF8200',
-    transform: [{ scale: 1.02 }], // Subtle scale for active state
-  },
-  stopButton: {
-    backgroundColor: '#FF6B6B',
-  },
-  buttonText: {
-    fontSize: 16,
+  stateText: {
+    color: '#C9C1C1',
+    fontSize: 14,
     fontFamily: FontFamily.latoRegular,
-    fontWeight: 'bold',
-    color: Color.colorGray_200,
   },
-  closeButton: {
-    backgroundColor: '#2F2F2F',
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    borderRadius: 10,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  closeButtonText: {
-    color: Color.white0,
-    fontSize: 16,
-    fontFamily: FontFamily.latoRegular,
-    fontWeight: 'bold',
-  },
-  statusContainer: {
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-    marginBottom: 15,
-    minHeight: 40,
+  closeIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  statusText: {
-    color: Color.white0,
-    fontWeight: 'bold',
-    fontSize: 14,
-    textAlign: 'center',
+  scene: {
+    height: 150,
+    borderRadius: 18,
+    backgroundColor: '#1B1B1B',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
   },
-  statusSubText: {
+  sceneGround: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 24,
+    backgroundColor: '#2A2626',
+  },
+  rvBody: {
+    position: 'absolute',
+    left: 16,
+    bottom: 24,
+    width: '30%',
+    height: 96,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 6,
+    borderBottomLeftRadius: 4,
+    borderBottomRightRadius: 4,
+    backgroundColor: '#3A3434',
+    borderWidth: 1,
+    borderColor: '#4E4747',
+  },
+  rvWindow: {
+    position: 'absolute',
+    top: 14,
+    left: 12,
+    width: '45%',
+    height: 20,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255, 178, 103, 0.35)',
+  },
+  rvDoor: {
+    position: 'absolute',
+    bottom: 0,
+    right: 10,
+    width: 18,
+    height: 50,
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
+    backgroundColor: '#2A2626',
+  },
+  rollerTube: {
+    position: 'absolute',
+    left: '33%',
+    bottom: 107,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#FFB267',
+  },
+  fabric: {
+    position: 'absolute',
+    left: '35%',
+    bottom: 108,
+    height: 8,
+    borderRadius: 3,
+    backgroundColor: '#FFB267',
+  },
+  fabricStripe: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: -4,
+    height: 4,
+    backgroundColor: '#C9853F',
+    borderBottomLeftRadius: 2,
+    borderBottomRightRadius: 2,
+  },
+  post: {
+    position: 'absolute',
+    right: 0,
+    top: 4,
+    width: 3,
+    backgroundColor: '#9E9696',
+  },
+  shade: {
+    position: 'absolute',
+    left: '35%',
+    bottom: 18,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+  },
+  progressTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    marginTop: 16,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 3,
+    backgroundColor: '#FFB267',
+  },
+  progressLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 6,
+  },
+  progressLabel: {
+    color: '#9E9696',
+    fontSize: 12,
+    fontFamily: FontFamily.latoRegular,
+  },
+  controls: {
+    flexDirection: 'row',
+    marginTop: 20,
+    gap: 12,
+  },
+  control: {
+    flex: 1,
+    height: 92,
+    borderRadius: 18,
+    backgroundColor: '#2A2626',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  controlLabel: {
+    marginTop: 6,
+    fontSize: 15,
+    fontFamily: FontFamily.latoBold,
+    fontWeight: '700',
+  },
+  statusBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: '#1B1B1B',
+  },
+  statusMessage: {
+    flex: 1,
+    color: Color.white0,
+    fontSize: 13,
+    marginLeft: 8,
+    fontFamily: FontFamily.latoRegular,
+  },
+  canStatus: {
     color: '#FFB267',
     fontSize: 12,
-    textAlign: 'center',
-    marginTop: 2,
-    fontStyle: 'italic',
+    fontFamily: FontFamily.latoRegular,
+    marginLeft: 8,
   },
 });
 

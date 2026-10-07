@@ -225,3 +225,15 @@ export function useRVWater() {
 }
 
 // Add hooks for other systems as needed
+// Hook for the live link to the RV server (true while the sync WebSocket is open)
+export function useRVConnection() {
+  const [isLinked, setIsLinked] = useState(rvStateManager.isRVLinked());
+
+  useEffect(() => {
+    // Catch a change that happened between the first render and subscribing
+    setIsLinked(rvStateManager.isRVLinked());
+    return rvStateManager.subscribeToConnection(setIsLinked);
+  }, []);
+
+  return isLinked;
+}

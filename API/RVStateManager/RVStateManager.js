@@ -100,6 +100,7 @@ class RVStateManager {
       lastUpdate: null,  // Timestamp of last update
       deviceId: null,    // Unique ID for this device
       isOnline: false,   // Network connectivity status
+      rvLinked: false,   // Live WebSocket link to the RV server (set only by the sync socket)
     };
     
     // Event emitter for state change notifications
@@ -441,6 +442,7 @@ class RVStateManager {
       this.syncSocket.onopen = () => {
         console.log('RVStateManager: WebSocket connected for state synchronization');
         this.state.isOnline = true;
+        this.setRVLinked(true);
         
         // Process any queued offline changes
         this.processOfflineQueue();
@@ -506,7 +508,8 @@ class RVStateManager {
       this.syncSocket.onclose = (event) => {
         console.log(`RVStateManager: WebSocket disconnected (code: ${event.code})`);
         this.state.isOnline = false;
-        
+        this.setRVLinked(false);
+
         // Try to reconnect after delay if not closing intentionally
         if (event.code !== 1000) {
           setTimeout(() => this.setupSyncSocket(), 5000);
@@ -516,10 +519,12 @@ class RVStateManager {
       this.syncSocket.onerror = (error) => {
         console.error('RVStateManager: WebSocket error:', error);
         this.state.isOnline = false;
+        this.setRVLinked(false);
       };
     } catch (error) {
       console.error('RVStateManager: Failed to create WebSocket:', error);
       this.state.isOnline = false;
+      this.setRVLinked(false);
     }
   }
 
@@ -740,6 +745,24 @@ class RVStateManager {
     };
   }
   
+  // Live link to the RV server. Emits 'connectionChange' only when it flips.
+  setRVLinked(linked) {
+    if (this.state.rvLinked === linked) return;
+    this.state.rvLinked = linked;
+    this.events.emit('connectionChange', linked);
+  }
+
+  isRVLinked() {
+    return !!this.state.rvLinked;
+  }
+
+  subscribeToConnection(callback) {
+    this.events.on('connectionChange', callback);
+    return () => {
+      this.events.off('connectionChange', callback);
+    };
+  }
+
   // Subscribe to external state changes only (from other devices)
   subscribeToExternalChanges(callback) {
     this.events.on('externalStateChange', callback);

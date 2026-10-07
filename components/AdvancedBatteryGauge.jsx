@@ -8,7 +8,7 @@ import Animated, {
   withTiming,
   interpolateColor
 } from 'react-native-reanimated';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router/react-navigation';
 import { FontFamily } from "../GlobalStyles";
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);

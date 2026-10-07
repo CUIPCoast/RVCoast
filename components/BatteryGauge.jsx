@@ -2,7 +2,7 @@ import React, { useCallback } from 'react';
 import { View, Text } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Path, Rect } from 'react-native-svg';
 import Animated, { Easing, useAnimatedProps, useSharedValue, withTiming } from 'react-native-reanimated';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router/react-navigation';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 

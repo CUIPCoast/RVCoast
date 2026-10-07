@@ -3,11 +3,11 @@ import { StyleSheet, View, Text, SectionList, Image, TouchableOpacity, Alert, Sc
 import GroupComponent from '../components/GroupComponent';
 import ToggleSwitch from '../components/ToggleSwitch.jsx';
 import RVConnectionModal from '../components/RVConnectionModal';
+import TabletSettings from '../components/TabletSettings';
 import { Color, Gap, FontSize, FontFamily, isDarkMode } from '../GlobalStyles';
 import { useScreenSize, handleSettingsToggle, handleSettingsItemPress } from '../helper';
 import { useAuth } from '../components/AuthContext';
 import moment from 'moment';
-import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 
@@ -23,7 +23,7 @@ const Settings = () => {
     notifyReminders: true,
     locationAccess: false,
     dataSharing: true,
-    wifiEnable: true,
+    wifiToggle: true,
   });
 
   const onToggle = key => {
@@ -146,126 +146,25 @@ const Settings = () => {
     } else if (item.key === 'rvDisconnect') {
       handleDisconnectRV();
     } else {
-      handleSettingsItemPress(item, Alert.alert, router);
+      handleSettingsItemPress(item, Alert.alert);
     }
   };
 
-  const renderTabletSettingsCard = (section) => (
-    <View key={section.title} style={[styles.tabletCard, { backgroundColor: isDark ? '#1B1B1B' : Color.colorWhite }]}>
-      <Text style={[styles.tabletCardTitle, { color: isDark ? Color.colorWhitesmoke_100 : Color.colorGray_200 }]}>
-        {section.title}
-      </Text>
-      {section.data.map((item, index) => (
-        <View key={item.key} style={[styles.tabletCardItem, index === section.data.length - 1 && { borderBottomWidth: 0 }]}>
-          {item.type === 'toggle' ? (
-            <View style={styles.tabletToggleRow}>
-              <Text style={[styles.tabletItemLabel, { 
-                color: isDark ? Color.colorWhitesmoke_100 : Color.colorGray_200,
-                opacity: (['notifyMessages', 'notifyReminders'].includes(item.key) && !toggles.pushNotifications) ? 0.5 : 1
-              }]}>
-                {item.label}
-              </Text>
-              <ToggleSwitch
-                isOn={(['notifyMessages', 'notifyReminders'].includes(item.key) && !toggles.pushNotifications) ? false : toggles[item.key]}
-                setIsOn={() => onToggle(item.key)}
-                disabled={['notifyMessages', 'notifyReminders'].includes(item.key) && !toggles.pushNotifications}
-              />
-            </View>
-          ) : (
-            <TouchableOpacity style={styles.tabletTouchableRow} onPress={() => handleItemPress(item)}>
-              <Text style={[styles.tabletItemLabel, { color: isDark ? Color.colorWhitesmoke_100 : Color.colorGray_200 }]}>
-                {item.label}
-              </Text>
-              <Text style={[styles.tabletArrow, { color: isDark ? Color.colorWhitesmoke_100 : Color.colorGray_200 }]}>
-                {item.type === 'info' ? 'ℹ️' : '›'}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      ))}
-    </View>
-  );
-
   if (isTablet) {
-    const day = moment().format('dddd');
-    const date = moment().format('MMMM Do, YYYY');
-
     return (
-      <View style={[styles.tabletContainer, { backgroundColor: isDark ? '#1B1B1B' : Color.colorWhitesmoke_100 }]}>
-        {/* Header */}
-        <View style={styles.tabletHeader}>
-          <View style={styles.tabletHeaderLeft}>
-            <Text style={[styles.tabletDay, { color: isDark ? Color.colorWhitesmoke_100 : Color.colorGray_200 }]}>{day}</Text>
-            <Text style={[styles.tabletDate, { color: isDark ? Color.colorWhitesmoke_100 : Color.colorGray_200 }]}>{date}</Text>
-          </View>
-          <View style={styles.tabletHeaderCenter}>
-            <Text style={[styles.tabletTitle, { color: isDark ? Color.colorWhitesmoke_100 : Color.colorGray_200 }]}>Settings</Text>
-          </View>
-          <View style={styles.tabletHeaderRight}>
-            <Image source={require('../assets/SettingGearTablet.png')} style={styles.tabletLogo} />
-          </View>
-        </View>
-
-        {/* Main Content */}
-        <ScrollView style={styles.tabletScrollView} showsVerticalScrollIndicator={false}>
-          {/* User Profile Section */}
-          <View style={[styles.tabletProfileCard, { backgroundColor: isDark ? '#1B1B1B' : Color.colorWhite }]}>
-            <View style={styles.tabletProfileContent}>
-              <View style={styles.tabletProfileAvatar}>
-                <Text style={[styles.tabletProfileInitials, { color: isDark ? Color.colorBlack : Color.colorWhite }]}>
-                  {user?.firstName && user?.lastName 
-                    ? `${user.firstName[0]}${user.lastName[0]}` 
-                    : user?.username ? user.username.substring(0, 2).toUpperCase() : 'GU'}
-                </Text>
-              </View>
-              <View style={styles.tabletProfileInfo}>
-                <Text style={[styles.tabletProfileName, { color: isDark ? Color.colorWhitesmoke_100 : Color.colorGray_200 }]}>
-                  {user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.username || 'Guest User'}
-                </Text>
-                <Text style={[styles.tabletProfileEmail, { color: isDark ? Color.colorGray_100 : Color.colorGray_100 }]}>
-                  {user?.email || 'guest@coastapp.com'}
-                </Text>
-                {user?.rvConnection && (
-                  <View style={styles.rvConnectionBadge}>
-                    <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
-                    <Text style={styles.rvConnectionText}>
-                      Connected to {user.rvConnection.rvName}
-                    </Text>
-                  </View>
-                )}
-              </View>
-              <TouchableOpacity style={styles.tabletProfileEditButton}>
-                <Text style={[styles.tabletProfileEditText, { color: isDark ? Color.colorWhitesmoke_100 : Color.colorGray_200 }]}>
-                  Edit
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Settings Grid */}
-          <View style={styles.tabletGrid}>
-            <View style={styles.tabletGridColumn}>
-              {sections.slice(0, Math.ceil(sections.length / 2)).map(renderTabletSettingsCard)}
-            </View>
-            <View style={styles.tabletGridColumn}>
-              {sections.slice(Math.ceil(sections.length / 2)).map(renderTabletSettingsCard)}
-            </View>
-          </View>
-
-          {/* Footer */}
-          <View style={styles.tabletFooter}>
-            <Text style={[styles.tabletFooterText, { color: isDark ? "#FFFFFF" : Color.colorGray_100 }]}>
-              Coast App v1.0.0 • © 2025 All rights reserved
-            </Text>
-          </View>
-        </ScrollView>
-        
-        {/* RV Connection Modal */}
-        <RVConnectionModal 
-          visible={showRVModal} 
-          onClose={() => setShowRVModal(false)} 
+      <>
+        <TabletSettings
+          sections={sections}
+          toggles={toggles}
+          onToggle={onToggle}
+          onItemPress={handleItemPress}
+          user={user}
         />
-      </View>
+        <RVConnectionModal
+          visible={showRVModal}
+          onClose={() => setShowRVModal(false)}
+        />
+      </>
     );
   }
 

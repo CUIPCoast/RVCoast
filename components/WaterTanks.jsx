@@ -1,12 +1,30 @@
 import React, { useState, useEffect, useRef } from "react";
-import { View, Text } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import useScreenSize from "../helper/useScreenSize.jsx";
 import { createCANBusListener } from "../Service/CANBusListener.js";
 import { FontFamily } from "../GlobalStyles";
 
-const WaterTanks = ({ name, tankType, trackColor }) => {
+const TANK_COLORS = {
+  fresh: '#4FC3F7',
+  gray: '#B8AFAF',
+  black: '#6B6363',
+};
+
+// Fresh water is a problem when low; gray/black waste is a problem when high.
+const getLevelStatus = (tankType, pct) => {
+  if (tankType === 'fresh') {
+    if (pct <= 10) return { label: 'Refill', color: '#FF6B6B' };
+    if (pct <= 25) return { label: 'Low', color: '#FFB267' };
+    return { label: 'OK', color: '#4ADE80' };
+  }
+  if (pct >= 90) return { label: 'Dump now', color: '#FF6B6B' };
+  if (pct >= 75) return { label: 'High', color: '#FFB267' };
+  return { label: 'OK', color: '#4ADE80' };
+};
+
+const WaterTanks =({ name, tankType, trackColor }) => {
   const [percentage, setPercentage] = useState(25); // Start with current actual levels
   const [heaterStatus, setHeaterStatus] = useState(false); // Track heater status
   const [rawData, setRawData] = useState(null); // Store raw CAN data for debugging
@@ -328,81 +346,35 @@ const WaterTanks = ({ name, tankType, trackColor }) => {
   const connectionStatus = getConnectionStatus();
   const fillGradient = getTankFillGradient();
 
-  // Modern vertical tank display design
+  // Tablet: themed capsule tank card
   if (isTablet) {
+    const fillColor = TANK_COLORS[tankType] || TANK_COLORS.fresh;
+    const level = getLevelStatus(tankType, percentage);
+
     return (
-      <View style={styles.tankContainer}>
-        <View style={styles.tankWrapper}>
-          {/* Tank Header */}
-          <View style={styles.tankHeader}>
-            <View style={styles.tankIconContainer}>
-              <Ionicons
-                name={getTankIcon()}
-                size={16}
-                color="#FFF"
-              />
-            </View>
-            <View style={styles.tankInfo}>
-              <Text style={styles.tankName}>{name}</Text>
-              <Text style={[styles.tankPercentage, { color: getLevelColor() }]}>
-                {percentage}%
-              </Text>
-            </View>
-            <View style={styles.statusIndicators}>
-              <Text style={[styles.connectionDot, { color: connectionStatus.color }]}>
-                {connectionStatus.text}
-              </Text>
-            </View>
+      <View
+        style={tankStyles.card}
+        accessible
+        accessibilityLabel={`${name} tank ${percentage} percent, ${level.label}`}
+      >
+        <View style={tankStyles.header}>
+          <View style={tankStyles.iconCircle}>
+            <Ionicons name={getTankIcon()} size={14} color={fillColor} />
           </View>
-          
-          {/* Vertical Tank Visual */}
-          <View style={styles.verticalTankContainer}>
-            <View style={styles.tankOutline}>
-              <View style={styles.tankFillContainer}>
-                <LinearGradient
-                  colors={fillGradient.colors}
-                  locations={fillGradient.locations}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 0, y: 1 }}
-                  style={[
-                    styles.tankFill,
-                    { 
-                      height: `${percentage}%`,
-                    }
-                  ]}
-                />
-              </View>
-              
-              {/* Tank level markers */}
-              <View style={styles.levelMarkers}>
-                <View style={styles.levelMarker} />
-                <View style={styles.levelMarker} />
-                <View style={styles.levelMarker} />
-                <View style={styles.levelMarker} />
-              </View>
-            </View>
-            
-            {/* Level labels */}
-            <View style={styles.levelLabels}>
-              <Text style={styles.levelLabel}>100</Text>
-              <Text style={styles.levelLabel}>75</Text>
-              <Text style={styles.levelLabel}>50</Text>
-              <Text style={styles.levelLabel}>25</Text>
-              <Text style={styles.levelLabel}>0</Text>
-            </View>
-          </View>
-          
-          {/* Status Text */}
-          <Text style={styles.tankStatusText}>
-            {percentage < 10 ? 'Low' : percentage < 50 ? 'OK' : percentage < 75 ? 'Good' : 'Full'}
-          </Text>
-          
-          {/* Connection Status */}
-          {isConnected && lastUpdate && (
-            <Text style={styles.lastUpdateText}>
-              {lastUpdate.toLocaleTimeString()}
-            </Text>
-          )}
+          <Text style={tankStyles.name} numberOfLines={1}>{name}</Text>
+          <View style={[tankStyles.connDot, { backgroundColor: isConnected ? '#4ADE80' : '#6B6363' }]} />
+        </View>
+
+        <View style={tankStyles.capsule}>
+          <View style={[tankStyles.fill, { height: `${percentage}%`, backgroundColor: fillColor }]} />
+          {[25, 50, 75].map((mark) => (
+            <View key={mark} style={[tankStyles.tick, { bottom: `${mark}%` }]} />
+          ))}
+        </View>
+
+        <Text style={tankStyles.percent}>{percentage}%</Text>
+        <View style={[tankStyles.statusPill, { backgroundColor: `${level.color}26` }]}>
+          <Text style={[tankStyles.statusText, { color: level.color }]}>{level.label}</Text>
         </View>
       </View>
     );
@@ -443,6 +415,83 @@ const WaterTanks = ({ name, tankType, trackColor }) => {
     </View>
   );
 };
+
+const tankStyles = StyleSheet.create({
+  card: {
+    width: 132,
+    margin: 6,
+    padding: 12,
+    borderRadius: 18,
+    backgroundColor: '#1B1B1B',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    marginBottom: 12,
+  },
+  iconCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#2A2626',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  name: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: FontFamily.latoBold,
+  },
+  connDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  capsule: {
+    width: 60,
+    height: 120,
+    borderRadius: 18,
+    backgroundColor: '#2A2626',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    overflow: 'hidden',
+    justifyContent: 'flex-end',
+  },
+  fill: {
+    width: '100%',
+    minHeight: 3,
+    opacity: 0.9,
+  },
+  tick: {
+    position: 'absolute',
+    left: 10,
+    right: 10,
+    height: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+  },
+  percent: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontFamily: FontFamily.latoBold,
+    marginTop: 10,
+  },
+  statusPill: {
+    marginTop: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  statusText: {
+    fontSize: 12,
+    fontFamily: FontFamily.latoBold,
+  },
+});
 
 const styles = {
   // Tablet styles

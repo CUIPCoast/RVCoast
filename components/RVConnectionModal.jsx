@@ -8,12 +8,17 @@ import {
   Alert,
   Modal,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from './AuthContext';
 import { useScreenSize } from '../helper';
 import { Ionicons } from '@expo/vector-icons';
 import { FontFamily } from "../GlobalStyles";
+
+const ACCENT = '#FFB267';
 
 const RVConnectionModal = ({ visible, onClose }) => {
   const [rvData, setRvData] = useState({
@@ -24,6 +29,8 @@ const RVConnectionModal = ({ visible, onClose }) => {
   const [isLoading, setIsLoading] = useState(false);
   const { connectToRV, user } = useAuth();
   const isTablet = useScreenSize();
+  const insets = useSafeAreaInsets();
+  const [focusedField, setFocusedField] = useState(null);
 
   const handleConnect = async () => {
     if (!rvData.rvId.trim() || !rvData.rvName.trim()) {
@@ -53,256 +60,278 @@ const RVConnectionModal = ({ visible, onClose }) => {
     setRvData(prev => ({ ...prev, [field]: value }));
   };
 
+  // ——— Bottom sheet on phones, centered card on tablets ———
+  const canSubmit = rvData.rvId.trim() && rvData.rvName.trim() && !isLoading;
+  const fields = [
+    { key: 'rvId', label: 'RV ID', icon: 'keypad-outline', placeholder: 'e.g. RV123456', autoCapitalize: 'characters', required: true },
+    { key: 'rvName', label: 'RV Name', icon: 'home-outline', placeholder: 'e.g. My Coast RV', autoCapitalize: 'words', required: true },
+    { key: 'rvModel', label: 'RV Model', icon: 'car-outline', placeholder: 'Optional', autoCapitalize: 'words' },
+  ];
+
   return (
     <Modal
       visible={visible}
-      transparent={true}
-      animationType="slide"
+      transparent
+      animationType={isTablet ? 'fade' : 'slide'}
+      supportedOrientations={['portrait', 'landscape']}
       onRequestClose={onClose}
     >
-      <View style={styles.overlay}>
-        <View style={[styles.modal, isTablet && styles.tabletModal]}>
-          {/* Header */}
+      <KeyboardAvoidingView
+        style={[styles.backdrop, isTablet && styles.backdropTablet]}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+        />
+        <View style={[styles.sheet, isTablet ? styles.sheetTablet : { paddingBottom: insets.bottom + 20 }]}>
+          {!isTablet && <View style={styles.grabber} />}
+
           <View style={styles.header}>
-            <Text style={[styles.title, isTablet && styles.tabletTitle]}>
-              Connect to RV
-            </Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color="#fff" />
+            <View style={styles.headerIcon}>
+              <Ionicons name="link" size={22} color={ACCENT} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.title}>Connect to RV</Text>
+              <Text style={styles.subtitle}>Enter your RV details to pair</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.closeIcon}
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+            >
+              <Ionicons name="close" size={22} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
 
-          {/* Content */}
-          <View style={styles.content}>
-            <Text style={[styles.subtitle, isTablet && styles.tabletSubtitle]}>
-              Enter your RV details to establish connection
-            </Text>
-
-            {/* RV ID Input */}
-            <View style={styles.inputContainer}>
-              <Ionicons name="keypad-outline" size={20} color="#888" style={styles.inputIcon} />
-              <TextInput
-                style={[styles.input, isTablet && styles.tabletInput]}
-                placeholder="RV ID (e.g., RV123456)"
-                placeholderTextColor="#888"
-                value={rvData.rvId}
-                onChangeText={(value) => handleInputChange('rvId', value)}
-                autoCapitalize="characters"
-              />
-            </View>
-
-            {/* RV Name Input */}
-            <View style={styles.inputContainer}>
-              <Ionicons name="home-outline" size={20} color="#888" style={styles.inputIcon} />
-              <TextInput
-                style={[styles.input, isTablet && styles.tabletInput]}
-                placeholder="RV Name (e.g., My Coast RV)"
-                placeholderTextColor="#888"
-                value={rvData.rvName}
-                onChangeText={(value) => handleInputChange('rvName', value)}
-                autoCapitalize="words"
-              />
-            </View>
-
-            {/* RV Model Input (Optional) */}
-            <View style={styles.inputContainer}>
-              <Ionicons name="car-outline" size={20} color="#888" style={styles.inputIcon} />
-              <TextInput
-                style={[styles.input, isTablet && styles.tabletInput]}
-                placeholder="RV Model (Optional)"
-                placeholderTextColor="#888"
-                value={rvData.rvModel}
-                onChangeText={(value) => handleInputChange('rvModel', value)}
-                autoCapitalize="words"
-              />
-            </View>
-
-            {/* Current Connection Status */}
+          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             {user?.rvConnection && (
-              <View style={styles.currentConnection}>
-                <Text style={styles.connectionTitle}>Current Connection:</Text>
-                <Text style={styles.connectionInfo}>
-                  {user.rvConnection.rvName} ({user.rvConnection.rvId})
-                </Text>
-                <Text style={styles.connectionTime}>
-                  Connected: {new Date(user.rvConnection.connectedAt).toLocaleDateString()}
-                </Text>
+              <View style={styles.currentCard}>
+                <Ionicons name="checkmark-circle" size={22} color={ACCENT} />
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text style={styles.currentCaption}>CURRENTLY CONNECTED</Text>
+                  <Text style={styles.currentName} numberOfLines={1}>
+                    {user.rvConnection.rvName} ({user.rvConnection.rvId})
+                  </Text>
+                  <Text style={styles.currentDate}>
+                    Since {new Date(user.rvConnection.connectedAt).toLocaleDateString()}
+                  </Text>
+                </View>
               </View>
             )}
 
-            {/* Connect Button */}
+            {fields.map(({ key, label, icon, placeholder, autoCapitalize, required }) => (
+              <View key={key} style={styles.field}>
+                <Text style={styles.label}>
+                  {label}
+                  {required ? <Text style={{ color: ACCENT }}> *</Text> : null}
+                </Text>
+                <View style={[styles.inputWrap, focusedField === key && styles.inputWrapFocused]}>
+                  <Ionicons
+                    name={icon}
+                    size={18}
+                    color={focusedField === key ? ACCENT : '#9E9696'}
+                    style={{ marginRight: 10 }}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder={placeholder}
+                    placeholderTextColor="#6B6363"
+                    value={rvData[key]}
+                    onChangeText={(value) => handleInputChange(key, value)}
+                    onFocus={() => setFocusedField(key)}
+                    onBlur={() => setFocusedField(null)}
+                    autoCapitalize={autoCapitalize}
+                    autoCorrect={false}
+                    accessibilityLabel={label}
+                  />
+                </View>
+              </View>
+            ))}
+
             <TouchableOpacity
-              style={[styles.connectButton, isTablet && styles.tabletConnectButton]}
+              style={[styles.primaryButton, !canSubmit && styles.primaryButtonDisabled]}
               onPress={handleConnect}
-              disabled={isLoading}
+              disabled={!canSubmit}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !canSubmit, busy: isLoading }}
             >
-              <LinearGradient
-                colors={['#66BB6A', '#4CAF50', '#388E3C']}
-                style={styles.connectGradient}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <>
-                    <Ionicons name="link-outline" size={20} color="#fff" style={styles.buttonIcon} />
-                    <Text style={[styles.connectButtonText, isTablet && styles.tabletConnectButtonText]}>
-                      {user?.rvConnection ? 'Update Connection' : 'Connect to RV'}
-                    </Text>
-                  </>
-                )}
-              </LinearGradient>
+              {isLoading ? (
+                <ActivityIndicator color="#1B1B1B" />
+              ) : (
+                <>
+                  <Ionicons name="link-outline" size={20} color="#1B1B1B" style={{ marginRight: 8 }} />
+                  <Text style={styles.primaryButtonText}>
+                    {user?.rvConnection ? 'Update Connection' : 'Connect to RV'}
+                  </Text>
+                </>
+              )}
             </TouchableOpacity>
 
-            {/* Info Text */}
-            <Text style={styles.infoText}>
-              Your RV ID can be found on the control panel or in your RV documentation.
+            <Text style={styles.helper}>
+              Your RV ID is on the control panel or in your RV documentation.
             </Text>
-          </View>
+          </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
+  backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  backdropTablet: {
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
-  modal: {
-    backgroundColor: 'rgba(40, 41, 43, 0.98)',
-    borderRadius: 20,
-    width: '100%',
-    maxWidth: 400,
-    maxHeight: '80%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 10,
+  sheetTablet: {
+    width: 520,
+    maxWidth: '90%',
+    borderRadius: 28,
+    borderWidth: 1,
+    paddingHorizontal: 28,
+    paddingTop: 24,
+    paddingBottom: 28,
   },
-  tabletModal: {
-    maxWidth: 500,
+  sheet: {
+    maxHeight: '90%',
+    backgroundColor: '#211D1D',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderColor: 'rgba(255, 178, 103, 0.15)',
+  },
+  grabber: {
+    alignSelf: 'center',
+    width: 40,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    marginBottom: 16,
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    marginBottom: 20,
+  },
+  headerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 178, 103, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
   title: {
+    color: '#FFFFFF',
     fontSize: 22,
-    fontFamily: FontFamily.latoRegular,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  tabletTitle: {
-    fontSize: 26,
-  },
-  closeButton: {
-    padding: 5,
-  },
-  content: {
-    padding: 20,
+    fontFamily: FontFamily.latoBold,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#888',
-    marginBottom: 25,
-    textAlign: 'center',
+    color: '#9E9696',
+    fontSize: 14,
+    fontFamily: FontFamily.latoRegular,
+    marginTop: 2,
   },
-  tabletSubtitle: {
-    fontSize: 18,
+  closeIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  inputContainer: {
+  currentCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
-    marginBottom: 15,
-    paddingHorizontal: 15,
+    backgroundColor: 'rgba(255, 178, 103, 0.1)',
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: 'rgba(255, 178, 103, 0.35)',
+    padding: 14,
+    marginBottom: 20,
   },
-  inputIcon: {
-    marginRight: 10,
+  currentCaption: {
+    color: ACCENT,
+    fontSize: 11,
+    fontFamily: FontFamily.latoBold,
+    letterSpacing: 1,
+  },
+  currentName: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: FontFamily.latoBold,
+    marginTop: 2,
+  },
+  currentDate: {
+    color: '#9E9696',
+    fontSize: 12,
+    fontFamily: FontFamily.latoRegular,
+    marginTop: 1,
+  },
+  field: {
+    marginBottom: 16,
+  },
+  label: {
+    color: '#C9C1C1',
+    fontSize: 13,
+    fontFamily: FontFamily.latoBold,
+    marginBottom: 6,
+  },
+  inputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1B1B1B',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 14,
+  },
+  inputWrapFocused: {
+    borderColor: ACCENT,
   },
   input: {
     flex: 1,
     height: 50,
-    color: '#fff',
+    color: '#FFFFFF',
     fontSize: 16,
-  },
-  tabletInput: {
-    height: 60,
-    fontSize: 18,
-  },
-  currentConnection: {
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(76, 175, 80, 0.3)',
-  },
-  connectionTitle: {
-    color: '#4CAF50',
-    fontSize: 14,
     fontFamily: FontFamily.latoRegular,
-    fontWeight: 'bold',
-    marginBottom: 5,
   },
-  connectionInfo: {
-    color: '#fff',
-    fontSize: 16,
-    marginBottom: 3,
-  },
-  connectionTime: {
-    color: '#888',
-    fontSize: 12,
-  },
-  connectButton: {
-    borderRadius: 12,
-    marginTop: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  tabletConnectButton: {
-    marginTop: 20,
-  },
-  connectGradient: {
-    borderRadius: 12,
-    height: 50,
+  primaryButton: {
+    height: 54,
+    borderRadius: 16,
+    backgroundColor: ACCENT,
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
   },
-  buttonIcon: {
-    marginRight: 8,
+  primaryButtonDisabled: {
+    opacity: 0.45,
   },
-  connectButtonText: {
-    color: '#fff',
+  primaryButtonText: {
+    color: '#1B1B1B',
     fontSize: 16,
-    fontFamily: FontFamily.latoRegular,
-    fontWeight: 'bold',
+    fontFamily: FontFamily.latoBold,
   },
-  tabletConnectButtonText: {
-    fontSize: 18,
-  },
-  infoText: {
-    color: '#888',
+  helper: {
+    color: '#9E9696',
     fontSize: 12,
+    fontFamily: FontFamily.latoRegular,
     textAlign: 'center',
-    marginTop: 15,
-    lineHeight: 16,
+    lineHeight: 17,
+    marginTop: 14,
   },
 });
 

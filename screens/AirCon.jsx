@@ -1,15 +1,16 @@
 // screens/AirCon.jsx - Fixed temperature synchronization and slider responsiveness
 import React, { useState, useEffect, useRef } from "react";
-import { StyleSheet, View, Text, TouchableOpacity, Keyboard, TouchableWithoutFeedback } from "react-native";
+import { StyleSheet, View, Text, TouchableOpacity, Keyboard, TouchableWithoutFeedback, ScrollView } from "react-native";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Color,
   isDarkMode
 } from "../GlobalStyles";
-import { RadialSlider } from 'react-native-radial-slider';
+import ThermostatDial from '../components/ThermostatDial';
 import { useScreenSize, handleCoolingToggle, handleToeKickToggle, handleTemperatureChange, dismissKeyboard } from "../helper";
 import { FontFamily } from "../GlobalStyles";
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import ToggleTile from '../components/ToggleTile';
 
 // Import RV State Management hooks
 import { useRVClimate } from "../API/RVStateManager/RVStateHooks";
@@ -24,6 +25,8 @@ import { ClimateService } from '../API/RVControlServices';
 // Import HeaterControlModal for fan speed
 import HeaterControlModal from "../components/HeaterControlModal";
 
+const THERMO_ACCENT = '#FFB267';
+
 const AirCon = ({ onClose }) => {
   const isTablet = useScreenSize();
 
@@ -32,6 +35,8 @@ const AirCon = ({ onClose }) => {
 
   // State for fan speed modal
   const [isFanSpeedModalVisible, setFanSpeedModalVisible] = useState(false);
+  // Phone popup: disabled while a finger is on the dial (see dialWrap below)
+  const [scrollEnabled, setScrollEnabled] = useState(true);
   
   // Get initial temperature from RV state BEFORE rendering to prevent flash
   const getInitialTemp = () => {
@@ -59,7 +64,10 @@ const AirCon = ({ onClose }) => {
   const isSlidingRef = useRef(false);
   const tempChangeTimeoutRef = useRef(null);
   const lastSentTempRef = useRef(initialTemp);
-  
+  // Mirrors `temp` so the slider callback can tell real drags from echoes.
+  const tempRef = useRef(initialTemp);
+  tempRef.current = temp;
+
   // Initialize temperature monitoring service
   useEffect(() => {
     console.log('AirCon: Starting temperature monitoring service');
@@ -67,37 +75,21 @@ const AirCon = ({ onClose }) => {
     // Start the temperature monitoring service
     temperatureMonitoringService.start();
     
-    // Subscribe to temperature changes from CAN bus
+    // Record the measured room temperature from the CAN bus. This is NOT the
+    // setpoint: the slider (`temp`) is what the user wants, so we never
+    // overwrite it with the ambient reading (that made the dial jump between
+    // the setpoint and the room temperature).
     const handleTemperatureUpdate = (data) => {
       const { temperature } = data;
-      console.log('AirCon: Real-time temperature update from RV-C:', temperature.fahrenheit);
-      
-      // Only update if not actively sliding
-      if (!isSlidingRef.current) {
-        const roundedTemp = Math.round(temperature.fahrenheit);
-        setTemp(roundedTemp);
-        
-        // Update RV state manager with actual temperature
-        rvStateManager.updateClimateState({
-          actualTemperature: temperature.fahrenheit,
-          actualTemperatureCelsius: temperature.celsius,
-          lastUpdate: temperature.lastUpdate
-        });
-      }
+      rvStateManager.updateClimateState({
+        actualTemperature: temperature.fahrenheit,
+        actualTemperatureCelsius: temperature.celsius,
+        lastUpdate: temperature.lastUpdate
+      });
     };
-    
+
     // Subscribe to temperature change events
     temperatureMonitoringService.on('temperatureChange', handleTemperatureUpdate);
-    
-    // Get initial temperature
-    const currentTemp = temperatureMonitoringService.getCurrentTemperature();
-    if (currentTemp.fahrenheit) {
-      console.log('AirCon: Initial temperature from RV-C:', currentTemp.fahrenheit);
-      const roundedTemp = Math.round(currentTemp.fahrenheit);
-      setTemp(roundedTemp);
-      setLastTemp(roundedTemp);
-      lastSentTempRef.current = roundedTemp;
-    }
     
     // Cleanup on unmount
     return () => {
@@ -367,8 +359,11 @@ const AirCon = ({ onClose }) => {
 
   // Handle temperature change from slider with improved responsiveness
   const handleTempChange = (newTemp) => {
+    // Guard against echoes of our own value (onChange should only be user input).
+    if (newTemp === tempRef.current) return;
+    tempRef.current = newTemp;
     console.log('AirCon: Slider changed to:', newTemp);
-    
+
     // Mark that we're actively sliding
     isSlidingRef.current = true;
     
@@ -452,478 +447,271 @@ const AirCon = ({ onClose }) => {
   }, [temp, climate.coolingOn, climate.toeKickOn]);
 
   
-  // Tablet view
+  const modeSummary = climate.coolingOn
+    ? `Cooling to ${temp}°F`
+    : climate.toeKickOn
+      ? `Heating to ${temp}°F`
+      : climate.heatingOn
+        ? 'Furnace on'
+        : 'System off';
+  const isRunning = climate.coolingOn || climate.toeKickOn || climate.heatingOn;
+
+  const statusToast = showStatus || isProcessing ? (
+    <View style={styles.toast} pointerEvents="none">
+      <View style={[styles.toastDot, { backgroundColor: isProcessing ? THERMO_ACCENT : '#4ADE80' }]} />
+      <Text style={styles.toastText} numberOfLines={1}>
+        {isProcessing ? 'Sending…' : statusMessage}
+      </Text>
+    </View>
+  ) : null;
+
+  const sliderHandlers = {
+    value: temp,
+    onChange: handleTempChange,
+    onChangeEnd: () => {
+      isSlidingRef.current = false;
+    },
+  };
+
+  // Tablet view (narrow column on the home screen: Cooling + Toe Kick)
   if (isTablet) {
     return (
       <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
-        <View style={tabletStyles.container}>
-          <RadialSlider
-            value={temp}
-            min={60}
-            max={85}
-            thumbColor={"#FFFFFF"}
-            thumbBorderColor={"#848482"}
-            sliderTrackColor={"#E5E5E5"}
-            linearGradient={[ { offset: '0%', color:'#ffaca6' }, { offset: '100%', color: '#FF8200' }]}
-            onChange={handleTempChange}
-            onComplete={() => {
-              console.log('AirCon: Slider interaction complete');
-              isSlidingRef.current = false;
-            }}
-            subTitle={'Degrees'}
-            subTitleStyle={{ color: isDarkMode ? 'white' : 'black', paddingBottom: 25, fontSize: 20 }}
-            unitStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5, fontSize: 20 }}
-            valueStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5, fontSize: 44 }}
-            style={{
-              backgroundColor: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
-            }}
-            buttonContainerStyle={{
-              color:"FFFFFF",
-            }}
-            leftIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginRight: 10, top:20, height: 40, width: 50, paddingLeft: 4 }}
-            rightIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginLeft: 10, top:20, height: 40, width: 50, paddingLeft: 5 }}
-            isHideTailText={true}
-            unit={'°F'}
-          />
+        <View style={styles.tabletContainer}>
+          <View style={styles.summaryRow}>
+            <View style={[styles.summaryDot, { backgroundColor: isRunning ? THERMO_ACCENT : '#6B6363' }]} />
+            <Text style={styles.summaryText}>{modeSummary}</Text>
+          </View>
 
-          <View style={tabletStyles.buttonsContainer}>
-            <TouchableOpacity
-              style={[
-                tabletStyles.button, 
-                climate.coolingOn ? tabletStyles.activeButton : null,
-                isProcessing ? tabletStyles.disabledButton : null
-              ]}
+          <View style={[styles.dialWrap, styles.tabletDialWrap]}>
+            <ThermostatDial size={180} {...sliderHandlers} />
+          </View>
+
+          <View style={styles.tabletModes}>
+            <ToggleTile
+              size="row"
+              label="Cooling"
+              icon="snowflake"
+              isOn={climate.coolingOn}
               onPress={handleCoolingPress}
               disabled={isProcessing}
-            >
-              <Text style={tabletStyles.buttonText}>Cooling</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                tabletStyles.button, 
-                climate.toeKickOn ? tabletStyles.activeButton : null,
-                isProcessing ? tabletStyles.disabledButton : null
-              ]}
+              onText="On"
+              offText="Off"
+              showPill={false}
+              style={styles.tabletModeTile}
+            />
+            <ToggleTile
+              size="row"
+              label="Toe Kick"
+              icon="radiator"
+              isOn={climate.toeKickOn}
               onPress={handleToeKickPress}
               disabled={isProcessing}
-            >
-              <Text style={tabletStyles.buttonText}>Toe Kick</Text>
-            </TouchableOpacity>
+              onText="Heating"
+              offText="Off"
+              showPill={false}
+              style={styles.tabletModeTile}
+            />
           </View>
-          
-          {/* Status message */}
-          {showStatus && (
-            <View style={tabletStyles.statusContainer}>
-              <Text style={tabletStyles.statusText}>{statusMessage}</Text>
-            </View>
-          )}
-          
-          {/* Processing indicator */}
-          {isProcessing && (
-            <View style={tabletStyles.processingContainer}>
-              <Text style={tabletStyles.processingText}>Processing...</Text>
-            </View>
-          )}
+
+          {statusToast}
         </View>
       </TouchableWithoutFeedback>
     );
   }
- 
-  // Mobile view
+
+  // Mobile view (opened as a modal from Home)
+  const modes = [
+    { key: 'cool', label: 'Cooling', icon: 'snowflake', isOn: climate.coolingOn, onPress: handleCoolingPress, onText: 'On' },
+    { key: 'toe', label: 'Toe Kick', icon: 'radiator', isOn: climate.toeKickOn, onPress: handleToeKickPress, onText: 'Heating' },
+    { key: 'furnace', label: 'Furnace', icon: 'fire', isOn: climate.heatingOn, onPress: handleFurnacePress, onText: 'On' },
+    { key: 'fan', label: 'Fan Speed', icon: 'fan', isOn: false, onPress: () => setFanSpeedModalVisible(true), offText: 'Adjust' },
+    { key: 'night', label: climate.nightMode ? 'Night' : 'Day', icon: climate.nightMode ? 'weather-night' : 'white-balance-sunny', isOn: climate.nightMode, onPress: handleNightModePress, onText: 'Quiet mode', offText: 'Normal' },
+    { key: 'dehumid', label: 'Dehumidify', icon: 'water-percent', isOn: climate.dehumidifyMode, onPress: handleDehumidifyPress, onText: 'On' },
+  ];
+
   return (
     <TouchableWithoutFeedback onPress={dismissKeyboard}>
       <View style={styles.container}>
-        {/*Closes the AC Window */}
-        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-          <Text style={styles.closeText}>X</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.label}>Air Conditioning</Text>
-
-        {/* Radial Slider for Temperature Control */}
-        <RadialSlider
-          value={temp}
-          min={60}
-          max={85}
-          thumbColor={"#FFFFFF"}
-          thumbBorderColor={"#848482"}
-          sliderTrackColor={"#E5E5E5"}
-          linearGradient={[ { offset: '0%', color:'#ffaca6' }, { offset: '100%', color: '#FF8200' }]}
-          onChange={handleTempChange}
-          onComplete={() => {
-            console.log('AirCon: Slider interaction complete');
-            isSlidingRef.current = false;
-          }}
-          subTitle={'Degrees'}
-          subTitleStyle={{ color: isDarkMode ? 'white' : 'black', paddingBottom: 25, fontSize: 20 }}
-          unitStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5, fontSize: 20 }}
-          valueStyle={{ color: isDarkMode ? 'white' : 'black', paddingTop: 5, fontSize: 24 }}
-          style={{
-            backgroundColor: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
-          }}
-          buttonContainerStyle={{
-            color:"FFFFFF",
-          }}
-          leftIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginRight: 10, top:20, height: 40, width: 50, paddingLeft: 4 }}
-          rightIconStyle={{ backgroundColor: 'white', borderRadius: 10, marginLeft: 10, top:20, height: 40, width: 50, paddingLeft: 5 }}
-          isHideTailText={true}
-          unit={'°F'}
-        />
-        
-        {/* Climate Control Buttons - Row 1 */}
-        <View style={styles.buttonsContainer}>
-          <TouchableOpacity
-            style={[
-              styles.button,
-              climate.coolingOn ? styles.activeButton : null,
-              isProcessing ? styles.disabledButton : null
-            ]}
-            onPress={handleCoolingPress}
-            disabled={isProcessing}
-          >
-            <Ionicons
-              name={climate.coolingOn ? "snow" : "snow-outline"}
-              size={18}
-              color={climate.coolingOn ? "#1a1a1a" : "#ffffff"}
-              style={{ marginRight: 6 }}
-            />
-            <Text style={[styles.buttonText, climate.coolingOn && styles.activeButtonText]}>Cooling</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.button,
-              climate.toeKickOn ? styles.activeButton : null,
-              isProcessing ? styles.disabledButton : null
-            ]}
-            onPress={handleToeKickPress}
-            disabled={isProcessing}
-          >
-            <Ionicons
-              name={climate.toeKickOn ? "flame" : "flame-outline"}
-              size={18}
-              color={climate.toeKickOn ? "#1a1a1a" : "#ffffff"}
-              style={{ marginRight: 6 }}
-            />
-            <Text style={[styles.buttonText, climate.toeKickOn && styles.activeButtonText]}>Toe Kick</Text>
-          </TouchableOpacity>
+        <View style={styles.header}>
+          <View style={styles.headerIcon}>
+            <MaterialCommunityIcons name="thermostat" size={22} color={THERMO_ACCENT} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.title}>Climate</Text>
+            <View style={styles.summaryRow}>
+              <View style={[styles.summaryDot, { backgroundColor: isRunning ? THERMO_ACCENT : '#6B6363' }]} />
+              <Text style={styles.summaryText}>{modeSummary}</Text>
+            </View>
+          </View>
+          {onClose && (
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel="Close climate controls"
+            >
+              <Ionicons name="close" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
         </View>
 
-        {/* Climate Control Buttons - Row 2 */}
-        <View style={styles.buttonsContainer}>
-          <TouchableOpacity
-            style={[
-              styles.button,
-              climate.heatingOn ? styles.activeButton : null,
-              isProcessing ? styles.disabledButton : null
-            ]}
-            onPress={handleFurnacePress}
-            disabled={isProcessing}
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          scrollEnabled={scrollEnabled}
+        >
+          {/* Lock scrolling while a finger is on the dial so the ScrollView
+              can't steal the drag from the slider knob. */}
+          <View
+            style={styles.dialWrap}
+            onTouchStart={() => setScrollEnabled(false)}
+            onTouchEnd={() => setScrollEnabled(true)}
+            onTouchCancel={() => setScrollEnabled(true)}
           >
-            <Ionicons
-              name={climate.heatingOn ? "bonfire" : "bonfire-outline"}
-              size={18}
-              color={climate.heatingOn ? "#1a1a1a" : "#ffffff"}
-              style={{ marginRight: 6 }}
-            />
-            <Text style={[styles.buttonText, climate.heatingOn && styles.activeButtonText]}>Furnace</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.button,
-              isProcessing ? styles.disabledButton : null
-            ]}
-            onPress={() => setFanSpeedModalVisible(true)}
-            disabled={isProcessing}
-          >
-            <Ionicons
-              name="options-outline"
-              size={18}
-              color="#ffffff"
-              style={{ marginRight: 6 }}
-            />
-            <Text style={styles.buttonText}>Fan Speed</Text>
-          </TouchableOpacity>
-        </View>
+            <ThermostatDial size={230} {...sliderHandlers} />
+          </View>
 
-        {/* Climate Control Buttons - Row 3 */}
-        <View style={styles.buttonsContainer}>
-          <TouchableOpacity
-            style={[
-              styles.button,
-              climate.nightMode ? styles.activeButtonNight : null,
-              isProcessing ? styles.disabledButton : null
-            ]}
-            onPress={handleNightModePress}
-            disabled={isProcessing}
-          >
-            <Ionicons
-              name={climate.nightMode ? "moon" : "sunny-outline"}
-              size={18}
-              color={climate.nightMode ? "#1a1a1a" : "#ffffff"}
-              style={{ marginRight: 6 }}
-            />
-            <Text style={[styles.buttonText, climate.nightMode && styles.activeButtonText]}>
-              {climate.nightMode ? 'Night' : 'Day'}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.button,
-              climate.dehumidifyMode ? styles.activeButtonDehumid : null,
-              isProcessing ? styles.disabledButton : null
-            ]}
-            onPress={handleDehumidifyPress}
-            disabled={isProcessing}
-          >
-            <Ionicons
-              name={climate.dehumidifyMode ? "water" : "water-outline"}
-              size={18}
-              color={climate.dehumidifyMode ? "#1a1a1a" : "#ffffff"}
-              style={{ marginRight: 6 }}
-            />
-            <Text style={[styles.buttonText, climate.dehumidifyMode && styles.activeButtonText]}>Dehumidify</Text>
-          </TouchableOpacity>
-        </View>
+          <View style={styles.grid}>
+            {[modes.slice(0, 3), modes.slice(3)].map((row, i) => (
+              <View key={i} style={styles.gridRow}>
+                {row.map(({ key, ...mode }) => (
+                  <ToggleTile
+                    key={key}
+                    size="chip"
+                    disabled={isProcessing}
+                    offText="Off"
+                    {...mode}
+                  />
+                ))}
+              </View>
+            ))}
+          </View>
+        </ScrollView>
 
-        {/* Fan Speed Modal */}
         <HeaterControlModal
           isVisible={isFanSpeedModalVisible}
           onClose={() => setFanSpeedModalVisible(false)}
         />
-        
-        {/* Status message */}
-        {showStatus && (
-          <View style={styles.statusContainer}>
-            <Text style={styles.statusText}>{statusMessage}</Text>
-          </View>
-        )}
-        
-        {/* Processing indicator */}
-        {isProcessing && (
-          <View style={styles.processingContainer}>
-            <Text style={styles.processingText}>Processing...</Text>
-          </View>
-        )}
+
+        {statusToast}
       </View>
     </TouchableWithoutFeedback>
   );
 };
 
-const tabletStyles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    marginTop: 120,
-    backgroundColor: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 3,
-    right: 75,
-    padding: 10,
-    zIndex: 1,
-    backgroundColor: 'white',
-    borderRadius: 20,
-    opacity: 0.5,
-    height: 25,
-    alignItems: 'center',
-  },
-  closeText: {
-    color: 'black',
-    fontSize: 10,
-    marginTop: -4,
-  },
-  label: {
-    color:  isDarkMode ? Color.white0 : Color.colorDarkslategray_200,
-    fontWeight: 'bold',
-    backgroundColor: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
-    margin: 10,
-  },
-  buttonsContainer: {
-    flexDirection: 'row',
-    marginTop: 30,
-  },
-  button: {
-    paddingHorizontal: 30,
-    paddingVertical: 15,
-    borderRadius: 5,
-    marginHorizontal: 5,
-    backgroundColor: 'white',
-    borderColor: 'black'
-  },
-  activeButton: {
-    backgroundColor: '#FFB267',
-  },
-  disabledButton: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    fontSize: 12,
-  },
-  statusContainer: {
-    position: 'absolute',
-    bottom: 100,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 5,
-    alignSelf: 'center',
-  },
-  statusText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  processingContainer: {
-    position: 'absolute',
-    top: '50%',
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 5,
-    alignSelf: 'center',
-  },
-  processingText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-});
-
 const styles = StyleSheet.create({
-  container: {
+  // Tablet
+  tabletContainer: {
     flex: 1,
-    alignItems: 'center',
-    marginTop: 40,
-    backgroundColor: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
-    paddingHorizontal: 16,
+    alignItems: 'stretch',
+    justifyContent: 'space-between',
+    paddingTop: 12,
+    paddingBottom: 16,
   },
-  closeButton: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    padding: 12,
-    zIndex: 1,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 178, 103, 0.15)',
-    height: 48,
-    width: 48,
-    alignItems: 'center',
+  tabletDialWrap: {
+    flex: 1,
     justifyContent: 'center',
+    paddingVertical: 12,
   },
-  closeText: {
-    color: '#FFB267',
-    fontSize: 22,
-    fontWeight: "700",
-    marginTop: -2,
+  tabletModeTile: {
+    minHeight: 76,
   },
-  label: {
-    color: isDarkMode ? Color.white0 : Color.colorDarkslategray_200,
-    fontSize: 24,
-    fontFamily: FontFamily.latoBold,
-    fontWeight: '700',
-    backgroundColor: isDarkMode ? Color.colorGray_200 : Color.colorWhitesmoke_100,
-    marginTop: 20,
-    marginBottom: 12,
-    letterSpacing: -0.3,
-  },
-  buttonsContainer: {
-    flexDirection: 'row',
-    marginTop: 28,
+  tabletModes: {
     gap: 12,
   },
-  button: {
+
+  // Mobile
+  container: {
     flex: 1,
+    backgroundColor: '#211D1D',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 8,
+  },
+  headerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 178, 103, 0.15)',
+    alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderRadius: 16,
-    marginHorizontal: 6,
-    backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.05)',
-    borderWidth: 1,
-    borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    marginRight: 12,
   },
-  activeButton: {
-    backgroundColor: '#FFB267',
-    borderColor: '#FFB267',
-    shadowColor: '#FFB267',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 8,
-  },
-  activeButtonNight: {
-    backgroundColor: '#FFBA00',
-    borderColor: '#FFBA00',
-    shadowColor: '#FFBA00',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 8,
-  },
-  activeButtonDehumid: {
-    backgroundColor: '#00B9E8',
-    borderColor: '#00B9E8',
-    shadowColor: '#00B9E8',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 8,
-  },
-  disabledButton: {
-    opacity: 0.5,
-  },
-  buttonText: {
-    fontSize: 15,
+  title: {
+    color: '#FFFFFF',
+    fontSize: 22,
     fontFamily: FontFamily.latoBold,
-    fontWeight: '600',
-    color: isDarkMode ? Color.white0 : Color.colorDarkslategray_200,
-    letterSpacing: 0.4,
   },
-  activeButtonText: {
-    color: '#1a1a1a',
-    fontWeight: '700',
+  closeButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  statusContainer: {
-    position: 'absolute',
-    bottom: 60,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignSelf: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+  scrollContent: {
+    paddingBottom: 20,
   },
-  statusText: {
-    color: 'white',
-    fontWeight: '600',
-    fontSize: 14,
+  grid: {
+    gap: 10,
+    marginTop: 8,
+  },
+  gridRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+
+  // Shared
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  summaryDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  summaryText: {
+    color: '#C9C1C1',
+    fontSize: 13,
     fontFamily: FontFamily.latoRegular,
-    letterSpacing: 0.2,
   },
-  processingContainer: {
+  dialWrap: {
+    alignItems: 'center',
+    marginVertical: 4,
+  },
+  toast: {
     position: 'absolute',
-    top: '50%',
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 12,
+    bottom: 16,
     alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    maxWidth: '90%',
+    backgroundColor: 'rgba(27, 27, 27, 0.95)',
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderColor: 'rgba(255, 178, 103, 0.3)',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
-  processingText: {
-    color: 'white',
-    fontWeight: '600',
-    fontSize: 15,
+  toastDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  toastText: {
+    color: '#FFFFFF',
+    fontSize: 13,
     fontFamily: FontFamily.latoRegular,
-    letterSpacing: 0.3,
   },
 });
 

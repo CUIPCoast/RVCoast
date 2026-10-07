@@ -5,7 +5,9 @@ import moment from 'moment';
 import WaterTanks from "../components/WaterTanks.jsx"; // Enhanced version
 import TemperatureDisplay from "../components/TemperatureDisplay"; // New component
 import useTemperature from "../hooks/useTemperature"; // New hook
-import {BatteryCard, SmallBatteryCard} from "../components/BatteryCard.jsx";
+import TabletBatteryWidget from "../components/TabletBatteryWidget.jsx";
+import ToggleTile from "../components/ToggleTile";
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import AwningControlModal from "../components/AwningControlModal";
 import AirCon from "./AirCon.jsx";
 import { FontFamily } from "../GlobalStyles";
@@ -357,55 +359,41 @@ const MainScreen = () => {
                         shadowRadius: 6,
                         elevation: 6,}}
                     size={30}>
-                        <View className="bg-brown rounded-xl m-3 mb-10 top-15">
-                            {/* User Info Display */}
-                        
-                            
-                            <View style={styles.userInfo}>
-                                <View style={styles.centeredContent}>
-                                    <View style={styles.connectionStatus}>
-                                        <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
-                                        <Text style={styles.connectionText}>
-                                            RV System Connected
-                                        </Text>
-                                    </View>
-                                    
-                                    {/* Weather Information */}
-                                    <View style={styles.weatherSection}>
-                                        <View style={styles.weatherHeader}>
-                                            <Ionicons name="partly-sunny" size={18} color="#FFB267" />
-                                            <Text style={styles.weatherTitle}>Current Weather</Text>
+                        <View style={styles.statusCard}>
+                            <View style={styles.connectionStatus}>
+                                <Ionicons name="checkmark-circle" size={16} color="#4ADE80" />
+                                <Text style={styles.connectionText}>RV System Connected</Text>
+                            </View>
+
+                            {/* Weather Information */}
+                            <View style={styles.weatherSection}>
+                                <View style={styles.weatherHeader}>
+                                    <Ionicons name="partly-sunny" size={18} color="#FFB267" />
+                                    <Text style={styles.weatherTitle}>Current Weather</Text>
+                                </View>
+                                <View style={styles.weatherContent}>
+                                    {[
+                                        { icon: 'thermometer', label: 'Temp', value: '72°F' },
+                                        { icon: 'water', label: 'Humidity', value: '65%' },
+                                        { icon: 'speedometer', label: 'Pressure', value: '1013 hPa' },
+                                        { icon: 'leaf', label: 'Wind', value: '5 mph SW' },
+                                    ].map((row) => (
+                                        <View key={row.label} style={styles.weatherRow}>
+                                            <Ionicons name={row.icon} size={14} color="#FFB267" />
+                                            <Text style={styles.weatherLabel}>{row.label}</Text>
+                                            <Text style={styles.weatherText}>{row.value}</Text>
                                         </View>
-                                        <View style={styles.weatherContent}>
-                                            <View style={styles.weatherRow}>
-                                                <Ionicons name="thermometer" size={14} color="#4FC3F7" />
-                                                <Text style={styles.weatherText}>72°F</Text>
-                                            </View>
-                                            <View style={styles.weatherRow}>
-                                                <Ionicons name="water" size={14} color="#29B6F6" />
-                                                <Text style={styles.weatherText}>65% Humidity</Text>
-                                            </View>
-                                            <View style={styles.weatherRow}>
-                                                <Ionicons name="speedometer" size={14} color="#A5A5A5" />
-                                                <Text style={styles.weatherText}>1013 hPa</Text>
-                                            </View>
-                                            <View style={styles.weatherRow}>
-                                                <Ionicons name="leaf" size={14} color="#10B981" />
-                                                <Text style={styles.weatherText}>5 mph SW</Text>
-                                            </View>
-                                        </View>
-                                    </View>
-                                    
-                                    {user && (
-                                        <Text style={styles.welcomeText}>
-                                            Remote user: {user.firstName || user.username}
-                                        </Text>
-                                    )}
+                                    ))}
                                 </View>
                             </View>
-                      
-                            
+
+                            {user && (
+                                <Text style={styles.welcomeText} numberOfLines={1}>
+                                    Remote user: {user.firstName || user.username}
+                                </Text>
+                            )}
                         </View>
+
                     </Row>
                 </Col>
 
@@ -427,165 +415,52 @@ const MainScreen = () => {
                     }}
                 >
 
-                <View className="flex-row justify-between items-start w-full mt-[-5] pb-2">
-                <View>
-                    <Text className="text-white mb-1" style={{fontFamily: FontFamily.latoBold}}>RV Tanks</Text>
-                    
-                    <View className="mt-5 space-y-2 mb-5">
-                    
-                  {/* Water Heater Button - Modern styling from first code */}
-                  <TouchableOpacity
-                    onPress={handleWaterHeaterToggle}
-                    disabled={isLoading}
-                    activeOpacity={0.8}
-                    style={[
-                      styles.modernButton,
-                      { marginBottom: 16 },
-                      isLoading && styles.buttonDisabled
-                    ]}
-                  >
-                    <LinearGradient
-                      colors={water.heaterOn 
-                        ? ["#FF6B6B", "#FF8E53", "#FF6B35"] 
-                        : ["#2C2C34", "#3A3A42", "#2C2C34"]
-                      }
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.modernGradientButton}
-                    >
-                      <View style={styles.buttonContent}>
-                        <View style={[
-                          styles.iconContainer,
-                          { backgroundColor: water.heaterOn ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)' }
-                        ]}>
-                          <Ionicons
-                            name={water.heaterOn ? "flame" : "flame-outline"}
-                            size={20}
-                            color={water.heaterOn ? "#FFF" : "#B0B0B0"}
-                          />
-                        </View>
-                        <View style={styles.textContainer}>
-                          <Text style={[
-                            styles.buttonTitle,
-                            { color: water.heaterOn ? "#FFF" : "#E0E0E0" }
-                          ]}>
-                            Water Heater
-                          </Text>
-                          <Text style={[
-                            styles.buttonSubtitle,
-                            { color: water.heaterOn ? "rgba(255,255,255,0.8)" : "#888" }
-                          ]}>
-                            {water.heaterOn ? "Heating" : "Off"}
-                          </Text>
-                        </View>
-                        <View style={[
-                          styles.statusIndicator,
-                          { backgroundColor: water.heaterOn ? "#4CAF50" : "#666" }
-                        ]} />
-                      </View>
-                    </LinearGradient>
-                  </TouchableOpacity>
-
-                  {/* Water Pump Button - Modern styling from first code */}
-                  <TouchableOpacity
-                    onPress={handleWaterPumpToggle}
-                    disabled={isLoading}
-                    activeOpacity={0.8}
-                    style={[
-                      styles.modernButton,
-                      isLoading && styles.buttonDisabled
-                    ]}
-                  >
-                    <LinearGradient
-                      colors={water.pumpOn 
-                        ? ["#4FC3F7", "#29B6F6", "#0288D1"] 
-                        : ["#2C2C34", "#3A3A42", "#2C2C34"]
-                      }
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.modernGradientButton}
-                    >
-                      <View style={styles.buttonContent}>
-                        <View style={[
-                          styles.iconContainer,
-                          { backgroundColor: water.pumpOn ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)' }
-                        ]}>
-                          <Ionicons
-                            name={water.pumpOn ? "water" : "water-outline"}
-                            size={20}
-                            color={water.pumpOn ? "#FFF" : "#B0B0B0"}
-                          />
-                        </View>
-                        <View style={styles.textContainer}>
-                          <Text style={[
-                            styles.buttonTitle,
-                            { color: water.pumpOn ? "#FFF" : "#E0E0E0" }
-                          ]}>
-                            Water Pump
-                          </Text>
-                          <Text style={[
-                            styles.buttonSubtitle,
-                            { color: water.pumpOn ? "rgba(255,255,255,0.8)" : "#888" }
-                          ]}>
-                            {water.pumpOn ? "Running" : "Off"}
-                          </Text>
-                        </View>
-                        <View style={[
-                          styles.statusIndicator,
-                          { backgroundColor: water.pumpOn ? "#4CAF50" : "#666" }
-                        ]} />
-                      </View>
-                    </LinearGradient>
-                  </TouchableOpacity>
+                <View style={styles.waterCard}>
+                  {/* Left: header, heater/pump toggles, CAN status */}
+                  <View style={styles.waterLeft}>
+                    <View>
+                      <Text style={styles.waterTitle}>Water</Text>
+                      <Text style={styles.waterSubtitle}>Heater, pump & tanks</Text>
                     </View>
-                </View>
 
-                {/* Enhanced TankHeaterControls with real-time CAN data - Reorganized Layout */}
-                <View style={styles.tanksSection}>
-                  
+                    <View style={styles.waterToggles}>
+                      <ToggleTile
+                        size="row"
+                        label="Water Heater"
+                        icon="water-boiler"
+                        isOn={water.heaterOn}
+                        onPress={handleWaterHeaterToggle}
+                        disabled={isLoading}
+                        onText="Heating"
+                        offText="Off"
+                      />
+                      <ToggleTile
+                        size="row"
+                        label="Water Pump"
+                        icon="water-pump"
+                        isOn={water.pumpOn}
+                        onPress={handleWaterPumpToggle}
+                        disabled={isLoading}
+                        onText="Running"
+                        offText="Off"
+                      />
+                    </View>
+
+                    <View style={styles.canStatus}>
+                      <View style={[styles.canDot, { backgroundColor: tempConnected ? '#4ADE80' : '#FF6B6B' }]} />
+                      <Text style={styles.canText}>
+                        CAN bus {tempConnected ? 'connected' : 'offline'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Right: tank levels */}
                   <View style={styles.tanksContainer}>
-                    <WaterTanks
-                        name="Fresh"
-                        tankType="fresh"
-                        isOn={isOn}
-                        setIsOn={setIsOn}
-                        trackColor={{ minimum: "lightblue", maximum: "white" }}
-                    />
-                    
-                    <WaterTanks
-                        name="Gray"
-                        tankType="gray"
-                        isOn={isOnGray}
-                        setIsOn={setIsOnGray}
-                        trackColor={{ minimum: "gray", maximum: "white" }}
-                    />
+                    <WaterTanks name="Fresh" tankType="fresh" />
+                    <WaterTanks name="Gray" tankType="gray" />
                   </View>
-                </View>
                 </View>
 
-                {/* System Status Indicator - NEW */}
-                <View style={styles.systemStatus}>
-                  <View style={styles.statusRow}>
-                    <Text style={styles.statusLabel}>CAN Bus:</Text>
-                    <Text style={[styles.statusValue, { 
-                      color: tempConnected ? '#10B981' : '#EF4444' 
-                    }]}>
-                      {tempConnected ? '● Connected' : '○ Disconnected'}
-                    </Text>
-                  </View>
-                  <View style={styles.statusRow}>
-                    <Text style={styles.statusLabel}>Temperature:</Text>
-                    <Text style={styles.statusValue}>
-                      {temperature.value ? `${temperature.value.toFixed(1)}${temperature.unit}` : '--°F'}
-                    </Text>
-                  </View>
-                  <View style={styles.statusRow}>
-                    <Text style={styles.statusLabel}>Last Update:</Text>
-                    <Text style={styles.statusValue}>
-                      {new Date().toLocaleTimeString()}
-                    </Text>
-                  </View>
-                </View>
 
                 </Row>
                             
@@ -616,30 +491,11 @@ const MainScreen = () => {
                         }}
                     >
                         
-<SmallBatteryCard  x={7} y={55} scale={1.25} percentageStyle={{
-    left: -23,     // Move percentage text left/right
-    top: -20,       // Move percentage text up/down
-    fontSize: 20, // Custom font size
-  }}
-  subtitleStyle={{
-    left: -24,      // Move subtitle left/right
-    top: -17,      // Move subtitle up/down
-    fontSize: 10, // Custom font size
-    marginTop: 2, // Spacing from percentage
-  }}>
-  {victronData ? (
-    <>
-      <Text style={styles.cardValue}>
-        {`${getBatterySOC()}%`}
-      </Text>
-      <Text style={styles.cardSubtitle}>
-        {formatPower(getBatteryPower())}
-      </Text>
-    </>
-  ) : (
-    <Text style={styles.cardValue}>--</Text>
-  )}
-</SmallBatteryCard>
+                        <TabletBatteryWidget
+                            soc={victronData?.battery ? victronData.battery.soc : null}
+                            power={victronData?.battery?.power}
+                            voltage={victronData?.battery?.voltage ? `${parseFloat(victronData.battery.voltage).toFixed(1)} V` : null}
+                        />
 
                         
                     </Row>
@@ -677,15 +533,16 @@ const MainScreen = () => {
                         >
                             Awning
                         </Text>
-                        <Pressable onPress={() => setModalVisible(true)}>
-                            <Image
-                                source={require("../assets/trailer.png")}
-                                style={{
-                                    width: 220,
-                                    height: 220,
-                                    resizeMode: "contain",
-                                }}
-                            />
+                        <Pressable
+                            onPress={() => setModalVisible(true)}
+                            style={({ pressed }) => [styles.awningTile, pressed && { opacity: 0.8 }]}
+                            accessibilityRole="button"
+                            accessibilityLabel="Open awning controls"
+                        >
+                            <View style={styles.awningIconCircle}>
+                                <MaterialCommunityIcons name="awning-outline" size={64} color="#FFB267" />
+                            </View>
+                            <Text style={styles.awningTileText}>Tap to control</Text>
                         </Pressable>
                         <AwningControlModal isVisible={isModalVisible} onClose={() => setModalVisible(false)} />
                     </Row>
@@ -784,16 +641,13 @@ const styles = {
         top:35,
     },
     temperatureDisplay: {
-        backgroundColor: 'rgb(40, 41, 43)', // Brown with transparency
-        height:180,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#FFFFFF20',
+        // Matches the other bg-brown home cards
+        height: 180,
         shadowColor: "#FFFFFF",
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 4,
-        elevation: 4,
+        shadowOpacity: 0.5,
+        shadowRadius: 6,
+        elevation: 6,
     },
     
     // New system status styles
@@ -927,43 +781,33 @@ const styles = {
     },
     
     // User info styles
-    userInfo: {
-        marginTop: 35,
-
-        left:18,
+    // RV status + weather card (fills its grid cell)
+    statusCard: {
         flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        
-    },
-    centeredContent: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: '100%',
-        top: 40,
+        alignSelf: 'stretch',
+        padding: 14,
+        justifyContent: 'space-between',
     },
     welcomeText: {
-        color: '#E0E0E0',
-        fontSize: 14,
+        color: '#9E9696',
+        fontSize: 12,
         fontFamily: FontFamily.latoRegular,
-        fontWeight: '500',
-        marginBottom: 4,
+        marginTop: 10,
     },
     connectionStatus: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(76, 175, 80, 0.1)',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
+        backgroundColor: 'rgba(74, 222, 128, 0.12)',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
         borderRadius: 12,
         alignSelf: 'flex-start',
     },
     connectionText: {
-        color: '#4CAF50',
-        fontSize: 12,
-        fontFamily: FontFamily.latoRegular,
-        fontWeight: '600',
-        marginLeft: 4,
+        color: '#4ADE80',
+        fontSize: 13,
+        fontFamily: FontFamily.latoBold,
+        marginLeft: 6,
     },
     connectButton: {
         flexDirection: 'row',
@@ -984,10 +828,13 @@ const styles = {
     
     // Weather section styles
     weatherSection: {
+        flex: 1,
         marginTop: 12,
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
-        borderRadius: 8,
-        padding: 10,
+        backgroundColor: '#1B1B1B',
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.06)',
+        padding: 12,
     },
     weatherHeader: {
         flexDirection: 'row',
@@ -995,26 +842,30 @@ const styles = {
         marginBottom: 8,
     },
     weatherTitle: {
-        color: '#FFB267',
-        fontSize: 14,
-        fontFamily: FontFamily.latoRegular,
-        fontWeight: '600',
-        marginLeft: 6,
+        color: '#FFFFFF',
+        fontSize: 15,
+        fontFamily: FontFamily.latoBold,
+        marginLeft: 8,
     },
     weatherContent: {
-        gap: 4,
+        flex: 1,
+        justifyContent: 'space-evenly',
     },
     weatherRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginVertical: 1,
+    },
+    weatherLabel: {
+        flex: 1,
+        color: '#9E9696',
+        fontSize: 13,
+        fontFamily: FontFamily.latoRegular,
+        marginLeft: 8,
     },
     weatherText: {
-        color: '#E0E0E0',
-        fontSize: 12,
-        fontFamily: FontFamily.latoRegular,
-        fontWeight: '500',
-        marginLeft: 6,
+        color: '#FFFFFF',
+        fontSize: 13,
+        fontFamily: FontFamily.latoBold,
     },
     
     // Tank section styles
@@ -1035,9 +886,74 @@ const styles = {
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        gap: 8,
-        flexWrap: 'wrap',
-        maxWidth: '100%',
+    },
+
+    // Water card (heater, pump, tanks)
+    waterCard: {
+        flex: 1,
+        width: '100%',
+        flexDirection: 'row',
+        alignItems: 'stretch',
+    },
+    waterLeft: {
+        flex: 1,
+        minWidth: 200,
+        marginRight: 12,
+        justifyContent: 'space-between',
+    },
+    waterTitle: {
+        color: '#FFFFFF',
+        fontSize: 18,
+        fontFamily: FontFamily.latoBold,
+    },
+    waterSubtitle: {
+        color: '#9E9696',
+        fontSize: 13,
+        fontFamily: FontFamily.latoRegular,
+        marginTop: 2,
+    },
+    waterToggles: {
+        gap: 10,
+        marginVertical: 14,
+    },
+    canStatus: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    canDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        marginRight: 8,
+    },
+    canText: {
+        color: '#9E9696',
+        fontSize: 12,
+        fontFamily: FontFamily.latoRegular,
+    },
+
+    // Awning launcher tile
+    awningTile: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 220,
+        height: 220,
+    },
+    awningIconCircle: {
+        width: 132,
+        height: 132,
+        borderRadius: 66,
+        backgroundColor: '#1B1B1B',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 178, 103, 0.35)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    awningTileText: {
+        color: '#9E9696',
+        fontSize: 14,
+        fontFamily: FontFamily.latoRegular,
+        marginTop: 14,
     },
 };
 

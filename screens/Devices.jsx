@@ -11,10 +11,11 @@ import { LightService, FanService, WaterService } from "../API/RVControlServices
 import MasterLightControl from "../components/MasterLightControl.jsx";
 import { Feather as Icon } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import FanButton from "../components/FanButton";
 
 
 import Ionicons from '@expo/vector-icons/Ionicons';
+import ToggleTile from "../components/ToggleTile";
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 // Import RV State Management hooks
 import { useRVLights, useRVWater } from "../API/RVStateManager/RVStateHooks";
@@ -77,7 +78,6 @@ const lightGroups = {
     'shower_lights'
   ]
 };
-
 
 const Devices = () => {
   const [isOn, setIsOn] = useState(false);
@@ -531,11 +531,13 @@ const handleWaterHeaterToggle = async () => {
         <>
           <View className="flex-row items-center justify-between mx-16 h-28">
             <View className="items-center bg-brown-300 ">
-              <Pressable onPress={() => setModalVisible(true)}>
-                <Image
-                  source={require("../assets/trailer.png")}
-                  className="h-20 w-24 mb-1"
-                />
+              <Pressable
+                onPress={() => setModalVisible(true)}
+                style={({ pressed }) => [styles.awningIcon, pressed && { opacity: 0.75 }]}
+                accessibilityRole="button"
+                accessibilityLabel="Open awning controls"
+              >
+                <MaterialCommunityIcons name="awning-outline" size={44} color={Color.colorSandybrown} />
               </Pressable>
               <Text className="text-white text-base">
                 Awning Controls
@@ -590,86 +592,29 @@ const handleWaterHeaterToggle = async () => {
       return (
         <>
         {/* ───── Water Controls (Bedroom Tab) ───── */}
-         <View style={styles.fanControlsContainer}>
-            <TouchableOpacity
-              style={[
-                styles.modernWaterButton,
-                water.heaterOn
-                  ? styles.waterButtonActive
-                  : styles.waterButtonInactive,
-                isLoading && styles.disabledButton,
-              ]}
+         <View style={styles.waterList}>
+            <ToggleTile
+              size="row"
+              label="Water Heater"
+              icon="water-boiler"
+              isOn={water.heaterOn}
               onPress={handleWaterHeaterToggle}
               disabled={isLoading}
-            >
-             <View style={styles.waterIconContainer}>
-              <View
-                style={[
-                  styles.waterIconCircle,
-                  water.heaterOn
-                    ? styles.waterIconCircleActive
-                    : styles.waterIconCircleInactive,
-                ]}
-              >
-                <Ionicons
-                  name="water"
-                  size={28}
-                  color={water.heaterOn ? '#FFF' : '#666'}
-                />
-              </View>
-             </View>
-
-             <Text style={[styles.waterButtonLabel, { color: water.heaterOn ? '#FFF' : '#CCC' }]}>
-               Water Heater
-             </Text>
-             <View style={[
-               styles.waterStatusIndicator, 
-               water.heaterOn ? styles.waterStatusActive : styles.waterStatusInactive
-             ]}>
-               <Text style={[styles.waterStatusText, { color: water.heaterOn ? '#FFF' : '#888' }]}>
-                 {water.heaterOn ? 'ON' : 'OFF'}
-               </Text>
-             </View>
-           </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[
-                styles.modernWaterButton,
-                water.pumpOn
-                  ? styles.waterButtonActive
-                  : styles.waterButtonInactive,
-                isLoading && styles.disabledButton,
-              ]}
+              onText="Heating"
+              offText="Off"
+            />
+            <ToggleTile
+              size="row"
+              label="Water Pump"
+              icon="water-pump"
+              isOn={water.pumpOn}
               onPress={handleWaterPumpToggle}
               disabled={isLoading}
-            >
-             <View style={styles.waterIconContainer}>
-               <View style={[
-                 styles.waterIconCircle,
-                 water.pumpOn
-                   ? styles.waterIconCircleActive
-                   : styles.waterIconCircleInactive
-               ]}>
-                 <Ionicons
-                   name="sync"
-                   size={28}
-                   color={water.pumpOn ? '#FFF' : '#666'}
-                 />
-               </View>
-             </View>
-             <Text style={[styles.waterButtonLabel, { color: water.pumpOn ? '#FFF' : '#CCC' }]}>
-               Water Pump
-             </Text>
-             <View style={[
-               styles.waterStatusIndicator, 
-               water.pumpOn ? styles.waterStatusActive : styles.waterStatusInactive
-             ]}>
-               <Text style={[styles.waterStatusText, { color: water.pumpOn ? '#FFF' : '#888' }]}>
-                 {water.pumpOn ? 'ON' : 'OFF'}
-               </Text>
-             </View>
-            </TouchableOpacity>
+              onText="Running"
+              offText="Off"
+            />
          </View>
+
          
          <MasterLightControl 
             isOn={masterLightOn}
@@ -704,24 +649,22 @@ const handleWaterHeaterToggle = async () => {
     } else if (selectedTab === TABS.BATHROOM) {
       return (
         <View className="">
-          <View style={[styles.fanControlsContainer, { flexDirection: 'column', paddingHorizontal: 20 }]}>
-        <FanButton
-          compact={true}
-          isOn={isBayVentFanOn}
-          onPress={toggleBayVentFan}
-          iconName="sun"
-          label="Bay Vent"
-          loading={isLoading}
-        />
-        <FanButton
-          compact={true}
-          isOn={isBathroomFanOn}
-          onPress={toggleBathroomFan}
-          iconName="wind"
-          label="Bath Fan"
-          loading={isLoading}
-        />
-      </View>
+          <View style={styles.ventRow}>
+            <ToggleTile
+              label="Bay Vent"
+              icon="hvac"
+              isOn={isBayVentFanOn}
+              onPress={toggleBayVentFan}
+              disabled={isLoading}
+            />
+            <ToggleTile
+              label="Bath Fan"
+              icon="fan"
+              isOn={isBathroomFanOn}
+              onPress={toggleBathroomFan}
+              disabled={isLoading}
+            />
+          </View>
     
           {/* Light Master Control */}
           <MasterLightControl 
@@ -1136,6 +1079,28 @@ const styles = StyleSheet.create({
   },
 
   // Fan Controls - Modern Style
+awningIcon: {
+  width: 80,
+  height: 80,
+  borderRadius: 24,
+  backgroundColor: '#1B1B1B',
+  borderWidth: 1,
+  borderColor: 'rgba(255, 178, 103, 0.35)',
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginBottom: 4,
+},
+waterList: {
+  gap: 10,
+  marginHorizontal: 20,
+  marginVertical: 20,
+},
+ventRow: {
+  flexDirection: 'row',
+  gap: 12,
+  marginHorizontal: 20,
+  marginVertical: 20,
+},
 fanControlsContainer: {
   flexDirection: 'row',
   justifyContent: 'center',

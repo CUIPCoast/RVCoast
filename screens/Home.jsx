@@ -733,8 +733,8 @@ const styles = StyleSheet.create({
   airConContainer: {
     width: width * 0.92,
     maxWidth: 420,
-    height: height * 0.65,
-    maxHeight: 520,
+    height: height * 0.82,
+    maxHeight: 680,
     borderRadius: 24,
     overflow: 'hidden',
     ...Platform.select({
