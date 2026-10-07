@@ -58,6 +58,11 @@ const distanceMeters = (a, b) => {
   return 2 * 6371000 * Math.asin(Math.sqrt(h));
 };
 
+// e.g. "35.0456° N, 85.3097° W" — shown when no street address is available.
+const formatCoords = ({ latitude, longitude }) =>
+  `${Math.abs(latitude).toFixed(4)}° ${latitude >= 0 ? 'N' : 'S'}, ` +
+  `${Math.abs(longitude).toFixed(4)}° ${longitude >= 0 ? 'E' : 'W'}`;
+
 const toCoords = (loc) => ({
   latitude: loc.coords.latitude,
   longitude: loc.coords.longitude,
@@ -84,6 +89,7 @@ const Map = () => {
   const [trackMarker, setTrackMarker] = useState(true);
   const [place, setPlace] = useState(null);
   const geocodedAtRef = useRef(null);
+  const mountedRef = useRef(true);
 
   const centerOn = useCallback((coords, duration = 600) => {
     if (!coords || !mapRef.current) return;
@@ -152,24 +158,39 @@ const Map = () => {
     if (last && distanceMeters(last, location) < 250) return;
     geocodedAtRef.current = location;
 
-    let cancelled = false;
-    Location.reverseGeocodeAsync(location)
-      .then(([place]) => {
-        if (cancelled || !place) return;
-        const city = place.city || place.subregion || place.district;
-        const region = place.region || place.country;
-        const street = [place.streetNumber, place.street].filter(Boolean).join(' ') || place.name;
+    // Not cancelled when `location` changes: GPS updates arrive every few
+    // seconds, and dropping in-flight lookups left the label stuck on
+    // "Finding address…". Only an unmount discards the result.
+    const coords = location;
+    Location.reverseGeocodeAsync(coords)
+      .then((results) => {
+        if (!mountedRef.current) return;
+        const found = results?.[0];
+        if (!found) {
+          setPlace({ title: formatCoords(coords), subtitle: null });
+          return;
+        }
+        const city = found.city || found.subregion || found.district;
+        const region = found.region || found.country;
+        const street = [found.streetNumber, found.street].filter(Boolean).join(' ') || found.name;
         setPlace({
-          title: [city, region].filter(Boolean).join(', ') || 'Current location',
+          title: [city, region].filter(Boolean).join(', ') || formatCoords(coords),
           subtitle: street && street !== city ? street : null,
         });
       })
       .catch((error) => {
         console.warn('Reverse geocode failed:', error);
+        if (!mountedRef.current) return;
+        // Show coordinates instead of waiting forever; retry on the next move.
+        setPlace((prev) => prev || { title: formatCoords(coords), subtitle: null });
         geocodedAtRef.current = null;
       });
-    return () => { cancelled = true; };
   }, [location]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   useEffect(() => {
     if (Platform.OS !== 'android' || !location) return undefined;
@@ -244,7 +265,7 @@ const Map = () => {
             coordinate={location}
             anchor={{ x: 0.5, y: 0.5 }}
             tracksViewChanges={Platform.OS === 'android' ? trackMarker : true}
-            title={place?.title || 'You are here'}
+            title={place?.title || formatCoords(location)}
             description={place?.subtitle || undefined}
           >
             <UserMarker />
@@ -252,19 +273,18 @@ const Map = () => {
         )}
       </MapView>
 
-      {status === 'ready' && (
+      {status === 'ready' && location && (
         <View
           style={styles.placeCard}
           accessible
-          accessibilityLabel={`Current location: ${place ? place.title : 'finding address'}`}
+          accessibilityLabel={`Current location: ${place ? place.title : formatCoords(location)}`}
         >
           <View style={styles.placeIcon}>
             <Ionicons name="location" size={16} color="#1B1B1B" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.placeCaption}>YOU ARE HERE</Text>
             <Text style={styles.placeTitle} numberOfLines={1}>
-              {place ? place.title : 'Finding address…'}
+              {place ? place.title : formatCoords(location)}
             </Text>
             {place?.subtitle ? (
               <Text style={styles.placeSubtitle} numberOfLines={1}>{place.subtitle}</Text>
@@ -368,12 +388,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
-  },
-  placeCaption: {
-    color: ACCENT,
-    fontSize: 11,
-    fontFamily: FontFamily.latoBold,
-    letterSpacing: 1,
   },
   placeTitle: {
     color: '#FFFFFF',

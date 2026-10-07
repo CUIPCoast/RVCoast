@@ -1,11 +1,23 @@
-import React, { useState, useEffect } from "react";
-import { StyleSheet, View, Text, Modal, TouchableOpacity, ActivityIndicator } from "react-native";
-import { Color, FontFamily } from "../GlobalStyles";
+import React, { useState, useEffect, useRef } from "react";
+import { StyleSheet, View, Text, Modal, TouchableOpacity, ActivityIndicator, Animated, Easing, AccessibilityInfo } from "react-native";
+import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { FontFamily } from "../GlobalStyles";
 import { ClimateService } from "../API/RVControlServices";
 import { RVControlService } from "../API/rvAPI";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRVClimate } from "../API/RVStateManager/RVStateHooks";
 import rvStateManager from "../API/RVStateManager/RVStateManager";
+
+const ACCENT = '#FFB267';
+
+// `speed` values are what the RV state and commands use; `label` is what users see.
+const SPEED_OPTIONS = [
+  { speed: 'Auto', label: 'Auto', icon: 'fan-auto', hint: 'Adjusts with the thermostat', spinMs: 1600 },
+  { speed: 'Low', label: 'Low', icon: 'fan-speed-1', hint: 'Quiet, gentle airflow', spinMs: 2200 },
+  { speed: 'Med', label: 'Medium', icon: 'fan-speed-2', hint: 'Balanced airflow', spinMs: 1100 },
+  { speed: 'High', label: 'High', icon: 'fan-speed-3', hint: 'Maximum airflow', spinMs: 550 },
+];
 
 /**
  * Modal for controlling climate system fan speed settings
@@ -17,6 +29,7 @@ import rvStateManager from "../API/RVStateManager/RVStateManager";
 const HeaterControlModal = ({ isVisible, onClose }) => {
   // Use RV state management hook for climate data
   const { climate, setFanSpeed: updateFanSpeed } = useRVClimate();
+  const insets = useSafeAreaInsets();
 
   // Local UI states
   const [selectedFanSpeed, setSelectedFanSpeed] = useState(null);
@@ -225,95 +238,128 @@ const HeaterControlModal = ({ isVisible, onClose }) => {
     }
   };
 
-  // Function to render fan speed button
-  const FanSpeedButton = ({ speed, isActive, onPress }) => {
-    return (
-      <TouchableOpacity
-        style={[
-          styles.fanSpeedButton,
-          isActive ? styles.activeFanButton : {},
-          isLoading ? styles.disabledButton : {}
-        ]}
-        onPress={() => onPress(speed)}
-        disabled={isLoading}
-      >
-        <Text style={[styles.fanSpeedText, isActive ? styles.activeText : {}]}>
-          {speed}
-        </Text>
-      </TouchableOpacity>
-    );
-  };
+  const activeSpeed = isAutoModeActive ? 'Auto' : selectedFanSpeed;
+  const activeOption = SPEED_OPTIONS.find((o) => o.speed === activeSpeed);
 
+  // Spinning fan preview: faster for higher speeds, still when nothing is set.
+  const spin = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    let cancelled = false;
+    let loop;
+    AccessibilityInfo.isReduceMotionEnabled()
+      .catch(() => false)
+      .then((reduce) => {
+        if (cancelled) return;
+        spin.stopAnimation();
+        spin.setValue(0);
+        if (reduce || !isVisible || !activeOption) return;
+        loop = Animated.loop(
+          Animated.timing(spin, { toValue: 1, duration: activeOption.spinMs, easing: Easing.linear, useNativeDriver: true })
+        );
+        loop.start();
+      });
+    return () => {
+      cancelled = true;
+      loop?.stop();
+    };
+  }, [activeSpeed, isVisible]);
+  const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
 
   return (
     <Modal
       visible={isVisible}
-      transparent={true}
+      transparent
       animationType="slide"
       onRequestClose={onClose}
     >
-      <View style={styles.modalContainer}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Fan Speed Control</Text>
+      <View style={styles.backdrop}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="Close fan speed"
+        />
+        <View style={[styles.sheet, { paddingBottom: insets.bottom + 20 }]}>
+          <View style={styles.grabber} />
 
-          {/* Error message display */}
-          {errorMessage && (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{errorMessage}</Text>
+          {/* Header */}
+          <View style={styles.header}>
+            <View style={styles.headerIcon}>
+              <MaterialCommunityIcons name="fan" size={22} color={ACCENT} />
             </View>
-          )}
-
-          {/* Status message */}
-          {showStatus && (
-            <View style={styles.statusContainer}>
-              <Text style={styles.statusText}>{statusMessage}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.title}>Fan Speed</Text>
+              <Text style={styles.subtitle}>
+                {activeOption ? `Currently ${activeOption.label}` : 'Not set'}
+              </Text>
             </View>
-          )}
-
-          {/* Loading indicator */}
-          {isLoading && (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color="#FFB267" />
-              <Text style={styles.loadingText}>Processing...</Text>
-            </View>
-          )}
-
-          {/* Fan Speed Selection */}
-          <View style={styles.fanSpeedContainer}>
-            <View style={styles.fanSpeedRow}>
-              <FanSpeedButton
-                speed="Auto"
-                isActive={isAutoModeActive}
-                onPress={setFanSpeed}
-              />
-              <FanSpeedButton
-                speed="High"
-                isActive={selectedFanSpeed === 'High' && !isAutoModeActive}
-                onPress={setFanSpeed}
-              />
-            </View>
-            <View style={styles.fanSpeedRow}>
-              <FanSpeedButton
-                speed="Med"
-                isActive={selectedFanSpeed === 'Med' && !isAutoModeActive}
-                onPress={setFanSpeed}
-              />
-              <FanSpeedButton
-                speed="Low"
-                isActive={selectedFanSpeed === 'Low' && !isAutoModeActive}
-                onPress={setFanSpeed}
-              />
-            </View>
+            <TouchableOpacity
+              style={styles.closeIcon}
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+            >
+              <Ionicons name="close" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
           </View>
 
-          {/* Close Button */}
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={onClose}
-            disabled={isLoading}
-          >
-            <Text style={styles.closeButtonText}>Close</Text>
-          </TouchableOpacity>
+          {/* Fan preview */}
+          <View style={styles.preview}>
+            <View style={[styles.previewRing, activeOption && styles.previewRingOn]}>
+              <Animated.View style={{ transform: [{ rotate }] }}>
+                <MaterialCommunityIcons name="fan" size={72} color={activeOption ? ACCENT : '#6B6363'} />
+              </Animated.View>
+            </View>
+            <Text style={styles.previewLabel}>{activeOption ? activeOption.label : 'Choose a speed'}</Text>
+            <Text style={styles.previewHint}>{activeOption ? activeOption.hint : 'The fan follows the thermostat until you pick one'}</Text>
+          </View>
+
+          {/* Speed options */}
+          <View style={styles.options} accessibilityRole="radiogroup">
+            {SPEED_OPTIONS.map((option) => {
+              const active = option.speed === activeSpeed;
+              return (
+                <TouchableOpacity
+                  key={option.speed}
+                  style={[styles.option, active && styles.optionActive, isLoading && styles.optionBusy]}
+                  onPress={() => setFanSpeed(option.speed)}
+                  disabled={isLoading}
+                  activeOpacity={0.75}
+                  accessibilityRole="radio"
+                  accessibilityLabel={`${option.label} fan speed`}
+                  accessibilityState={{ checked: active, disabled: isLoading }}
+                >
+                  <MaterialCommunityIcons name={option.icon} size={26} color={active ? '#1B1B1B' : '#C9C1C1'} />
+                  <Text style={[styles.optionText, active && styles.optionTextActive]}>{option.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Status */}
+          <View style={styles.statusBar}>
+            {isLoading ? (
+              <>
+                <ActivityIndicator size="small" color={ACCENT} />
+                <Text style={styles.statusText}>Sending to RV…</Text>
+              </>
+            ) : errorMessage ? (
+              <>
+                <MaterialCommunityIcons name="alert-circle-outline" size={18} color="#FF6B6B" />
+                <Text style={[styles.statusText, { color: '#FF6B6B' }]} numberOfLines={2}>{errorMessage}</Text>
+              </>
+            ) : showStatus ? (
+              <>
+                <MaterialCommunityIcons name="check-circle" size={18} color="#4ADE80" />
+                <Text style={styles.statusText}>{statusMessage}</Text>
+              </>
+            ) : (
+              <>
+                <Ionicons name="information-circle-outline" size={18} color="#9E9696" />
+                <Text style={[styles.statusText, { color: '#9E9696' }]}>Tap a speed to apply it</Text>
+              </>
+            )}
+          </View>
         </View>
       </View>
     </Modal>
@@ -321,139 +367,139 @@ const HeaterControlModal = ({ isVisible, onClose }) => {
 };
 
 const styles = StyleSheet.create({
-  modalContainer: {
+  backdrop: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'flex-end',
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
-  modalContent: {
-    width: '85%',
-    maxWidth: 420,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 28,
-    padding: 32,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 24 },
-    shadowOpacity: 0.4,
-    shadowRadius: 32,
-    elevation: 24,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.12)',
+  sheet: {
+    backgroundColor: '#211D1D',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderColor: 'rgba(255, 178, 103, 0.15)',
   },
-  modalTitle: {
-    fontSize: 32,
-    fontFamily: FontFamily.latoBold,
-    fontWeight: '800',
-    color: '#ffffff',
-    marginBottom: 28,
-    textAlign: 'center',
-    letterSpacing: -0.5,
+  grabber: {
+    alignSelf: 'center',
+    width: 40,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    marginBottom: 16,
   },
-  fanSpeedContainer: {
-    marginBottom: 20,
-  },
-  fanSpeedRow: {
+  header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 14,
+    alignItems: 'center',
+    marginBottom: 8,
   },
-  fanSpeedButton: {
-    flex: 1,
-    paddingVertical: 22,
+  headerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 178, 103, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2a2a2a',
-    borderRadius: 18,
-    marginHorizontal: 6,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.12)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    marginRight: 12,
   },
-  activeFanButton: {
-    backgroundColor: '#FFB267',
-    borderColor: '#FFD4A8',
-    shadowColor: '#FFB267',
-    shadowOpacity: 0.5,
-    shadowRadius: 12,
-    elevation: 10,
-  },
-  fanSpeedText: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 18,
+  title: {
+    color: '#FFFFFF',
+    fontSize: 22,
     fontFamily: FontFamily.latoBold,
-    fontWeight: '700',
-    letterSpacing: 0.5,
   },
-  activeText: {
-    color: '#1a1a1a',
-    fontWeight: '800',
-  },
-  disabledButton: {
-    opacity: 0.5,
-  },
-  closeButton: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    paddingVertical: 18,
-    borderRadius: 18,
-    alignItems: 'center',
-    marginTop: 10,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.15)',
-  },
-  closeButtonText: {
-    color: '#ffffff',
-    fontSize: 17,
-    fontFamily: FontFamily.latoBold,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  errorContainer: {
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    padding: 14,
-    borderRadius: 12,
-    marginBottom: 20,
-    borderWidth: 1.5,
-    borderColor: 'rgba(239, 68, 68, 0.4)',
-  },
-  errorText: {
-    color: '#FCA5A5',
-    textAlign: 'center',
+  subtitle: {
+    color: '#9E9696',
     fontSize: 14,
     fontFamily: FontFamily.latoRegular,
+    marginTop: 2,
   },
-  statusContainer: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    paddingHorizontal: 18,
+  closeIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  preview: {
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  previewRing: {
+    width: 128,
+    height: 128,
+    borderRadius: 64,
+    backgroundColor: '#1B1B1B',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewRingOn: {
+    borderColor: 'rgba(255, 178, 103, 0.45)',
+    backgroundColor: 'rgba(255, 178, 103, 0.08)',
+  },
+  previewLabel: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontFamily: FontFamily.latoBold,
+    marginTop: 12,
+  },
+  previewHint: {
+    color: '#9E9696',
+    fontSize: 13,
+    fontFamily: FontFamily.latoRegular,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  options: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 8,
+  },
+  option: {
+    flex: 1,
+    height: 84,
+    borderRadius: 18,
+    backgroundColor: '#2A2626',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  optionActive: {
+    backgroundColor: ACCENT,
+    borderColor: ACCENT,
+  },
+  optionBusy: {
+    opacity: 0.6,
+  },
+  optionText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: FontFamily.latoBold,
+    marginTop: 6,
+  },
+  optionTextActive: {
+    color: '#1B1B1B',
+  },
+  statusBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 48,
+    marginTop: 18,
+    paddingHorizontal: 14,
     paddingVertical: 12,
-    borderRadius: 12,
-    marginBottom: 20,
-    alignSelf: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
+    borderRadius: 14,
+    backgroundColor: '#1B1B1B',
   },
   statusText: {
-    color: '#6EE7B7',
-    fontWeight: '600',
-    fontSize: 14,
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 13,
     fontFamily: FontFamily.latoRegular,
-  },
-  loadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
-    paddingVertical: 12,
-  },
-  loadingText: {
-    color: 'rgba(255,255,255,0.8)',
-    marginLeft: 12,
-    fontSize: 15,
-    fontFamily: FontFamily.latoRegular,
+    marginLeft: 8,
   },
 });
 
