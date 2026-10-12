@@ -1,89 +1,131 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { Color, FontFamily } from '../GlobalStyles';
 
-const MasterLightControl = ({ isOn, onToggleOn, onToggleOff, isLoading }) => {
+// "All lights" bar: summary of how many lights are on plus an OFF / ON segmented switch.
+// onCount / total are optional; without them the subtitle falls back to a hint.
+const MasterLightControl = ({ isOn, onToggleOn, onToggleOff, isLoading, onCount, total, style }) => {
+  const hasCount = typeof onCount === 'number' && typeof total === 'number';
+  const anyOn = hasCount ? onCount > 0 : isOn;
+
+  const subtitle = hasCount
+    ? onCount === 0
+      ? 'All lights are off'
+      : `${onCount} of ${total} on`
+    : 'Control every light at once';
+
+  const segment = (label, active, onPress) => (
+    <TouchableOpacity
+      style={[styles.segment, active && styles.segmentActive]}
+      onPress={onPress}
+      disabled={isLoading}
+      activeOpacity={0.75}
+      accessibilityRole="button"
+      accessibilityLabel={`Turn all lights ${label.toLowerCase()}`}
+      accessibilityState={{ selected: active, disabled: isLoading }}
+    >
+      <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</Text>
+    </TouchableOpacity>
+  );
+
   return (
-    <View style={styles.masterLightContainer}>
-      <View style={styles.masterLightContent}>
-        <View style={styles.masterLightLeft}>
-          <Image
-            source={require("../assets/lamplight.png")}
-            style={styles.masterLightIcon}
-          />
-          <Text style={styles.masterLightText}>Light Master</Text>
-        </View>
-        
-        <View style={styles.masterLightRight}>
-          {isLoading ? (
-            <ActivityIndicator size="small" color="#FFB267" />
-          ) : (
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              {/* ON Button */}
-              <TouchableOpacity
-                style={{
-                  backgroundColor: isOn ? '#FFB267' : '#444',
-                  paddingHorizontal: 15,
-                  paddingVertical: 8,
-                  borderTopLeftRadius: 20,
-                  borderBottomLeftRadius: 20,
-                  marginRight: 1,
-                }}
-                onPress={onToggleOn}
-                disabled={isLoading || isOn}
-              >
-                <Text style={{ color: isOn ? '#000' : '#FFF' }}>ON</Text>
-              </TouchableOpacity>
-              
-              {/* OFF Button */}
-              <TouchableOpacity
-                style={{
-                  backgroundColor: !isOn ? '#FFB267' : '#444',
-                  paddingHorizontal: 15,
-                  paddingVertical: 8,
-                  borderTopRightRadius: 20,
-                  borderBottomRightRadius: 20,
-                }}
-                onPress={onToggleOff}
-                disabled={isLoading || !isOn}
-              >
-                <Text style={{ color: !isOn ? '#000' : '#FFF' }}>OFF</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
+    <View style={[styles.container, anyOn && styles.containerOn, style]}>
+      <View style={[styles.iconCircle, anyOn ? styles.iconCircleOn : styles.iconCircleOff]}>
+        <MaterialCommunityIcons name="lightbulb-group" size={24} color={anyOn ? '#1B1B1B' : '#9E9696'} />
       </View>
+
+      <View style={styles.text}>
+        <Text style={styles.title}>All Lights</Text>
+        <Text style={[styles.subtitle, { color: anyOn ? Color.colorSandybrown : '#9E9696' }]} numberOfLines={1}>
+          {subtitle}
+        </Text>
+      </View>
+
+      {isLoading ? (
+        <View style={styles.loading}>
+          <ActivityIndicator size="small" color={Color.colorSandybrown} />
+        </View>
+      ) : (
+        <View style={styles.segmented}>
+          {segment('OFF', !isOn, onToggleOff)}
+          {segment('ON', isOn, onToggleOn)}
+        </View>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  masterLightContainer: {
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginTop: 10,
     marginHorizontal: 20,
     backgroundColor: '#1B1B1B',
-    borderRadius: 10,
-    padding: 15,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
-  masterLightContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  containerOn: {
+    borderColor: 'rgba(255, 178, 103, 0.35)',
+  },
+  iconCircle: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  masterLightLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  iconCircleOn: {
+    backgroundColor: Color.colorSandybrown,
   },
-  masterLightIcon: {
-    width: 30,
-    height: 30,
-    marginRight: 10,
+  iconCircleOff: {
+    backgroundColor: '#2A2626',
   },
-  masterLightText: {
-    color: 'white',
+  text: {
+    flex: 1,
+    marginHorizontal: 12,
+  },
+  title: {
+    color: Color.white0,
     fontSize: 16,
+    fontFamily: FontFamily.latoBold,
   },
-  masterLightRight: {
+  subtitle: {
+    fontSize: 13,
+    fontFamily: FontFamily.latoRegular,
+    marginTop: 2,
+  },
+  segmented: {
     flexDirection: 'row',
+    backgroundColor: '#2A2626',
+    borderRadius: 14,
+    padding: 3,
+  },
+  segment: {
+    minWidth: 52,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    alignItems: 'center',
+    borderRadius: 11,
+  },
+  segmentActive: {
+    backgroundColor: Color.colorSandybrown,
+  },
+  segmentText: {
+    color: '#9E9696',
+    fontSize: 13,
+    fontFamily: FontFamily.latoBold,
+    letterSpacing: 0.5,
+  },
+  segmentTextActive: {
+    color: '#1B1B1B',
+  },
+  loading: {
+    width: 110,
     alignItems: 'center',
   },
 });

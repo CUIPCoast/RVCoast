@@ -20,6 +20,8 @@ import { VictronEnergyService } from "../API/VictronEnergyService";
 import BatteryCard from "../components/BatteryCard.jsx";
 import { HorizontalLine, VerticalLine, ConnectionDot } from '../components/Lines.js';
 import PVChargerCard from "../components/PVChargerCard.jsx";
+import VictronPowerCard from "../components/VictronPowerCard.jsx";
+import { LinearGradient } from 'expo-linear-gradient';
 import GlowingCard from '../components/GlowingCards.jsx';
 import { FontFamily } from "../GlobalStyles";
 
@@ -77,27 +79,22 @@ const System = () => {
   
   const handleEnergyError = (error) => setEnergyError(error);
 
-  const formatGridPower = () => {
-    if (!victronData || !victronData.grid) return "--";
-    if (!victronData.grid.isConnected) return "Shore Disconnected";
-    let displayText = formatPower(victronData.grid.power);
-    const l1 = victronData.grid.l1Power;
-    const l2 = victronData.grid.l2Power;
-    if (l1 !== 0 || l2 !== 0) {
-      displayText += `\nL1: ${formatPower(l1)} L2: ${formatPower(l2)}`;
-    }
-    return displayText;
+  // Whole watts for the big card numbers
+  const wattsText = (value) => {
+    const num = parseFloat(value);
+    return Number.isFinite(num) ? `${Math.round(Math.abs(num))}` : '--';
   };
 
-  const getBatterySOC = () => {
-    if (!victronData || !victronData.battery) return 0;
-    const socDecimal = victronData.battery.soc;
-    return Math.round(socDecimal * 100);
+  const gridSubtitle = () => {
+    if (!victronData || !victronData.grid) return 'Waiting for data';
+    if (!victronData.grid.isConnected) return 'Shore disconnected';
+    const l1 = victronData.grid.l1Power;
+    const l2 = victronData.grid.l2Power;
+    if (l1 !== 0 || l2 !== 0) return `L1 ${wattsText(l1)} W · L2 ${wattsText(l2)} W`;
+    return 'Shore power connected';
   };
-  const getBatteryPower = () => {
-    if (!victronData || !victronData.battery) return 0;
-    return parseFloat(victronData.battery.power).toFixed(2);
-  };
+
+
   const getBatteryVoltage = () => {
     if (!victronData || !victronData.battery) return '0.00';
     return parseFloat(victronData.battery.voltage || 0).toFixed(2);
@@ -141,100 +138,10 @@ const System = () => {
   // ✨ NEW: Overview page extracted so it's tidy inside the pager
   const OverviewPage = () => (
     <SafeAreaView style={[styles.tabletContainer, { width: screenWidth }]}>
-       <View style={styles.header}>
-          <View>
-            <Text style={styles.headerDay}>Victron System</Text>
-            
-          </View>
-          <Image
-            source={require("../assets/trailer.png")}
-            style={styles.logo}
-          />
-        </View>
 
       {/* ————————————— DIAGRAM CONTAINER ————————————— */}
       <View style={styles.diagramContainer}>
-        {/* ————————————— TOP ROW OF CARDS ————————————— */}
-        <View style={styles.panelRow}>
-          <GlowingCard glowColor="#D32F2F" style={styles.cardWrapper}>
-            <View style={styles.redCard}>
-              <View style={styles.redCardHeader}>
-                <Text style={styles.redCardHeaderText}>Grid Power</Text>
-              </View>
-              <Text style={styles.cardValue}>
-                {formatGridPower()}
-              </Text>
-            </View>
-          </GlowingCard>
-
-          <View collapsable={false} key="victron-container">
-            <GlowingCard glowColor="#6CB4EE" style={styles.cardWrapper}>
-              <Image
-                source={victronImageSource}
-                style={styles.blueCard}
-                resizeMode="cover"
-                fadeDuration={0}
-                defaultSource={victronImageSource}
-              />
-            </GlowingCard>
-          </View>
-
-          <GlowingCard glowColor="#228B22" style={styles.cardWrapper}>
-            <View style={styles.greenCard}>
-              <View style={styles.greenCardHeader}>
-                <Text style={styles.greenCardHeaderText}>AC Loads</Text>
-              </View>
-              <Text style={styles.cardValue}>
-                {victronData ? formatPower(victronData.acLoads.power) : "--"}
-              </Text>
-              <Text style={styles.cardSubtitle}>
-                L1 + L2
-              </Text>
-            </View>
-          </GlowingCard>
-        </View>
-
-        {/* ————————————— BOTTOM ROW OF CARDS ————————————— */}
-        <View style={styles.panelRow}>
-          <BatteryCard>
-            {victronData ? (
-              <>
-                <Text style={styles.cardValue}>
-                  {`${getBatterySOC()}%`}
-                </Text>
-                <Text style={styles.cardSubtitle}>
-                  {formatPower(getBatteryPower())}
-                </Text>
-              </>
-            ) : (
-              <Text style={styles.cardValue}>--</Text>
-            )}
-          </BatteryCard>
-          
-          <GlowingCard glowColor="#228B22" style={styles.cardWrapper}>
-            <View style={styles.darkerGreenCard}>
-              <View style={styles.darkerGreenCardHeader}>
-                <Text style={styles.greenCardHeaderText}>DC Power</Text>
-              </View>
-              <Text style={[styles.cardValue, { top: 20 }]}>
-                {victronData ? formatPower(victronData.dcSystem.power) : "--"}
-              </Text>
-            </View>
-          </GlowingCard>
-
-          <View collapsable={false} key="pvcharger-container">
-            <GlowingCard glowColor="#FFBF00" style={styles.cardWrapper}>
-              <PVChargerCard
-                power={victronData ? formatPower(victronData.pvCharger.power) : '0.00W'}
-                imageSource={smartSolarImageSource}
-                cardOffset={{ top: 110, left: -100 }}
-                imageOffset={{ top: 160, left: -174 }}
-              />
-            </GlowingCard>
-          </View>
-        </View>
-
-        {/* ————————————— CONNECTION LINES ————————————— */}
+        {/* ————————————— CONNECTION LINES (drawn first so cards sit on top) ————————————— */}
         <ConnectionDot top={87} left={330} />
         <ConnectionDot top={88} left={490} />
         <HorizontalLine top={86} left={245} width={250} />
@@ -258,6 +165,98 @@ const System = () => {
         <ConnectionDot top={513} left={744} />
         <HorizontalLine top={512} left={738} width={75} />
         <ConnectionDot top={513} left={815} />
+
+        {/* ————————————— TOP ROW OF CARDS ————————————— */}
+        <View style={styles.panelRow}>
+          <GlowingCard glowColor="#D32F2F" style={styles.cardWrapper}>
+            <VictronPowerCard
+              style={styles.redCard}
+              title="Grid Power"
+              icon="transmission-tower"
+              badge={victronData?.grid?.isConnected ? 'Connected' : 'Unplugged'}
+              value={victronData?.grid?.isConnected ? wattsText(victronData.grid.power) : '--'}
+              unit={victronData?.grid?.isConnected ? 'W' : null}
+              subtitle={gridSubtitle()}
+              colors={['#F0524F', '#8E1B1B']}
+              glow="#FF6B6B"
+            />
+          </GlowingCard>
+
+          <View collapsable={false} key="victron-container">
+            <GlowingCard glowColor="#6CB4EE" style={styles.cardWrapper}>
+              <LinearGradient
+                colors={['#64B5F6', '#0D47A1']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.blueCard}
+              >
+                <Image
+                  source={victronImageSource}
+                  style={styles.victronImage}
+                  resizeMode="contain"
+                  fadeDuration={0}
+                  defaultSource={victronImageSource}
+                />
+                {/* Caption sits below the photo so it never covers the device */}
+                <View style={styles.victronCaption}>
+                  <Text style={styles.victronTitle} numberOfLines={1}>Inverter / Charger</Text>
+                  <Text style={styles.victronState} numberOfLines={1}>
+                    {victronData?.systemOverview?.state || 'MultiPlus'}
+                  </Text>
+                </View>
+              </LinearGradient>
+            </GlowingCard>
+          </View>
+
+          <GlowingCard glowColor="#228B22" style={styles.cardWrapper}>
+            <VictronPowerCard
+              style={styles.greenCard}
+              title="AC Loads"
+              icon="home-lightning-bolt-outline"
+              value={victronData ? wattsText(victronData.acLoads.power) : '--'}
+              unit={victronData ? 'W' : null}
+              subtitle="Outlets and appliances, L1 + L2"
+              colors={['#43C46B', '#1B5E20']}
+              glow="#A0FF9F"
+            />
+          </GlowingCard>
+        </View>
+
+        {/* ————————————— BOTTOM ROW OF CARDS ————————————— */}
+        <View style={styles.panelRow}>
+          <BatteryCard
+            soc={victronData?.battery ? victronData.battery.soc : null}
+            power={victronData?.battery?.power}
+            voltage={victronData?.battery?.voltage}
+          />
+          
+          <GlowingCard glowColor="#228B22" style={styles.cardWrapper}>
+            <VictronPowerCard
+              compact
+              style={styles.darkerGreenCard}
+              title="DC Power"
+              icon="current-dc"
+              value={victronData ? wattsText(victronData.dcSystem.power) : '--'}
+              unit={victronData ? 'W' : null}
+              subtitle="Lights, pumps and fans"
+              colors={['#2E9E55', '#0B3D1A']}
+              glow="#66FF99"
+            />
+          </GlowingCard>
+
+          <View collapsable={false} key="pvcharger-container">
+            <GlowingCard glowColor="#FFBF00" style={styles.cardWrapper}>
+              <PVChargerCard
+                power={victronData ? victronData.pvCharger.power : null}
+                state={victronData?.pvCharger?.state}
+                imageSource={smartSolarImageSource}
+                cardOffset={{ top: 110, left: -100 }}
+                imageOffset={{ top: 160, left: -174 }}
+              />
+            </GlowingCard>
+          </View>
+        </View>
+
       </View>
     </SafeAreaView>
   );
@@ -399,31 +398,9 @@ const styles = StyleSheet.create({
     top:20,
     right:10,
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 15,
-    paddingHorizontal: 20,
-  },
-  headerDay: {
-    color: "#fff",
-    fontSize: 28,
-    fontFamily: FontFamily.latoRegular,
-    fontWeight: "600",
-  },
-  headerDate: {
-    color: "#fff",
-    fontSize: 16,
-  },
-  logo: {
-    width: 70,
-    height: 45,
-    backgroundColor: "black",
-    borderRadius: 8,
-  },
   diagramContainer: {
     bottom: 15,
+    marginTop: 60, // space where the header used to be; cards and lines move together
     position: 'relative',
   },
   panelRow: {
@@ -433,130 +410,68 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
 
-  // Card header styles
-  redCardHeader: {
-    backgroundColor: '#FE6F5E',
-    width: '100%',
-    paddingVertical: 8,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
-    alignItems: 'center',
-    position: 'absolute',
-    top: 10,
-  },
-  greenCardHeader: {
-    backgroundColor: '#50C878',
-    width: '100%',
-    paddingVertical: 8,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
-    alignItems: 'center',
-    position: 'absolute',
-    top: 10,
-    
-  },
-  darkerGreenCardHeader: {
-    backgroundColor: '#004225',
-    width: '100%',
-    paddingVertical: 8,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
-    alignItems: 'center',
-    position: 'absolute',
-    top: 10,
-  },
-  redCardHeaderText: {
-    color: '#FFF',
-    fontSize: 18,
-    fontFamily: FontFamily.latoRegular,
-    fontWeight: '700',
-  },
-  greenCardHeaderText: {
-    color: '#FFF',
-    fontSize: 18,
-    fontFamily: FontFamily.latoRegular,
-    fontWeight: '700',
-  },
-  darkerGreenCardHeaderText: {
-    color: '#FFF',
-    fontSize: 18,
-    fontFamily: FontFamily.latoRegular,
-    fontWeight: '700',
-  },
 
   // Top row cards
+  // Card size/position must stay put: the connection lines below are drawn at fixed coordinates
   redCard: {
-    borderRadius: 12,
-    padding: 12,
     marginHorizontal: 8,
-    justifyContent: "center",
-    alignItems: "center",
     width: 310,
     height: 240,
-    backgroundColor: "#D32F2F",
     position: "relative",
-    paddingTop: 40,
-    shadowColor: "#FF6B6B",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.8,
-    shadowRadius: 15,
-    elevation: 10,
   },
   blueCard: {
-    borderRadius: 12,
+    borderRadius: 20,
     marginHorizontal: 12,
     width: 180,
     height: 200,
     right:12,
-    backgroundColor: "#1976D2",
+    padding: 3,
+    backgroundColor: "#0D47A1",
     shadowColor: "#6CB4EE",
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
-    shadowRadius: 15,
+    shadowRadius: 16,
     elevation: 10,
-    overflow: "hidden",
+  },
+  victronImage: {
+    flex: 1,
+    width: '100%',
+    backgroundColor: '#2459B5', // matches the photo's own background so the letterbox blends in
+    borderTopLeftRadius: 17,
+    borderTopRightRadius: 17,
+  },
+  victronCaption: {
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    backgroundColor: 'rgba(5, 25, 60, 0.85)',
+    borderBottomLeftRadius: 17,
+    borderBottomRightRadius: 17,
+  },
+  victronTitle: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontFamily: FontFamily.latoBold,
+  },
+  victronState: {
+    color: "rgba(255, 255, 255, 0.8)",
+    fontSize: 12,
+    fontFamily: FontFamily.latoRegular,
+    marginTop: 1,
   },
   greenCard: {
-    borderRadius: 12,
-    padding: 12,
     marginHorizontal: 8,
-    justifyContent: "center",
-    alignItems: "center",
     width: 310,
     height: 240,
-    backgroundColor: "#388E3C",
     position: "relative",
-    paddingTop: 40,
-    shadowColor: "#A0FF9F",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 15,
-    elevation: 10,
     right:20,
   },
   darkerGreenCard: {
     marginTop: 155,
-    borderRadius: 12,
-    padding: 12,
     marginHorizontal: 8,
-    justifyContent: "center",
-    alignItems: "center",
     right: 27,
     top: 60,
     width: 220,
     height: 130,
-    backgroundColor: "#1B5E20",
-    shadowColor: "#66FF99",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 15,
-    elevation: 10,
   },
   cardTitle: {
     color: "#fff",

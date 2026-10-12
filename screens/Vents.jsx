@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import TabletHeader from "../components/TabletHeader";
 import { StyleSheet, View, Text, Image, ActivityIndicator } from 'react-native';
 import useScreenSize from '../helper/useScreenSize.jsx';
 import { Col, Row, Grid } from 'react-native-easy-grid';
@@ -22,8 +23,6 @@ const Vents = () => {
   const prevBayVentFanRef = useRef(isBayVentFanOn);
   const isInitializedRef = useRef(false);
 
-  const currentDate   = moment().format('MMMM Do, YYYY');
-  const dayOfTheWeek  = moment().format('dddd');
   const isTablet      = useScreenSize();
 
   // Initialize from AsyncStorage once on mount
@@ -168,27 +167,8 @@ const Vents = () => {
     return (
       <Grid style={styles.container}>
         <Row size={10}>
-                <Row className="bg-black" size={9}>
-                  <Col className="m-1 ml-3">
-                    <Text className="text-3xl text-white" style={{ fontFamily: FontFamily.latoBold }}>{dayOfTheWeek}</Text>
-                    <Text className="text-lg text-white" style={{ fontFamily: FontFamily.latoBold }}>{currentDate}</Text>
-                  </Col>
-                </Row>
-                <Row className="bg-black" size={1}>
-                                    <View className="pt-3 pl-3">
-                                        <Image
-                                            source={require("../assets/trailer.png")}
-                                            style={{
-                                                width: 90,
-                                                height: 55,
-                                                right: 0,
-                                                paddingTop: 0,
-                                                backgroundColor: "black"
-                                            }}
-                                        />
-                                    </View>
-                                </Row>
-              </Row>
+          <TabletHeader style={{ flex: 1 }} />
+        </Row>
         <Row size={70} style={styles.centered}>
           <Col style={styles.centered}>
             <Text style={[styles.headerText, { marginBottom: 20 }]}>Fan Controls</Text>

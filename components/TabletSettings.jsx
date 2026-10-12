@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
+import TabletHeader from './TabletHeader';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import moment from 'moment';
 import ToggleSwitch from './ToggleSwitch.jsx';
 import { FontFamily } from '../GlobalStyles';
 import { useRVConnection } from '../API/RVStateManager/RVStateHooks';
@@ -90,18 +90,7 @@ const TabletSettings = ({ sections, toggles, onToggle, onItemPress, user }) => {
   return (
     <View style={styles.root}>
       {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.day}>{moment().format('dddd')}</Text>
-          <Text style={styles.date}>{moment().format('MMMM Do, YYYY')}</Text>
-        </View>
-        <View style={styles.headerRight}>
-          <Text style={styles.headerTitle}>Settings</Text>
-          <View style={styles.headerIcon}>
-            <Ionicons name="settings-outline" size={22} color={ACCENT} />
-          </View>
-        </View>
-      </View>
+      <TabletHeader title="Settings" style={styles.header} />
 
       <View style={styles.body}>
         {/* Left pane */}
@@ -182,38 +171,9 @@ const styles = StyleSheet.create({
     paddingTop: 16,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    marginHorizontal: -24,
+    marginTop: -16,
     marginBottom: 20,
-  },
-  day: {
-    color: '#FFFFFF',
-    fontSize: 30,
-    fontFamily: FontFamily.latoBold,
-  },
-  date: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontFamily: FontFamily.latoBold,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontFamily: FontFamily.latoBold,
-    marginRight: 12,
-  },
-  headerIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 178, 103, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   body: {
     flex: 1,

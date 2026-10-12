@@ -1,38 +1,40 @@
-// screens/LightScreenTablet.jsx - Updated with removed scenes and separate master control
+// screens/LightScreenTablet.jsx - Room cards of hold-to-dim light tiles with a master control bar
 import React, { useState, useEffect } from "react";
-import { View, Text, Image, ScrollView, Alert, ActivityIndicator, TouchableOpacity } from "react-native";
-import { Col, Row, Grid } from "react-native-easy-grid";
-import moment from "moment";
+import { View, Text, ScrollView, StyleSheet } from "react-native";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import SimpleHoldToDimLight from "../components/SimpleHoldToDimLight.jsx";
+import MasterLightControl from "../components/MasterLightControl.jsx";
+import TabletHeader from "../components/TabletHeader";
 import { LightControlService } from "../Service/LightControlService.js";
 import { CANBusMonitor } from "../Service/CANBusMonitor.js";
-import { LightingScenes } from "../API/rvAPI.js";
 import rvStateManager from "../API/RVStateManager/RVStateManager";
 import { handleAllLightsOn, handleAllLightsOff, getLightDisplayName, getLightGroups, showStatusMessage } from "../helper";
-import { FontFamily } from "../GlobalStyles";
+import { Color, FontFamily } from "../GlobalStyles";
+
+const ROOMS = [
+  { key: "kitchen", title: "Kitchen & Living", icon: "sofa-outline", columns: 3, flex: 1.5 },
+  { key: "bedroom", title: "Bedroom", icon: "bed-outline", columns: 2, flex: 1 },
+  { key: "bathroom", title: "Bathroom", icon: "shower", columns: 2, flex: 1 },
+];
 
 const ImprovedLightScreenTablet = () => {
-  // Current date/time
-  const currentDate = moment().format("MMMM Do, YYYY");
-  const dayOfTheWeek = moment().format("dddd");
-
   // State for loading and operations
   const [isLoading, setIsLoading] = useState(false);
   const [activeDimmingLights, setActiveDimmingLights] = useState(new Set());
-  
+
   // State for master light switch - independent from individual lights
   const [masterLightOn, setMasterLightOn] = useState(false);
-  
+
   // Status messages
   const [statusMessage, setStatusMessage] = useState('');
   const [showStatus, setShowStatus] = useState(false);
-  
+
   // Get all available lights
   const allLights = LightControlService.getAllLights();
-  
+
   // Check if dimming is supported
   const supportsDimming = LightControlService.supportsDimming();
-  
+
   // Individual light states from RV State Manager
   const [lightStates, setLightStates] = useState({});
   const [lightBrightness, setLightBrightness] = useState({});
@@ -44,15 +46,15 @@ const ImprovedLightScreenTablet = () => {
         const currentLights = state.lights || {};
         const newLightStates = {};
         const newLightBrightness = {};
-        
+
         Object.entries(currentLights).forEach(([lightId, lightState]) => {
           newLightStates[lightId] = lightState.isOn;
           newLightBrightness[lightId] = lightState.brightness || 0;
         });
-        
+
         setLightStates(newLightStates);
         setLightBrightness(newLightBrightness);
-        
+
         // Master state is now independent - don't update based on individual lights
       }
     });
@@ -61,12 +63,12 @@ const ImprovedLightScreenTablet = () => {
     const currentLights = rvStateManager.getCategoryState('lights');
     const initialLightStates = {};
     const initialLightBrightness = {};
-    
+
     Object.entries(currentLights).forEach(([lightId, lightState]) => {
       initialLightStates[lightId] = lightState ? lightState.isOn : false;
       initialLightBrightness[lightId] = lightState ? lightState.brightness || 0 : 0;
     });
-    
+
     setLightStates(initialLightStates);
     setLightBrightness(initialLightBrightness);
 
@@ -79,17 +81,16 @@ const ImprovedLightScreenTablet = () => {
       Object.entries(updates).forEach(([lightId, updateData]) => {
         const brightness = updateData.brightness || 0;
         const isOn = updateData.isOn || brightness > 0;
-        
+
         // Update RV State Manager
         rvStateManager.updateLightState(lightId, isOn, brightness);
       });
     });
-    
+
     return () => {
       subscription.unsubscribe();
     };
   }, []);
-
 
   // Turn all lights on
   const handleAllLightsOnPress = async () => {
@@ -102,7 +103,7 @@ const ImprovedLightScreenTablet = () => {
       setMasterLightOn(true);
     }
   };
-  
+
   // Turn all lights off
   const handleAllLightsOffPress = async () => {
     const success = await handleAllLightsOff(
@@ -119,338 +120,192 @@ const ImprovedLightScreenTablet = () => {
 
   // Group lights by category
   const lightGroups = getLightGroups();
+  const groupedLights = ROOMS.flatMap((room) => lightGroups[room.key] || []);
+  const countOn = (ids) => ids.filter((id) => lightStates[id]).length;
 
+  const renderRoom = (room) => {
+    const ids = lightGroups[room.key] || [];
+    const onCount = countOn(ids);
+    const tileWidth = `${(100 - (room.columns - 1) * 3) / room.columns}%`;
+
+    return (
+      <View key={room.key} style={[styles.roomCard, { flex: room.flex }]}>
+        <View style={styles.roomHeader}>
+          <View style={[styles.roomIcon, onCount > 0 && styles.roomIconOn]}>
+            <MaterialCommunityIcons name={room.icon} size={20} color={onCount > 0 ? Color.colorSandybrown : '#9E9696'} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.roomTitle}>{room.title}</Text>
+            <Text style={styles.roomSubtitle}>
+              {onCount > 0 ? `${onCount} of ${ids.length} on` : `${ids.length} lights · all off`}
+            </Text>
+          </View>
+        </View>
+
+        <ScrollView
+          contentContainerStyle={styles.tileGrid}
+          showsVerticalScrollIndicator={false}
+        >
+          {ids.map((lightId) => (
+            <SimpleHoldToDimLight
+              key={lightId}
+              name={getLightDisplayName(lightId)}
+              lightId={lightId}
+              value={lightBrightness[lightId] || 0}
+              isOn={lightStates[lightId] || false}
+              supportsDimming={supportsDimming}
+              style={{ width: tileWidth }}
+            />
+          ))}
+        </ScrollView>
+      </View>
+    );
+  };
 
   return (
-    <Grid className="bg-black">
-      {/* Header row */}
-      <Row size={10}>
-        <Row className="bg-black" size={9}>
-          <Col className="m-1 ml-3">
-            <Text className="text-3xl text-white" style={{fontFamily: FontFamily.latoBold}}>{dayOfTheWeek}</Text>
-            <Text className="text-lg text-white" style={{fontFamily: FontFamily.latoBold}}>{currentDate}</Text>
-          </Col>
-        </Row>
-       <Row className="bg-black" size={1}>
-                           <View className="pt-3 pl-3">
-                               <Image
-                                   source={require("../assets/trailer.png")}
-                                   style={{
-                                       width: 90,
-                                       height: 55,
-                                       right: 0,
-                                       paddingTop: 0,
-                                       backgroundColor: "black"
-                                   }}
-                               />
-                           </View>
-                       </Row>
-      </Row>
-      
+    <View style={styles.container}>
+      <TabletHeader style={styles.header} />
+
+      <View style={styles.titleRow}>
+        <View>
+          <Text style={styles.screenTitle}>Lighting</Text>
+          <Text style={styles.screenHint}>
+            {supportsDimming ? "Tap a light to switch it · hold to dim" : "Tap a light to switch it"}
+          </Text>
+        </View>
+        <MasterLightControl
+          isOn={masterLightOn}
+          onToggleOn={handleAllLightsOnPress}
+          onToggleOff={handleAllLightsOffPress}
+          isLoading={isLoading}
+          onCount={countOn(groupedLights)}
+          total={groupedLights.length}
+          style={styles.master}
+        />
+      </View>
+
+      {/* Room cards */}
+      <View style={styles.rooms}>
+        {ROOMS.map(renderRoom)}
+      </View>
+
       {/* Status message overlay */}
       {showStatus && (
-        <View style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: [{ translateX: -150 }, { translateY: -25 }],
-          backgroundColor: 'rgba(0, 0, 0, 0.8)',
-          padding: 15,
-          borderRadius: 10,
-          zIndex: 1000,
-          width: 300,
-          alignItems: 'center'
-        }}>
-          <Text style={{ color: 'white', fontSize: 16, fontFamily: FontFamily.latoRegular }}>{statusMessage}</Text>
+        <View style={styles.toast} pointerEvents="none">
+          <MaterialCommunityIcons name="lightbulb-on-outline" size={16} color={Color.colorSandybrown} />
+          <Text style={styles.toastText}>{statusMessage}</Text>
         </View>
       )}
-      
-      {/* Master Light Control Row */}
-      <Row size={5} style={{ justifyContent: "center", alignItems: "center" }}>
-        <Col
-          style={{
-            width: "50%",
-            height: 80,
-            backgroundColor: "#1B1B1B",
-            borderRadius: 10,
-            justifyContent: "center",
-            padding: 20,
-            bottom: 300,
-          }}
-        >
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              width: "100%",
-            }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-              }}
-            >
-              <Image
-                source={require("../assets/lamplight.png")}
-                style={{
-                  width: 40,
-                  height: 40,
-                  resizeMode: "contain",
-                  marginRight: 10,
-                }}
-              />
-              <Text className="text-white" style={{ fontFamily: FontFamily.latoBold }}>Light Master</Text>
-              <Text style={{
-                color: '#FFB267',
-                fontSize: 12,
-                marginLeft: 10,
-                fontStyle: 'italic',
-                fontFamily: FontFamily.latoRegular
-              }}>
-                Hold-to-Dim Mode
-              </Text>
-            </View>
-            
-            {/* Master ON/OFF buttons with even spacing */}
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              {isLoading ? (
-                <ActivityIndicator size="small" color="#FFB267" />
-              ) : (
-                <>
-                  {/* ON Button */}
-                  <TouchableOpacity
-                    style={{
-                      backgroundColor: masterLightOn ? '#FFB267' : '#444',
-                      paddingHorizontal: 20,
-                      paddingVertical: 10,
-                      borderTopLeftRadius: 20,
-                      borderBottomLeftRadius: 20,
-                      marginRight: 1,
-                    }}
-                    onPress={handleAllLightsOnPress}
-                    disabled={isLoading}
-                  >
-                    <Text style={{
-                      color: masterLightOn ? '#000' : '#FFF',
-                      fontWeight: 'bold',
-                      fontFamily: FontFamily.latoBold
-                    }}>ON</Text>
-                  </TouchableOpacity>
-                  
-                  {/* OFF Button */}
-                  <TouchableOpacity
-                    style={{
-                      backgroundColor: !masterLightOn ? '#FFB267' : '#444',
-                      paddingHorizontal: 20,
-                      paddingVertical: 10,
-                      borderTopRightRadius: 20,
-                      borderBottomRightRadius: 20,
-                    }}
-                    onPress={handleAllLightsOffPress}
-                    disabled={isLoading}
-                  >
-                    <Text style={{
-                      color: !masterLightOn ? '#000' : '#FFF',
-                      fontWeight: 'bold',
-                      fontFamily: FontFamily.latoBold
-                    }}>OFF</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-            </View>
-          </View>
-        </Col>
-      </Row>
-
-      {/* Main Content Row */}
-      <Row
-        size={5}
-        style={{
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            width: "45%",
-          }}
-        >
-          {/* Kitchen & Living Area Lights */}
-          <Col
-            style={{
-              width: "63%",
-              height: 410,
-              backgroundColor: "#1B1B1B",
-              borderRadius: 10,
-              justifyContent: "flex-start",
-              padding: 20,
-              marginLeft: -300,
-              marginRight: 30,
-              bottom: 180,
-               shadowColor: "#FFFFFF",
-                        shadowOffset: { width: 0, height: 4 },
-                        shadowOpacity: 0.5,
-                        shadowRadius: 6,
-                        elevation: 6,
-            }}
-          >
-            <Text
-              style={{
-                color: "white",
-                fontSize: 16,
-                position: "absolute",
-                top: 10,
-                left: 10,
-                fontFamily: FontFamily.latoBold
-              }}
-            >
-              Kitchen & Living Area
-            </Text>
-            {/* Divider */}
-            <View
-              style={{
-                height: 1,
-                backgroundColor: "white",
-                width: "100%",
-                marginTop: 40,
-                marginLeft: 20,
-                position: "absolute",
-              }}
-            />
-
-            <ScrollView style={{ marginTop: 35 }}>
-              {lightGroups.kitchen.map((lightId) => (
-                <SimpleHoldToDimLight
-                  key={lightId}
-                  name={getLightDisplayName(lightId)}
-                  lightId={lightId}
-                  value={lightBrightness[lightId] || 0}
-                  isOn={lightStates[lightId] || false}
-                  supportsDimming={supportsDimming}
-                />
-              ))}
-            </ScrollView>
-          </Col>
-
-          {/* Bedroom Lights */}
-          <Col
-            style={{
-              width: "70%",
-              height: 410,
-              backgroundColor: "#1B1B1B",
-              borderRadius: 10,
-              justifyContent: "flex-start",
-              padding: 20,
-              marginRight: 30,
-              bottom: 180,
-               shadowColor: "#FFFFFF",
-                        shadowOffset: { width: 0, height: 4 },
-                        shadowOpacity: 0.5,
-                        shadowRadius: 6,
-                        elevation: 6,
-            }}
-          >
-            <Text
-              style={{
-                color: "white",
-                fontSize: 16,
-                position: "absolute",
-                top: 10,
-                left: 10,
-                fontFamily: FontFamily.latoBold
-              }}
-            >
-              Bedroom
-            </Text>
-            {/* Divider */}
-            <View
-              style={{
-                height: 1,
-                backgroundColor: "white",
-                width: "100%",
-                marginTop: 40,
-                marginLeft: 20,
-                position: "absolute",
-              }}
-            />
-
-            <ScrollView style={{ marginTop: 35 }}>
-              {lightGroups.bedroom.map((lightId) => (
-                <SimpleHoldToDimLight
-                  key={lightId}
-                  name={getLightDisplayName(lightId)}
-                  lightId={lightId}
-                  value={lightBrightness[lightId] || 0}
-                  isOn={lightStates[lightId] || false}
-                  supportsDimming={supportsDimming}
-                />
-              ))}
-            </ScrollView>
-          </Col>
-
-          {/* Bathroom Lights */}
-          <Col
-            style={{
-              width: "70%",
-              height: 410,
-              backgroundColor: "#1B1B1B",
-              borderRadius: 10,
-              justifyContent: "flex-start",
-              padding: 20,
-              bottom: 180,
-               shadowColor: "#FFFFFF",
-                        shadowOffset: { width: 0, height: 4 },
-                        shadowOpacity: 0.5,
-                        shadowRadius: 6,
-                        elevation: 6,
-            }}
-          >
-            <Text
-              style={{
-                color: "white",
-                fontSize: 16,
-                position: "absolute",
-                top: 10,
-                left: 10,
-                fontFamily: FontFamily.latoBold
-              }}
-            >
-              Bathroom
-            </Text>
-
-            {/* Divider */}
-            <View
-              style={{
-                height: 1,
-                backgroundColor: "white",
-                width: "100%",
-                marginTop: 40,
-                marginLeft: 20,
-                position: "absolute",
-              }}
-            />
-
-            <ScrollView style={{ marginTop: 35 }}>
-              {lightGroups.bathroom.map((lightId) => (
-                <SimpleHoldToDimLight
-                  key={lightId}
-                  name={getLightDisplayName(lightId)}
-                  lightId={lightId}
-                  value={lightBrightness[lightId] || 0}
-                  isOn={lightStates[lightId] || false}
-                  supportsDimming={supportsDimming}
-                />
-              ))}
-            </ScrollView>
-          </Col>
-        </View>
-      </Row>
-    </Grid>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#000',
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+  },
+  header: {
+    marginHorizontal: -20,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 12,
+    marginBottom: 16,
+  },
+  screenTitle: {
+    color: Color.white0,
+    fontSize: 24,
+    fontFamily: FontFamily.latoBold,
+  },
+  screenHint: {
+    color: '#9E9696',
+    fontSize: 14,
+    fontFamily: FontFamily.latoRegular,
+    marginTop: 2,
+  },
+  master: {
+    width: 440,
+    marginTop: 0,
+    marginHorizontal: 0,
+    backgroundColor: '#211D1D',
+  },
+  rooms: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 16,
+  },
+  roomCard: {
+    backgroundColor: '#211D1D',
+    borderRadius: 20,
+    padding: 16,
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  roomHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  roomIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#1B1B1B',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  roomIconOn: {
+    borderColor: 'rgba(255, 178, 103, 0.35)',
+  },
+  roomTitle: {
+    color: Color.white0,
+    fontSize: 18,
+    fontFamily: FontFamily.latoBold,
+  },
+  roomSubtitle: {
+    color: '#9E9696',
+    fontSize: 13,
+    fontFamily: FontFamily.latoRegular,
+    marginTop: 1,
+  },
+  tileGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 12,
+    paddingBottom: 4,
+  },
+  toast: {
+    position: 'absolute',
+    bottom: 28,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(27, 27, 27, 0.95)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 178, 103, 0.35)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    zIndex: 1000,
+  },
+  toastText: {
+    color: Color.white0,
+    fontSize: 15,
+    fontFamily: FontFamily.latoRegular,
+    marginLeft: 8,
+  },
+});
 
 export default ImprovedLightScreenTablet;

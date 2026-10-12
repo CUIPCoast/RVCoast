@@ -19,10 +19,10 @@ const TabNavigator = () => {
 
   // Define mobile routes with AntDesign icon names
   const MOBILE_ROUTES = [
-    { name: 'Home', icon: 'home', component: Home },
-    { name: 'System', icon: 'api', component: System },
-    { name: 'Devices', icon: 'codepen', component: Devices },
-    { name: 'Settings', icon: 'setting', component: Settings },
+    { name: 'Home', icon: 'home-outline', activeIcon: 'home', component: Home },
+    { name: 'System', label: 'Energy', icon: 'lightning-bolt-outline', activeIcon: 'lightning-bolt', component: System },
+    { name: 'Devices', icon: 'lightbulb-group-outline', activeIcon: 'lightbulb-group', component: Devices },
+    { name: 'Settings', icon: 'cog-outline', activeIcon: 'cog', component: Settings },
   ];
 
   // For phones, use the new animated tabs

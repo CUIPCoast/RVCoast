@@ -1,357 +1,122 @@
-import React, { useEffect, useState } from 'react';
-import Svg, { 
-  Rect, 
-  LinearGradient, 
-  Stop, 
-  Path,
-  Text as SvgText
-} from 'react-native-svg';
-import {
-  View,
-  Text,
-  StyleSheet,
-} from "react-native";
+import React from 'react';
+import Svg, { Rect, Line, Defs, LinearGradient, Stop } from 'react-native-svg';
+import { View, Text, StyleSheet } from 'react-native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { FontFamily } from '../GlobalStyles';
 
- const BatteryCard = ({
-   width = 280,
-  height = 180,
-  children,
-  subtitleStyle = {},
-  percentageStyle = {}, 
-  containerStyle = {},
- }) => {
-  // State to track parsed values
-  const [batteryLevel, setBatteryLevel] = useState(0);
-  const [batteryPower, setBatteryPower] = useState("0W");
-  const [isLoading, setIsLoading] = useState(true);
-  
-  // Helper function to normalize SOC values (same as in VictronEnergyService)
-  const normalizeSoc = (soc) => {
-    // If SOC appears to be in a different range (like 7000-8000), convert it
-    if (soc > 100) {
-      // If it's in the thousands, it might be in different units
-      // Common cases: 
-      // - Some systems report as 0-10000 (divide by 100)
-      // - Some systems report in raw values that need scaling
-      if (soc > 1000) {
-        return Math.min(100, Math.max(0, (soc / 100) % 100));
-      }
-      // If it's just above 100, clamp it
-      return 100;
-    }
-    
-    // If it's negative or way too low, set to a reasonable minimum
-    if (soc < 0) {
-      return 5; // Minimum reasonable battery level
-    }
-    
-    // Return the value as-is if it's in the expected 0-100 range
-    return Math.min(100, Math.max(0, soc));
-  };
+// Battery-shaped panel for the tablet Victron overview.
+// The drawing keeps its original 280x180 footprint (cap on the right) because the
+// power lines on that screen are positioned around it.
+//   soc:     0-100 or 0-1, null while loading
+//   power:   watts, + charging / - discharging
+//   voltage: volts
 
-  // Parse children when they change
-  useEffect(() => {
-    let foundLevel = 0;
-    let foundPower = "0W";
-    let stillLoading = true;
-    
-    // Parse battery info from children
-    const parseChildren = (child) => {
-      if (!child) return;
-      
-      // Handle fragments or arrays of children
-      if (child.type === React.Fragment) {
-        React.Children.forEach(child.props.children, parseChildren);
-        return;
-      }
-      
-      // Parse text content
-      if (child.props && child.props.children) {
-        const childText = String(child.props.children);
-        
-        // Look for percentage values
-        if (childText.includes('%')) {
-          const match = childText.match(/(\d+(?:\.\d+)?)%/);
-          if (match && match[1]) {
-            const rawLevel = parseFloat(match[1]);
-            foundLevel = normalizeSoc(rawLevel); // FIXED: Normalize the SOC value
-            stillLoading = false;
-          }
-        } 
-        
-        // Look for power values
-        if (childText.includes('W')) {
-          foundPower = childText;
-        }
-      }
-    };
-    
-    // Start the parsing process
-    React.Children.forEach(children, parseChildren);
-    
-    // Update state with what we found
-    setBatteryLevel(foundLevel);
-    setBatteryPower(foundPower);
-    setIsLoading(stillLoading);
-  }, [children]);
-  
-  // Function to enhance children with battery-specific styling
-  const enhanceChildren = (children) => {
-    return React.Children.map(children, (child, index) => {
-      if (!child || typeof child !== 'object') return child;
-      
-      // Handle React fragments
-      if (child.type === React.Fragment) {
-        return React.cloneElement(child, {
-          children: React.Children.map(child.props.children, (fragmentChild, fragmentIndex) => {
-            if (!fragmentChild || typeof fragmentChild !== 'object') return fragmentChild;
-            
-            // Check if this is the first child in the fragment (index 0) - the percentage
-            if (fragmentChild.type === Text && fragmentIndex === 0) {
-              return React.cloneElement(fragmentChild, {
-                style: [fragmentChild.props.style, styles.batteryPercentage, percentageStyle]
-              });
-            }
-            
-            // Check if this is the second child in the fragment (index 1) - the subtitle
-            if (fragmentChild.type === Text && fragmentIndex === 1) {
-              return React.cloneElement(fragmentChild, {
-                style: [fragmentChild.props.style, styles.batterySubtitle, subtitleStyle]
-              });
-            }
-            
-            // Also check for percentage text (contains '%')
-            if (fragmentChild.type === Text && 
-                fragmentChild.props.children && 
-                String(fragmentChild.props.children).includes('%')) {
-              return React.cloneElement(fragmentChild, {
-                style: [fragmentChild.props.style, styles.batteryPercentage, percentageStyle]
-              });
-            }
-            
-            // Also check if it contains 'W' - power text
-            if (fragmentChild.type === Text && 
-                fragmentChild.props.children && 
-                String(fragmentChild.props.children).includes('W')) {
-              return React.cloneElement(fragmentChild, {
-                style: [fragmentChild.props.style, styles.batterySubtitle, subtitleStyle]
-              });
-            }
-            
-            return fragmentChild;
-          })
-        });
-      }
-      
-      // If it's a Text component, check if it's the first child (percentage)
-      if (child.type === Text && index === 0) {
-        return React.cloneElement(child, {
-          style: [child.props.style, styles.batteryPercentage, percentageStyle]
-        });
-      }
-      
-      // If it's a Text component, check if it's likely a subtitle (second child, contains 'W', etc.)
-      if (child.type === Text && index === 1) {
-        // This is likely the subtitle/power text
-        return React.cloneElement(child, {
-          style: [child.props.style, styles.batterySubtitle, subtitleStyle]
-        });
-      }
-      
-      // If it contains '%' and is a Text component, treat as percentage
-      if (child.type === Text && 
-          child.props.children && 
-          String(child.props.children).includes('%')) {
-        return React.cloneElement(child, {
-          style: [child.props.style, styles.batteryPercentage, percentageStyle]
-        });
-      }
-      
-      // If it contains 'W' and is a Text component, treat as subtitle
-      if (child.type === Text && 
-          child.props.children && 
-          String(child.props.children).includes('W')) {
-        return React.cloneElement(child, {
-          style: [child.props.style, styles.batterySubtitle, subtitleStyle]
-        });
-      }
-      
-      return child;
-    });
-  };
-  
-  // Calculate dynamic values
-  const padding = 8;
-  const cornerRadius = 16;
-  const batteryBody = width - 15; // Account for the cap
-  const capWidth = 15;
-  const capHeight = height * 0.4;
-  const innerPadding = 6;
-  
-  // Important fix: ensure levelWidth calculation is correct
-  const maxFillWidth = batteryBody - (innerPadding * 2) - padding * 1.5;
-  const levelWidth = isLoading ? 0 : (maxFillWidth * batteryLevel / 100);
-  
-  // Determine battery color based on level
-  let fillColor = '#4CAF50'; // Green for good battery
-  let gradientColors = ['#57c25c', '#2E7D32'];
-  
-  if (batteryLevel <= 20) {
-    fillColor = '#D32F2F'; // Red for low battery (matching your red card)
-    gradientColors = ['#FF5252', '#B71C1C'];
-  } else if (batteryLevel <= 50) {
-    fillColor = '#F57C00'; // Orange for medium battery (matching your orange card)
-    gradientColors = ['#FFB74D', '#E65100'];
-  }
+const SEGMENTS = 5;
 
-  return (
-    <View style={[styles.container, containerStyle]}>
-      <Svg width={width} height={height} style={{ position: 'absolute', top: 0, left: 0 }}>
-        {/* Battery body shell - outer case with gradient */}
-        <LinearGradient id="batteryBodyGradient" x1="0" y1="0" x2="0" y2={height}>
-          <Stop offset="0" stopColor="#424242" />
-          <Stop offset="0.5" stopColor="#303030" />
-          <Stop offset="1" stopColor="#212121" />
-        </LinearGradient>
-        <Rect
-          x={padding / 2}
-          y={padding / 2}
-          width={batteryBody - padding}
-          height={height - padding}
-          rx={cornerRadius}
-          ry={cornerRadius}
-          fill="url(#batteryBodyGradient)"
-          stroke="#424242"
-          strokeWidth="2"
-        />
-        
-        {/* Battery cap */}
-        <LinearGradient id="batteryCapGradient" x1="0" y1="0" x2="0" y2={capHeight}>
-          <Stop offset="0" stopColor="#424242" />
-          <Stop offset="1" stopColor="#212121" />
-        </LinearGradient>
-        <Rect
-          x={batteryBody - padding}
-          y={(height - capHeight) / 2}
-          width={capWidth}
-          height={capHeight}
-          rx={4}
-          ry={4}
-          fill="url(#batteryCapGradient)"
-          stroke="#424242"
-          strokeWidth="2"
-        />
-        
-        {/* Battery inner area - black background */}
-        <Rect
-          x={innerPadding + padding}
-          y={innerPadding + padding}
-          width={batteryBody - (innerPadding * 2) - padding * 1.5}
-          height={height - (innerPadding * 2) - padding}
-          rx={cornerRadius / 2}
-          ry={cornerRadius / 2}
-          fill="#121212"
-        />
-        
-        {/* Battery level fill with gradient */}
-        {!isLoading && (
-          <LinearGradient id="batteryLevelGradient" x1="0" y1="0" x2="0" y2={height}>
-            <Stop offset="0" stopColor={gradientColors[0]} />
-            <Stop offset="1" stopColor={gradientColors[1]} />
-          </LinearGradient>
-        )}
-        {!isLoading && levelWidth > 0 && (
-          <Rect
-            x={innerPadding + padding}
-            y={innerPadding + padding}
-            width={levelWidth}
-            height={height - (innerPadding * 2) - padding}
-            rx={cornerRadius / 2}
-            ry={cornerRadius / 2}
-            fill="url(#batteryLevelGradient)"
-          />
-        )}
-        
-        {/* Battery label */}
-        <SvgText
-          x={width / 2}
-          y={30}
-          fontSize="16"
-          fontWeight="bold"
-          fill="#ffffff"
-          textAnchor="middle"
-        >
-          Battery
-        </SvgText>
-        
-        {/* Battery terminals */}
-        <Rect 
-          x={width - 22} 
-          y={height/2 - 10} 
-          width={5} 
-          height={20} 
-          fill="#111" 
-          stroke="#666" 
-          strokeWidth="1" 
-        />
-        <Rect 
-          x={width - 24} 
-          y={height/2 - 5} 
-          width={8} 
-          height={10} 
-          fill="#333" 
-          stroke="#666" 
-          strokeWidth="1" 
-        />
-      </Svg>
-      
-      {/* Content container - this will display the children passed from parent */}
-      <View style={styles.contentContainer}>
-        {enhanceChildren(children)}
-      </View>
-    </View>
-  );
+const normaliseSoc = (soc) => {
+  const num = parseFloat(soc);
+  if (!Number.isFinite(num)) return null;
+  const pct = num > 0 && num <= 1 ? num * 100 : num;
+  return Math.max(0, Math.min(100, pct));
 };
 
-// FIXED: Custom SmallBatteryCard component for positioning and scaling
-const SmallBatteryCard = ({ 
-  x = 20, 
-  y = 20, 
-  scale = 0.7, 
-  children, 
-  width = 200,  // Smaller default width
-  height = 120, // Smaller default height
-  ...props 
+const levelColors = (level) => {
+  if (level === null) return ['#616161', '#303030'];
+  if (level <= 20) return ['#FF6B6B', '#B71C1C'];
+  if (level <= 50) return ['#FFB74D', '#E65100'];
+  return ['#69F0AE', '#1B7F3B'];
+};
+
+const BatteryCard = ({
+  soc = null,
+  power = 0,
+  voltage,
+  width = 280,
+  height = 180,
+  containerStyle = {},
 }) => {
-  // Calculate scaled dimensions
-  const scaledWidth = width * scale;
-  const scaledHeight = height * scale;
+  const level = normaliseSoc(soc);
+  const watts = parseFloat(power) || 0;
+  const isCharging = watts > 1;
+  const isDischarging = watts < -1;
+  const [light, dark] = levelColors(level);
+
+  // Geometry
+  const capWidth = 16;
+  const capHeight = height * 0.38;
+  const bodyWidth = width - capWidth;
+  const inset = 9;
+  const innerWidth = bodyWidth - inset * 2;
+  const innerHeight = height - inset * 2;
+  const fillWidth = level === null ? 0 : (innerWidth * level) / 100;
+
+  const stateLabel = level === null ? 'Waiting' : isCharging ? 'Charging' : isDischarging ? 'Discharging' : 'Idle';
+  const powerText = `${isCharging ? '+' : isDischarging ? '−' : ''}${Math.round(Math.abs(watts))} W`;
+  const voltageText = voltage !== undefined && voltage !== null ? `${parseFloat(voltage).toFixed(1)} V` : null;
 
   return (
-    <View style={{
-      position: 'absolute',
-      top: y,
-      left: x,
-      width: scaledWidth,
-      height: scaledHeight,
-      zIndex: 10 // Ensure it appears above other elements
-    }}>
-      <View style={{
-        transform: [{ scaleX: scale }, { scaleY: scale }],
-        transformOrigin: 'top left', // This might not work in RN, but we handle it with positioning
-      }}>
-        <BatteryCard 
-          width={width}
-          height={height}
-          containerStyle={{
-            position: 'relative',
-            top: 0,
-            left: 0,
-          }}
-          {...props}
-        >
-          {children}
-        </BatteryCard>
+    <View
+      style={[styles.container, containerStyle]}
+      accessible
+      accessibilityLabel={level === null ? 'Battery, waiting for data' : `Battery ${Math.round(level)} percent, ${stateLabel}, ${powerText}`}
+    >
+      <Svg width={width} height={height} style={styles.svg}>
+        <Defs>
+          <LinearGradient id="bodyGradient" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor="#2E2A2A" />
+            <Stop offset="1" stopColor="#151313" />
+          </LinearGradient>
+          <LinearGradient id="levelGradient" x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0" stopColor={light} />
+            <Stop offset="1" stopColor={dark} />
+          </LinearGradient>
+          <LinearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0.22" />
+            <Stop offset="0.45" stopColor="#FFFFFF" stopOpacity="0" />
+          </LinearGradient>
+        </Defs>
+
+        {/* Shell */}
+        <Rect x={1} y={1} width={bodyWidth - 2} height={height - 2} rx={24} fill="url(#bodyGradient)" stroke={light} strokeOpacity={0.7} strokeWidth={2} />
+        {/* Cap */}
+        <Rect x={bodyWidth - 1} y={(height - capHeight) / 2} width={capWidth} height={capHeight} rx={6} fill={light} fillOpacity={0.85} />
+
+        {/* Charge level */}
+        <Rect x={inset} y={inset} width={innerWidth} height={innerHeight} rx={16} fill="#0D0C0C" />
+        {fillWidth > 0 && (
+          <Rect x={inset} y={inset} width={fillWidth} height={innerHeight} rx={16} fill="url(#levelGradient)" />
+        )}
+        {/* Cell dividers */}
+        {Array.from({ length: SEGMENTS - 1 }).map((_, i) => {
+          const x = inset + (innerWidth / SEGMENTS) * (i + 1);
+          return <Line key={i} x1={x} x2={x} y1={inset + 6} y2={inset + innerHeight - 6} stroke="#000" strokeOpacity={0.35} strokeWidth={2} />;
+        })}
+        {/* Glass highlight */}
+        <Rect x={inset} y={inset} width={innerWidth} height={innerHeight} rx={16} fill="url(#shine)" />
+      </Svg>
+
+      <View style={[styles.content, { width: bodyWidth, height }]}>
+        <View style={styles.header}>
+          <MaterialCommunityIcons
+            name={isCharging ? 'battery-charging-high' : 'battery-high'}
+            size={18}
+            color="#FFFFFF"
+          />
+          <Text style={styles.title}>Battery</Text>
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{stateLabel}</Text>
+          </View>
+        </View>
+
+        <Text style={styles.percent}>
+          {level === null ? '--' : Math.round(level)}
+          <Text style={styles.percentUnit}>%</Text>
+        </Text>
+
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>{powerText}</Text>
+          {voltageText ? <Text style={styles.footerText}>{voltageText}</Text> : null}
+        </View>
       </View>
     </View>
   );
@@ -360,51 +125,79 @@ const SmallBatteryCard = ({
 const styles = StyleSheet.create({
   container: {
     position: 'relative',
-   width: 250,
-   height: 150,
+    width: 250,
+    height: 150,
     top: 70,
     left: 25,
     marginHorizontal: 8,
-    shadowColor: "#000",
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
     elevation: 5,
   },
-  contentContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  svg: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+  },
+  content: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    paddingHorizontal: 22,
+    paddingVertical: 18,
+    justifyContent: 'space-between',
+  },
+  header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 15,
-    zIndex: 1, // Ensure content appears above the SVG
   },
-  // New battery-specific subtitle styling
-  batterySubtitle: {
-    color: "#CCCCCC",         // Lighter gray color
-    fontSize: 14,             // Slightly larger font
-    fontWeight: "500",        // Medium weight
-    marginTop: 6,             // More space from main text
-    left:10,
-    top:18,
-    textAlign: "center",      // Center aligned
-    letterSpacing: 0.5,       // Slight letter spacing
-    opacity: 0.9,             // Slight transparency
+  title: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: FontFamily.latoBold,
+    marginLeft: 6,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
-  // New battery-specific percentage styling
-  batteryPercentage: {
-    color: "#FFFFFF",         // Pure white for contrast
-    fontSize: 32,             // Larger, more prominent
-    fontWeight: "700",        // Bold weight
-    textAlign: "center",      // Center aligned
-    left:20,
-    top:18,
-    letterSpacing: 1,         // Better letter spacing
-    textShadowColor: "rgba(0, 0, 0, 0.3)", // Subtle text shadow
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  }
+  badge: {
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    borderRadius: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontFamily: FontFamily.latoBold,
+  },
+  percent: {
+    color: '#FFFFFF',
+    fontSize: 46,
+    fontFamily: FontFamily.latoBold,
+    textShadowColor: 'rgba(0, 0, 0, 0.45)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 6,
+  },
+  percentUnit: {
+    fontSize: 22,
+    fontFamily: FontFamily.latoRegular,
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  footerText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: FontFamily.latoBold,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
 });
 
-// Export both components
 export default BatteryCard;
-export { SmallBatteryCard };

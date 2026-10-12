@@ -1,49 +1,53 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet } from 'react-native';
-import { FontFamily } from "../GlobalStyles";
+import { View, Image, StyleSheet } from 'react-native';
+import VictronPowerCard from './VictronPowerCard';
+
 /**
- * PVChargerCard – shows the current PV charger power output with a branded orange card
- * and a decorative sun icon in the bottom‑right corner.
+ * PVChargerCard – current PV charger output as an amber panel, with the SmartSolar
+ * unit photo layered behind it.
  *
  * Props
- *  power          string   formatted power value, e.g. "120W"
+ *  power          number   watts
+ *  state          string   charger state, e.g. "charging"
  *  imageSource    ImageSrc local image for the SmartSolar unit photo
- *  sunIcon        ImageSrc (optional) custom sun icon, defaults to built‑in asset
- *  cardOffset     {top,left} fine‑tune position of the orange card
+ *  cardOffset     {top,left} fine‑tune position of the amber card
  *  imageOffset    {top,left} fine‑tune position of the background photo
  */
 const PVChargerCard = React.memo(({
   power,
+  state,
   imageSource,
-  sunIcon = require('../assets/sun.png'),
   cardOffset = { top: 0, left: 0 },
   imageOffset = { top: 0, left: 0 },
-}) => (
-  <View style={styles.frame}>
-    {/* — back layer : SmartSolar photo — */}
-    <Image
-      source={imageSource}
-      style={[styles.photo, imageOffset]}
-      fadeDuration={0}
-    />
+}) => {
+  const watts = parseFloat(power);
+  const hasValue = Number.isFinite(watts);
+  const producing = hasValue && watts > 1;
 
-    {/* — front layer : orange card — */}
-    <View style={[styles.orangeCard, cardOffset]}>
-      <View style={styles.orangeCardHeader}>
-        <Text style={styles.orangeCardHeaderText}>PV Charger</Text>
-      </View>
-
-      <Text style={styles.cardValue}>{power}</Text>
-
-      {/* decorative sun icon */}
+  return (
+    <View style={styles.frame}>
+      {/* — back layer : SmartSolar photo — */}
       <Image
-        source={sunIcon}
-        style={styles.sunIcon}
+        source={imageSource}
+        style={[styles.photo, imageOffset]}
         fadeDuration={0}
       />
+
+      {/* — front layer : amber card — */}
+      <VictronPowerCard
+        compact
+        title="PV Charger"
+        icon="solar-power"
+        value={hasValue ? `${Math.round(watts)}` : '--'}
+        unit={hasValue ? 'W' : null}
+        subtitle={producing ? 'Producing' : state ? `${state.charAt(0).toUpperCase()}${state.slice(1)}` : 'No sun right now'}
+        colors={producing ? ['#FFB300', '#E65100'] : ['#9A6A12', '#5A2E06']}
+        glow="#FFBF00"
+        style={[styles.card, cardOffset]}
+      />
     </View>
-  </View>
-));
+  );
+});
 
 export default PVChargerCard;
 
@@ -61,56 +65,9 @@ const styles = StyleSheet.create({
     height: '110%',
     resizeMode: 'contain',
   },
-  orangeCard: {
-    borderRadius: 12,
-    padding: 12,
+  card: {
     marginHorizontal: 8,
-    justifyContent: "center",
-    alignItems: "center",
     width: 180,
     height: 140,
-    backgroundColor: "#F57C00",
-  
-    // Glow
-    shadowColor: "#FFBF00",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 15,
-    elevation: 10,
-  },
-  orangeCardHeader: {
-    backgroundColor: '#E86100',
-    width: '100%',
-    paddingVertical: 8,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
-    alignItems: 'center',
-    position: 'absolute',
-    top: 10,
-
-  },
-  orangeCardHeaderText: {
-    color: '#F7E7CE',
-    fontSize: 18,
-    fontFamily: FontFamily.latoRegular,
-    fontWeight: '700',
-  },
-  cardValue: {
-    color: '#fff',
-    fontSize: 24,
-    fontFamily: FontFamily.latoRegular,
-    fontWeight: '700',
-    marginTop: 28, // clears the header strip
-  },
-  sunIcon: {
-    position: 'absolute',
-    width: 32,
-    height: 32,
-    bottom: 10,
-    right: 10,
-    resizeMode: 'contain',
-    opacity: 0.9,
   },
 });

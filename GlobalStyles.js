@@ -64,3 +64,13 @@ export const FontFamily = {
     isDarkMode = !isDarkMode;
   };
   
+  /* Energy system identity colors (Victron overview + analytics) */
+  export const EnergyColor = {
+    shore: "#EF5350",
+    solar: "#FFB300",
+    inverter: "#1E88E5",
+    battery: "#43A047",
+    acLoads: "#26A69A",
+    dcLoads: "#7E57C2",
+    low: "#FF6B6B",
+  };

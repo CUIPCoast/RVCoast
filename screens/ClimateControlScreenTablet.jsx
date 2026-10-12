@@ -1,5 +1,6 @@
 // screens/ClimateControlScreenTablet.jsx - Fixed temperature synchronization and persistence
 import React, { useState, useEffect, useRef } from 'react';
+import TabletHeader from "../components/TabletHeader";
 import { StyleSheet, View, Text, Image, TouchableOpacity, TouchableWithoutFeedback, Keyboard, ScrollView } from "react-native";
 import { Color, isDarkMode } from "../GlobalStyles";
 import useScreenSize from "../helper/useScreenSize.jsx";
@@ -67,8 +68,6 @@ const ClimateControlScreenTablet = () => {
   tempRef.current = temp;
   
   var now = moment().format();
-  var currentDate = moment().format("MMMM Do, YYYY");
-  var DayOfTheWeek = moment().format("dddd");
 
   const moonImage = require("../assets/moon.png");
   const sunImage = require("../assets/sun.png");
@@ -763,26 +762,7 @@ const ClimateControlScreenTablet = () => {
       <TouchableWithoutFeedback onPress={dismissKeyboard}>
         <Grid className="bg-black">
           <Row size={10}>
-            <Row className="bg-black" size={9}>
-              <Col className="m-1 ml-3">
-                <Text className="text-3xl text-white" style={{ fontFamily: FontFamily.latoBold }}>{DayOfTheWeek}</Text>
-                <Text className="text-lg text-white" style={{ fontFamily: FontFamily.latoBold }}>{currentDate}</Text>
-              </Col>
-            </Row>
-           <Row className="bg-black" size={1}>
-                               <View className="pt-3 pl-3">
-                                   <Image
-                                       source={require("../assets/trailer.png")}
-                                       style={{
-                                           width: 90,
-                                           height: 55,
-                                           right: 0,
-                                           paddingTop: 0,
-                                           backgroundColor: "black"
-                                       }}
-                                   />
-                               </View>
-                           </Row>
+            <TabletHeader style={{ flex: 1 }} />
           </Row>
 
           {/* Weather error indicator */}

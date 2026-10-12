@@ -1,18 +1,22 @@
-// components/SimpleHoldToDimLight.jsx - FIXED VERSION
-// Single button: Tap to toggle, Hold to dim (up/down based on current brightness)
+// components/SimpleHoldToDimLight.jsx
+// Light tile: Tap to toggle, Hold to dim (cycles down to 0%, then back up to 100%)
 // Uses DC Dimmer Command 2 protocol: Command 13 (Ramp Up), Command 14 (Ramp Down), Command 04 (Stop)
 import React, { useState, useEffect, useRef } from "react";
-import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
+import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from "react-native";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { LightControlService } from "../Service/LightControlService";
 import rvStateManager from "../API/RVStateManager/RVStateManager";
 import { FontFamily } from "../GlobalStyles";
+import { getLightIcon } from "../helper/rvControl/lightHelpers";
 
 const SimpleHoldToDimLight = ({ 
   name, 
   lightId, 
   isOn = false,
   value = 50,
-  supportsDimming = true 
+  supportsDimming = true,
+  icon,
+  style,
 }) => {
   // Local state for immediate UI feedback
   const [localIsOn, setLocalIsOn] = useState(isOn);
@@ -364,140 +368,184 @@ const SimpleHoldToDimLight = ({
     }
   };
 
-  // Display functions
-  const getDisplayColor = () => {
-    if (error) return "#FF6B6B";
-    if (isDimming) return "#FFB267";
-    if (localIsOn) return "#FFB267";
-    return "#666";
+  // Display helpers
+  const brightness = Math.max(0, Math.min(100, Math.round(localBrightness)));
+  const showOn = localIsOn && !error;
+
+  const getStatusText = () => {
+    if (error) return error;
+    if (isToggling) return localIsOn ? "Turning off..." : "Turning on...";
+    if (isDimming) return dimmingDirection === 'up' ? "Brightening ↑" : "Dimming ↓";
+    if (!localIsOn) return "Tap to turn on";
+    return supportsDimming ? "Hold to dim" : "Tap to turn off";
   };
 
-  const getBrightnessText = () => {
-    if (error) return "ERROR";
-    if (isDimming) {
-      return `${Math.round(localBrightness)}% ⟲`;
-    }
-    return localIsOn ? `${Math.round(localBrightness)}%` : "";
-  };
+  // Icon circle fades with brightness so dim lights read as dim
+  const iconCircleColor = showOn
+    ? `rgba(255, 178, 103, ${0.35 + (brightness / 100) * 0.65})`
+    : "#2A2626";
 
   return (
-    <View style={{ marginBottom: 20 }}>
-      {/* Light name and combined button */}
-      <View style={{ 
-        flexDirection: "row", 
-        justifyContent: "space-between", 
-        alignItems: "center",
-        marginBottom: 5
-      }}>
-        <Text style={{
-          color: getDisplayColor(),
-          fontSize: 14,
-          flex: 1,
-          fontFamily: FontFamily.latoRegular
-        }}>
-          {name}
-        </Text>
-        
-        {/* Brightness indicator */}
-        <Text style={{
-          color: getDisplayColor(),
-          fontSize: 12,
-          marginRight: 15, // Increased margin to push button left
-          minWidth: 80,
-          textAlign: 'center',
-          fontFamily: FontFamily.latoBold
-        }}>
-          {getBrightnessText()}
-        </Text>
-        
-        {/* Combined toggle/dim button - MOVED LEFT */}
-        <TouchableOpacity
-          style={{
-            backgroundColor: localIsOn ? "#FFB267" : "#666",
-            width: 40,
-            height: 40,
-            borderRadius: 20,
-            alignItems: 'center',
-            justifyContent: 'center',
-            shadowColor: localIsOn ? "#FFB267" : "transparent",
-            shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: localIsOn ? 0.8 : 0,
-            shadowRadius: localIsOn ? 8 : 0,
-            elevation: localIsOn ? 8 : 0,
-            borderWidth: isDimming ? 2 : 0,
-            borderColor: isDimming ? "#FF8C00" : "transparent",
-            marginRight: 10,
-            marginTop: 15,
-          }}
-          onPressIn={handleButtonPressIn}
-          onPressOut={handleButtonPressOut}
-          onTouchCancel={handleTouchCancel}
-          onTouchMove={handleTouchMove}
-          disabled={false}
-          activeOpacity={0.7}
-          delayPressIn={0}
-          delayPressOut={0}
-        >
+    <TouchableOpacity
+      style={[
+        styles.tile,
+        showOn ? styles.tileOn : styles.tileOff,
+        isDimming && styles.tileDimming,
+        error && styles.tileError,
+        style,
+      ]}
+      onPressIn={handleButtonPressIn}
+      onPressOut={handleButtonPressOut}
+      onTouchCancel={handleTouchCancel}
+      onTouchMove={handleTouchMove}
+      activeOpacity={0.8}
+      delayPressIn={0}
+      delayPressOut={0}
+      accessibilityRole="switch"
+      accessibilityLabel={name}
+      accessibilityHint={supportsDimming ? "Tap to toggle, hold to adjust brightness" : "Tap to toggle"}
+      accessibilityState={{ checked: localIsOn, busy: isToggling || isDimming }}
+      accessibilityValue={localIsOn ? { min: 0, max: 100, now: brightness } : undefined}
+    >
+      <View style={styles.top}>
+        <View style={[styles.iconCircle, { backgroundColor: iconCircleColor }]}>
           {isToggling ? (
-            <ActivityIndicator size="small" color={localIsOn ? "#000" : "#FFF"} />
-          ) : isDimming ? (
-            <Text style={{
-              color: localIsOn ? "#000" : "#FFF",
-              fontSize: 16,
-              fontFamily: FontFamily.latoRegular,
-              fontWeight: 'bold'
-            }}>
-              ⟲
-            </Text>
-          ) : null}
-        </TouchableOpacity>
+            <ActivityIndicator size="small" color={localIsOn ? "#1B1B1B" : "#FFB267"} />
+          ) : (
+            <MaterialCommunityIcons
+              name={icon || getLightIcon(lightId)}
+              size={22}
+              color={showOn ? "#1B1B1B" : "#9E9696"}
+            />
+          )}
+        </View>
+
+        {localIsOn ? (
+          <Text style={[styles.percent, isDimming && styles.percentDimming]}>
+            {brightness}
+            <Text style={styles.percentUnit}>%</Text>
+          </Text>
+        ) : (
+          <View style={styles.offPill}>
+            <Text style={styles.offPillText}>OFF</Text>
+          </View>
+        )}
       </View>
 
-      {/* Error message */}
-      {error && (
-        <View style={{ marginTop: 5 }}>
-          <Text style={{
-            color: "#FF6B6B",
-            fontSize: 10,
-            textAlign: 'center',
-            fontFamily: FontFamily.latoRegular
-          }}>
-            {error}
-          </Text>
-        </View>
-      )}
+      <View>
+        <Text style={styles.name} numberOfLines={2}>{name}</Text>
+        <Text
+          style={[
+            styles.status,
+            { color: error ? "#FF6B6B" : showOn ? "#FFB267" : "#9E9696" },
+          ]}
+          numberOfLines={1}
+        >
+          {getStatusText()}
+        </Text>
+      </View>
 
-      {/* Status indicator for dimming */}
-      {isDimming && dimmingDirection && (
-        <View style={{ marginTop: 5 }}>
-          <Text style={{
-            color: "#FFB267",
-            fontSize: 10,
-            textAlign: 'center',
-            fontStyle: 'italic',
-            fontFamily: FontFamily.latoRegular
-          }}>
-            Cycling {dimmingDirection.toUpperCase()} • Hold to continue
-          </Text>
-        </View>
-      )}
-
-      {/* Help text for new users */}
-      {supportsDimming && localIsOn && !isDimming && !error && (
-        <View style={{ marginTop: 5 }}>
-          <Text style={{
-            color: "#888",
-            fontSize: 9,
-            textAlign: 'center',
-            fontStyle: 'italic',
-            fontFamily: FontFamily.latoLight
-          }}>
-            Tap: On/Off • Hold: Cycle brightness
-          </Text>
-        </View>
-      )}
-    </View>
+      {/* Brightness track */}
+      <View style={styles.track}>
+        <View
+          style={[
+            styles.trackFill,
+            { width: `${localIsOn ? brightness : 0}%` },
+          ]}
+        />
+      </View>
+    </TouchableOpacity>
   );
 };
+
+const styles = StyleSheet.create({
+  tile: {
+    minHeight: 132,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 14,
+    justifyContent: "space-between",
+  },
+  tileOn: {
+    backgroundColor: "rgba(255, 178, 103, 0.12)",
+    borderColor: "rgba(255, 178, 103, 0.6)",
+    shadowColor: "#FFB267",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+  },
+  tileOff: {
+    backgroundColor: "#1B1B1B",
+    borderColor: "rgba(255, 255, 255, 0.08)",
+  },
+  tileDimming: {
+    borderColor: "#FFB267",
+    borderWidth: 2,
+    padding: 13,
+  },
+  tileError: {
+    borderColor: "rgba(255, 107, 107, 0.6)",
+  },
+  top: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  iconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  percent: {
+    color: "#FFFFFF",
+    fontSize: 22,
+    fontFamily: FontFamily.latoBold,
+  },
+  percentDimming: {
+    color: "#FFB267",
+  },
+  percentUnit: {
+    fontSize: 13,
+    color: "#9E9696",
+    fontFamily: FontFamily.latoRegular,
+  },
+  offPill: {
+    backgroundColor: "#2A2626",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  offPillText: {
+    color: "#9E9696",
+    fontSize: 12,
+    fontFamily: FontFamily.latoBold,
+    letterSpacing: 0.5,
+  },
+  name: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontFamily: FontFamily.latoBold,
+    marginTop: 12,
+  },
+  status: {
+    fontSize: 12,
+    fontFamily: FontFamily.latoRegular,
+    marginTop: 2,
+  },
+  track: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#2A2626",
+    marginTop: 12,
+    overflow: "hidden",
+  },
+  trackFill: {
+    height: "100%",
+    borderRadius: 2,
+    backgroundColor: "#FFB267",
+  },
+});
 
 export default SimpleHoldToDimLight;

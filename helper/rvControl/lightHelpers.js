@@ -136,3 +136,30 @@ export const getLightGroups = () => {
     ]
   };
 };
+
+/**
+ * MaterialCommunityIcons glyph for a light
+ * @param {string} lightId - Light ID from API
+ * @returns {string} - Icon name
+ */
+export const getLightIcon = (lightId) => {
+  const iconMap = {
+    'kitchen_lights': 'stove',
+    'dinette_lights': 'table-chair',
+    'under_cab_lights': 'cupboard-outline',
+    'strip_lights': 'led-strip-variant',
+    'awning_lights': 'awning-outline',
+    'porch_lights': 'outdoor-lamp',
+    'hitch_lights': 'tow-truck',
+    'bed_ovhd_light': 'bed-outline',
+    'left_reading_lights': 'book-open-variant',
+    'right_reading_lights': 'book-open-variant',
+    'vibe_light': 'string-lights',
+    'bath_light': 'ceiling-light',
+    'vanity_light': 'mirror',
+    'shower_lights': 'shower-head',
+    'wardrobe_lights': 'wall-sconce-flat'
+  };
+
+  return iconMap[lightId] || 'lightbulb-outline';
+};

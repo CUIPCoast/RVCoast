@@ -1,17 +1,52 @@
+// components/SystemCharts.jsx - Energy analytics: live trend chart, battery ring, power in/out balance
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, useWindowDimensions, ScrollView } from 'react-native';
-import { FontFamily } from "../GlobalStyles";
+import { View, Text, StyleSheet, useWindowDimensions, ScrollView, TouchableOpacity } from 'react-native';
+import Svg, { Path, Line, Circle, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { Color, EnergyColor, FontFamily } from "../GlobalStyles";
 import { VictronEnergyService } from "../API/VictronEnergyService";
+import TabletHeader from "./TabletHeader";
+
+const MUTED = '#9E9696';
+const CARD = '#211D1D';
+const TRACK = '#2A2626';
+const HISTORY_LENGTH = 36; // 36 readings x 5 s = 3 minutes
+const POLL_MS = 5000;
+const CHART_HEIGHT = 200;
+
+const SERIES = [
+  { key: 'solar', label: 'Solar', color: EnergyColor.solar },
+  { key: 'grid', label: 'Shore', color: EnergyColor.shore },
+  { key: 'loads', label: 'Loads', color: EnergyColor.acLoads },
+  { key: 'battery', label: 'Battery', color: EnergyColor.inverter },
+];
+
+const toNumber = (value) => {
+  const num = parseFloat(value);
+  return Number.isFinite(num) ? num : 0;
+};
+
+// 0-1 or 0-100 -> 0-100
+const normaliseSoc = (soc) => {
+  const num = parseFloat(soc);
+  if (!Number.isFinite(num)) return null;
+  const pct = num > 0 && num <= 1 ? num * 100 : num;
+  return Math.max(0, Math.min(100, pct));
+};
+
+const formatWatts = (watts) => {
+  const abs = Math.abs(toNumber(watts));
+  if (abs >= 1000) return `${(abs / 1000).toFixed(2)} kW`;
+  return `${Math.round(abs)} W`;
+};
 
 const SystemCharts = () => {
   const { width } = useWindowDimensions();
+  const isWide = width >= 720;
   const [victronData, setVictronData] = useState(null);
-  const [powerHistory, setPowerHistory] = useState({
-    solar: [],
-    battery: [],
-    grid: [],
-    loads: []
-  });
+  const [powerHistory, setPowerHistory] = useState({ solar: [], battery: [], grid: [], loads: [] });
+  const [hiddenSeries, setHiddenSeries] = useState({});
+  const [chartWidth, setChartWidth] = useState(0);
 
   // Fetch Victron data and update power history
   useEffect(() => {
@@ -20,12 +55,12 @@ const SystemCharts = () => {
         const data = await VictronEnergyService.getAllData();
         setVictronData(data);
 
-        // Update power history (keep last 20 readings)
-        setPowerHistory(prev => ({
-          solar: [...prev.solar.slice(-19), data?.pvCharger?.power || 0],
-          battery: [...prev.battery.slice(-19), data?.battery?.power || 0],
-          grid: [...prev.grid.slice(-19), data?.grid?.power || 0],
-          loads: [...prev.loads.slice(-19), data?.acLoads?.power || 0]
+        const keep = (list, value) => [...list.slice(-(HISTORY_LENGTH - 1)), value];
+        setPowerHistory((prev) => ({
+          solar: keep(prev.solar, toNumber(data?.pvCharger?.power)),
+          battery: keep(prev.battery, Math.abs(toNumber(data?.battery?.power))),
+          grid: keep(prev.grid, data?.grid?.isConnected ? toNumber(data?.grid?.power) : 0),
+          loads: keep(prev.loads, toNumber(data?.acLoads?.power) + toNumber(data?.dcSystem?.power)),
         }));
       } catch (error) {
         console.error("Failed to load Victron data:", error);
@@ -33,434 +68,538 @@ const SystemCharts = () => {
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 5000); // Update every 5 seconds
+    const interval = setInterval(fetchData, POLL_MS);
     return () => clearInterval(interval);
   }, []);
 
-  // Calculate statistics
-  const calculateStats = () => {
-    if (!victronData) return null;
+  // ——— Derived values ———
+  const battery = victronData?.battery || {};
+  const soc = normaliseSoc(battery.soc);
+  const battW = toNumber(battery.power); // + charging, - discharging
+  const isCharging = battW > 1;
+  const isDischarging = battW < -1;
+  const gridConnected = !!victronData?.grid?.isConnected;
+  const solarW = toNumber(victronData?.pvCharger?.power);
+  const gridW = gridConnected ? toNumber(victronData?.grid?.power) : 0;
+  const acW = toNumber(victronData?.acLoads?.power);
+  const dcW = toNumber(victronData?.dcSystem?.power);
 
-    const batterySOC = (victronData.battery?.soc || 0) * 100;
-    const batteryVoltage = victronData.battery?.voltage || 0;
-    const batteryCurrent = victronData.battery?.current || 0;
-    const batteryPower = victronData.battery?.power || 0;
+  const average = (list) => (list.length ? list.reduce((a, b) => a + b, 0) / list.length : 0);
 
-    const solarPower = victronData.pvCharger?.power || 0;
-    const gridPower = victronData.grid?.power || 0;
-    const loadPower = victronData.acLoads?.power || 0;
+  const powerIn = [
+    { label: 'Shore', value: gridW, color: EnergyColor.shore },
+    { label: 'Solar', value: solarW, color: EnergyColor.solar },
+    { label: 'Battery', value: isDischarging ? -battW : 0, color: EnergyColor.inverter },
+  ];
+  const powerOut = [
+    { label: 'AC loads', value: acW, color: EnergyColor.acLoads },
+    { label: 'DC loads', value: dcW, color: EnergyColor.dcLoads },
+    { label: 'Charging', value: isCharging ? battW : 0, color: EnergyColor.battery },
+  ];
+  const totalIn = powerIn.reduce((a, s) => a + s.value, 0);
+  const totalOut = powerOut.reduce((a, s) => a + s.value, 0);
+  const balanceScale = Math.max(totalIn, totalOut, 1);
 
-    // Calculate averages from history
-    const avgSolar = powerHistory.solar.length > 0
-      ? powerHistory.solar.reduce((a, b) => a + b, 0) / powerHistory.solar.length
-      : 0;
-    const avgBattery = powerHistory.battery.length > 0
-      ? powerHistory.battery.reduce((a, b) => a + b, 0) / powerHistory.battery.length
-      : 0;
+  const toggleSeries = (key) => setHiddenSeries((prev) => ({ ...prev, [key]: !prev[key] }));
 
-    return {
-      batterySOC,
-      batteryVoltage,
-      batteryCurrent,
-      batteryPower,
-      solarPower,
-      gridPower,
-      loadPower,
-      avgSolar,
-      avgBattery,
-      isCharging: batteryPower < 0, // Negative = charging
-      isDischarging: batteryPower > 0,
-      powerBalance: solarPower + gridPower - loadPower
-    };
-  };
+  // ——— Trend chart ———
+  const visibleSeries = SERIES.filter((s) => !hiddenSeries[s.key]);
+  const maxValue = Math.max(1, ...visibleSeries.flatMap((s) => powerHistory[s.key])) * 1.15;
+  // Right-aligned so the newest reading always sits at "Now"
+  const pointX = (i) => (chartWidth / (HISTORY_LENGTH - 1)) * (HISTORY_LENGTH - powerHistory.solar.length + i);
+  const pointY = (v) => CHART_HEIGHT - (v / maxValue) * (CHART_HEIGHT - 8);
 
-  const stats = calculateStats();
+  const linePath = (values) =>
+    values.map((v, i) => `${i === 0 ? 'M' : 'L'}${pointX(i).toFixed(1)},${pointY(v).toFixed(1)}`).join(' ');
+  const areaPath = (values) =>
+    values.length < 2
+      ? ''
+      : `${linePath(values)} L${pointX(values.length - 1).toFixed(1)},${CHART_HEIGHT} L${pointX(0).toFixed(1)},${CHART_HEIGHT} Z`;
 
-  const formatPower = (value) => {
-    if (value === null || value === undefined) return '--';
-    return `${Math.abs(parseFloat(value)).toFixed(1)}W`;
-  };
+  const trendCard = (
+    <View style={[styles.card, isWide && { flex: 2 }]}>
+      <View style={styles.cardHeader}>
+        <View>
+          <Text style={styles.cardTitle}>Power over the last 3 minutes</Text>
+          <Text style={styles.cardHint}>Tap a source to hide or show it</Text>
+        </View>
+      </View>
 
-  const formatNumber = (value, decimals = 2) => {
-    if (value === null || value === undefined) return '--';
-    return parseFloat(value).toFixed(decimals);
-  };
+      <View style={styles.legend}>
+        {SERIES.map((s) => {
+          const hidden = hiddenSeries[s.key];
+          const latest = powerHistory[s.key][powerHistory[s.key].length - 1] || 0;
+          return (
+            <TouchableOpacity
+              key={s.key}
+              onPress={() => toggleSeries(s.key)}
+              style={[styles.legendChip, { borderColor: hidden ? TRACK : `${s.color}88` }, !hidden && { backgroundColor: `${s.color}1F` }]}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: !hidden }}
+              accessibilityLabel={`${s.label} line`}
+            >
+              <View style={[styles.legendSwatch, { backgroundColor: hidden ? TRACK : s.color }]} />
+              <Text style={[styles.legendLabel, hidden && { color: MUTED }]}>{s.label}</Text>
+              <Text style={[styles.legendValue, { color: hidden ? MUTED : s.color }]}>{formatWatts(latest)}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      <View style={styles.chart} onLayout={(e) => setChartWidth(e.nativeEvent.layout.width)}>
+        {chartWidth > 0 && (
+          <Svg width={chartWidth} height={CHART_HEIGHT}>
+            <Defs>
+              {SERIES.map((s) => (
+                <SvgGradient key={s.key} id={`fill-${s.key}`} x1="0" y1="0" x2="0" y2="1">
+                  <Stop offset="0" stopColor={s.color} stopOpacity="0.35" />
+                  <Stop offset="1" stopColor={s.color} stopOpacity="0" />
+                </SvgGradient>
+              ))}
+            </Defs>
+            {[0.25, 0.5, 0.75].map((f) => (
+              <Line key={f} x1="0" x2={chartWidth} y1={CHART_HEIGHT * f} y2={CHART_HEIGHT * f} stroke={TRACK} strokeWidth="1" strokeDasharray="4 6" />
+            ))}
+            <Line x1="0" x2={chartWidth} y1={CHART_HEIGHT - 0.5} y2={CHART_HEIGHT - 0.5} stroke="#3A3434" strokeWidth="1" />
+            {visibleSeries.map((s) => {
+              const values = powerHistory[s.key];
+              if (values.length < 2) return null;
+              return (
+                <React.Fragment key={s.key}>
+                  <Path d={areaPath(values)} fill={`url(#fill-${s.key})`} />
+                  <Path d={linePath(values)} stroke={s.color} strokeWidth="2.5" fill="none" strokeLinejoin="round" strokeLinecap="round" />
+                  <Circle cx={pointX(values.length - 1)} cy={pointY(values[values.length - 1])} r="4.5" fill={s.color} stroke="#000" strokeWidth="2" />
+                </React.Fragment>
+              );
+            })}
+          </Svg>
+        )}
+        <Text style={[styles.axisLabel, { top: 0 }]}>{formatWatts(maxValue)}</Text>
+        {powerHistory.solar.length < 2 && (
+          <View style={styles.chartEmpty}>
+            <Text style={styles.cardHint}>Collecting readings…</Text>
+          </View>
+        )}
+      </View>
+      <View style={styles.axisRow}>
+        <Text style={styles.axisText}>3 min ago</Text>
+        <Text style={styles.axisText}>Now</Text>
+      </View>
+    </View>
+  );
+
+  // ——— Battery ring ———
+  const RING = 168;
+  const STROKE = 14;
+  const radius = (RING - STROKE) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const ringColor = soc !== null && soc <= 20 ? EnergyColor.low : EnergyColor.battery;
+
+  const batteryCard = (
+    <View style={[styles.card, isWide && { flex: 1 }]}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardTitle}>Battery</Text>
+        <View style={[styles.statePill, { backgroundColor: `${ringColor}26` }]}>
+          <MaterialCommunityIcons
+            name={isCharging ? 'battery-charging-high' : isDischarging ? 'battery-arrow-down' : 'battery'}
+            size={14}
+            color={ringColor}
+          />
+          <Text style={[styles.statePillText, { color: ringColor }]}>
+            {isCharging ? 'Charging' : isDischarging ? 'Discharging' : 'Idle'}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.ringWrap}>
+        <Svg width={RING} height={RING}>
+          <Circle cx={RING / 2} cy={RING / 2} r={radius} stroke={TRACK} strokeWidth={STROKE} fill="none" />
+          <Circle
+            cx={RING / 2}
+            cy={RING / 2}
+            r={radius}
+            stroke={ringColor}
+            strokeWidth={STROKE}
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={`${circumference} ${circumference}`}
+            strokeDashoffset={circumference * (1 - (soc ?? 0) / 100)}
+            transform={`rotate(-90 ${RING / 2} ${RING / 2})`}
+          />
+        </Svg>
+        <View style={styles.ringCenter}>
+          <Text style={styles.ringValue}>
+            {soc === null ? '--' : Math.round(soc)}
+            <Text style={styles.ringUnit}>%</Text>
+          </Text>
+          <Text style={styles.cardHint}>{battery.timeToGo ? `${isCharging ? 'Full in' : 'Lasts'} ${battery.timeToGo}` : 'State of charge'}</Text>
+        </View>
+      </View>
+
+      <View style={styles.batteryStats}>
+        {[
+          { label: 'Voltage', value: `${toNumber(battery.voltage).toFixed(2)} V` },
+          { label: 'Current', value: `${toNumber(battery.current).toFixed(1)} A` },
+          { label: '3 min avg', value: formatWatts(average(powerHistory.battery)) },
+        ].map((stat) => (
+          <View key={stat.label} style={styles.batteryStat}>
+            <Text style={styles.statLabel}>{stat.label}</Text>
+            <Text style={styles.statValue}>{victronData ? stat.value : '--'}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+
+  // ——— Power in vs out ———
+  const balanceBar = (title, total, segments) => (
+    <View style={styles.balanceBlock}>
+      <View style={styles.balanceHeader}>
+        <Text style={styles.balanceTitle}>{title}</Text>
+        <Text style={styles.balanceTotal}>{formatWatts(total)}</Text>
+      </View>
+      <View style={styles.balanceTrack}>
+        {segments.filter((s) => s.value > 0).map((s) => (
+          <View key={s.label} style={{ width: `${(s.value / balanceScale) * 100}%`, backgroundColor: s.color }} />
+        ))}
+      </View>
+      <View style={styles.balanceLegend}>
+        {segments.map((s) => (
+          <View key={s.label} style={styles.balanceLegendItem}>
+            <View style={[styles.legendSwatch, { backgroundColor: s.value > 0 ? s.color : TRACK }]} />
+            <Text style={styles.balanceLegendText}>
+              {s.label} <Text style={styles.balanceLegendValue}>{formatWatts(s.value)}</Text>
+            </Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+
+  const net = totalIn - totalOut;
+  const balanceCard = (
+    <View style={[styles.card, isWide && { flex: 2 }]}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardTitle}>Where power comes from and goes</Text>
+      </View>
+      {balanceBar('Coming in', totalIn, powerIn)}
+      {balanceBar('Going out', totalOut, powerOut)}
+      <Text style={styles.cardHint}>
+        {!victronData
+          ? 'Waiting for the Cerbo GX'
+          : Math.abs(net) < 5
+            ? 'Supply and use are balanced'
+            : net > 0
+              ? `${formatWatts(net)} more coming in than going out`
+              : `${formatWatts(net)} more going out than coming in`}
+      </Text>
+    </View>
+  );
+
+  // ——— Status ———
+  const statusRows = [
+    {
+      icon: 'access-point-network',
+      label: 'Cerbo GX',
+      value: !victronData ? 'Offline' : victronData.apiStatus === 'simulation' ? 'Simulated data' : 'Connected',
+      color: !victronData ? EnergyColor.low : victronData.apiStatus === 'simulation' ? Color.colorSandybrown : EnergyColor.battery,
+    },
+    {
+      icon: 'transmission-tower',
+      label: 'Shore power',
+      value: gridConnected ? 'Plugged in' : 'Unplugged',
+      color: gridConnected ? EnergyColor.shore : MUTED,
+    },
+    {
+      icon: 'solar-power',
+      label: 'Solar',
+      value: solarW > 1 ? `Producing, ${formatWatts(average(powerHistory.solar))} avg` : 'Not producing',
+      color: solarW > 1 ? EnergyColor.solar : MUTED,
+    },
+    {
+      icon: 'sine-wave',
+      label: 'Inverter',
+      value: victronData?.systemOverview?.state || '--',
+      color: EnergyColor.inverter,
+    },
+    {
+      icon: 'heart-pulse',
+      label: 'Battery health',
+      value: soc === null ? '--' : soc >= 50 ? 'Good' : soc >= 20 ? 'Fair' : 'Low, charge soon',
+      color: soc === null ? MUTED : soc >= 50 ? EnergyColor.battery : soc >= 20 ? Color.colorSandybrown : EnergyColor.low,
+    },
+  ];
+
+  const statusCard = (
+    <View style={[styles.card, isWide && { flex: 1 }]}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardTitle}>System status</Text>
+      </View>
+      {statusRows.map((row, i) => (
+        <View key={row.label} style={[styles.statusRow, i > 0 && styles.statusRowDivider]}>
+          <View style={[styles.statusIcon, { backgroundColor: `${row.color}22` }]}>
+            <MaterialCommunityIcons name={row.icon} size={18} color={row.color} />
+          </View>
+          <Text style={styles.statusLabel}>{row.label}</Text>
+          <Text style={[styles.statusValue, { color: row.color === MUTED ? MUTED : Color.white0 }]} numberOfLines={1}>
+            {row.value}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
 
   return (
-    <View style={[styles.tabletContainer, { width }]}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Energy Analytics</Text>
-          <Text style={styles.subtitle}>Real-time Power & System Metrics</Text>
+    <View style={[styles.container, { width }]}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <TabletHeader title="Energy Analytics" style={styles.header} />
+        <Text style={styles.subtitle}>Live readings from your Victron system, every 5 seconds</Text>
+
+        <View style={[styles.grid, isWide && styles.gridRow]}>
+          {trendCard}
+          {batteryCard}
         </View>
-
-        {/* Power Flow Summary */}
-        <View style={styles.summaryRow}>
-          <View style={[styles.summaryCard, styles.solarCard]}>
-            <Text style={styles.summaryLabel}>Solar Generation</Text>
-            <Text style={styles.summaryValue}>{formatPower(stats?.solarPower)}</Text>
-            <Text style={styles.summarySubtext}>
-              Avg: {formatPower(stats?.avgSolar)}
-            </Text>
-          </View>
-
-          <View style={[styles.summaryCard, styles.batteryCard]}>
-            <Text style={styles.summaryLabel}>Battery</Text>
-            <Text style={styles.summaryValue}>{stats?.batterySOC?.toFixed(0)}%</Text>
-            <Text style={styles.summarySubtext}>
-              {stats?.isCharging ? '⚡ Charging' : stats?.isDischarging ? '🔋 Discharging' : '⏸ Idle'}
-            </Text>
-          </View>
-
-          <View style={[styles.summaryCard, styles.loadCard]}>
-            <Text style={styles.summaryLabel}>Total Load</Text>
-            <Text style={styles.summaryValue}>{formatPower(stats?.loadPower)}</Text>
-            <Text style={styles.summarySubtext}>
-              AC Consumption
-            </Text>
-          </View>
-        </View>
-
-        {/* Battery Analytics */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Battery Analytics</Text>
-          <View style={styles.metricsGrid}>
-            <MetricBox
-              label="State of Charge"
-              value={`${stats?.batterySOC?.toFixed(1)}%`}
-              color="#4CAF50"
-            />
-            <MetricBox
-              label="Voltage"
-              value={`${formatNumber(stats?.batteryVoltage)} V`}
-              color="#2196F3"
-            />
-            <MetricBox
-              label="Current"
-              value={`${formatNumber(stats?.batteryCurrent)} A`}
-              color="#FF9800"
-            />
-            <MetricBox
-              label="Power"
-              value={formatPower(stats?.batteryPower)}
-              color="#9C27B0"
-            />
-          </View>
-        </View>
-
-        {/* Power Sources */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Power Sources & Consumption</Text>
-          <View style={styles.metricsGrid}>
-            <MetricBox
-              label="Solar (PV)"
-              value={formatPower(stats?.solarPower)}
-              color="#FFD700"
-            />
-            <MetricBox
-              label="Shore Power"
-              value={formatPower(stats?.gridPower)}
-              color="#D32F2F"
-            />
-            <MetricBox
-              label="AC Loads"
-              value={formatPower(stats?.loadPower)}
-              color="#388E3C"
-            />
-            <MetricBox
-              label="Power Balance"
-              value={formatPower(stats?.powerBalance)}
-              color={stats?.powerBalance >= 0 ? '#4CAF50' : '#F44336'}
-            />
-          </View>
-        </View>
-
-        {/* Simple Power History Graph */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Power Trends (Last 20 readings)</Text>
-          <View style={styles.chartContainer}>
-            <PowerBarChart data={powerHistory.solar} label="Solar" color="#FFD700" />
-            <PowerBarChart data={powerHistory.battery} label="Battery" color="#2196F3" />
-            <PowerBarChart data={powerHistory.loads} label="Loads" color="#388E3C" />
-          </View>
-        </View>
-
-        {/* System Status */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>System Status</Text>
-          <View style={styles.statusGrid}>
-            <StatusItem
-              label="Connection"
-              value={victronData ? "Connected" : "Disconnected"}
-              isGood={!!victronData}
-            />
-            <StatusItem
-              label="Grid Status"
-              value={victronData?.grid?.isConnected ? "Connected" : "Disconnected"}
-              isGood={victronData?.grid?.isConnected}
-            />
-            <StatusItem
-              label="Solar Active"
-              value={stats?.solarPower > 0 ? "Yes" : "No"}
-              isGood={stats?.solarPower > 0}
-            />
-            <StatusItem
-              label="Battery Health"
-              value={stats?.batterySOC >= 50 ? "Good" : stats?.batterySOC >= 20 ? "Fair" : "Low"}
-              isGood={stats?.batterySOC >= 50}
-            />
-          </View>
+        <View style={[styles.grid, isWide && styles.gridRow]}>
+          {balanceCard}
+          {statusCard}
         </View>
       </ScrollView>
     </View>
   );
 };
 
-// Metric Box Component
-const MetricBox = ({ label, value, color }) => (
-  <View style={[styles.metricBox, { borderLeftColor: color }]}>
-    <Text style={styles.metricLabel}>{label}</Text>
-    <Text style={[styles.metricValue, { color }]}>{value}</Text>
-  </View>
-);
-
-// Status Item Component
-const StatusItem = ({ label, value, isGood }) => (
-  <View style={styles.statusItem}>
-    <View style={[styles.statusDot, { backgroundColor: isGood ? '#4CAF50' : '#F44336' }]} />
-    <View style={styles.statusText}>
-      <Text style={styles.statusLabel}>{label}</Text>
-      <Text style={styles.statusValue}>{value}</Text>
-    </View>
-  </View>
-);
-
-// Simple Bar Chart Component
-const PowerBarChart = ({ data, label, color }) => {
-  const maxValue = Math.max(...data, 1);
-
-  return (
-    <View style={styles.chartRow}>
-      <Text style={styles.chartLabel}>{label}</Text>
-      <View style={styles.barsContainer}>
-        {data.map((value, index) => {
-          const height = (Math.abs(value) / maxValue) * 60;
-          return (
-            <View
-              key={index}
-              style={[
-                styles.bar,
-                {
-                  height: height || 2,
-                  backgroundColor: color,
-                  opacity: 0.3 + (index / data.length) * 0.7
-                }
-              ]}
-            />
-          );
-        })}
-      </View>
-      <Text style={styles.chartValue}>{Math.abs(data[data.length - 1] || 0).toFixed(0)}W</Text>
-    </View>
-  );
-};
-
 const styles = StyleSheet.create({
-  tabletContainer: {
+  container: {
     flex: 1,
-    backgroundColor: "#000",
-    padding: 20,
+    backgroundColor: '#000',
+    paddingHorizontal: 24,
+    paddingTop: 12,
   },
   scrollContent: {
-    paddingBottom: 40,
+    paddingBottom: 48,
   },
   header: {
-    marginBottom: 24,
-    marginTop: 10,
-  },
-  title: {
-    fontSize: 32,
-    fontFamily: FontFamily.latoRegular,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 4,
+    marginHorizontal: -24,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: FontFamily.latoRegular,
-    color: '#AAA',
+    color: MUTED,
+    marginTop: 4,
+    marginBottom: 16,
   },
-
-  // Summary Cards
-  summaryRow: {
+  grid: {
+    gap: 16,
+    marginBottom: 16,
+  },
+  gridRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  card: {
+    backgroundColor: CARD,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    padding: 18,
+  },
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 24,
-    gap: 16,
+    alignItems: 'center',
+    marginBottom: 14,
   },
-  summaryCard: {
-    flex: 1,
-    backgroundColor: '#1A1A1A',
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 2,
-    borderColor: '#2A2A2A',
+  cardTitle: {
+    color: Color.white0,
+    fontSize: 18,
+    fontFamily: FontFamily.latoBold,
   },
-  solarCard: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#FFD700',
-  },
-  batteryCard: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#2196F3',
-  },
-  loadCard: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#388E3C',
-  },
-  summaryLabel: {
-    fontSize: 14,
-    fontFamily: FontFamily.latoRegular,
-    color: '#AAA',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  summaryValue: {
-    fontSize: 36,
-    fontFamily: FontFamily.latoRegular,
-    fontWeight: 'bold',
-    color: '#FFF',
-    marginBottom: 4,
-  },
-  summarySubtext: {
+  cardHint: {
+    color: MUTED,
     fontSize: 13,
     fontFamily: FontFamily.latoRegular,
-    color: '#888',
+    marginTop: 2,
   },
-
-  // Sections
-  section: {
-    marginBottom: 28,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontFamily: FontFamily.latoRegular,
-    fontWeight: '700',
-    color: '#FFF',
-    marginBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#2A2A2A',
-    paddingBottom: 8,
-  },
-
-  // Metrics Grid
-  metricsGrid: {
+  legend: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 8,
+    marginBottom: 14,
   },
-  metricBox: {
-    flex: 1,
-    minWidth: 200,
-    backgroundColor: '#1A1A1A',
+  legendChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
     borderRadius: 12,
-    padding: 16,
-    borderLeftWidth: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
-  metricLabel: {
+  legendSwatch: {
+    width: 10,
+    height: 10,
+    borderRadius: 3,
+    marginRight: 6,
+  },
+  legendLabel: {
+    color: Color.white0,
     fontSize: 13,
     fontFamily: FontFamily.latoRegular,
-    color: '#AAA',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    marginRight: 8,
   },
-  metricValue: {
-    fontSize: 28,
+  legendValue: {
+    fontSize: 13,
+    fontFamily: FontFamily.latoBold,
+  },
+  chart: {
+    height: CHART_HEIGHT,
+  },
+  chartEmpty: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  axisLabel: {
+    position: 'absolute',
+    left: 0,
+    color: MUTED,
+    fontSize: 11,
     fontFamily: FontFamily.latoRegular,
-    fontWeight: 'bold',
   },
-
-  // Chart Container
-  chartContainer: {
-    backgroundColor: '#1A1A1A',
-    borderRadius: 12,
-    padding: 20,
-    gap: 16,
+  axisRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 6,
   },
-  chartRow: {
+  axisText: {
+    color: MUTED,
+    fontSize: 11,
+    fontFamily: FontFamily.latoRegular,
+  },
+  statePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
-  chartLabel: {
-    fontSize: 14,
-    fontFamily: FontFamily.latoRegular,
-    color: '#AAA',
-    width: 80,
-    fontWeight: '600',
+  statePillText: {
+    fontSize: 12,
+    fontFamily: FontFamily.latoBold,
+    marginLeft: 4,
   },
-  barsContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    height: 60,
-    gap: 2,
-  },
-  bar: {
-    flex: 1,
-    borderRadius: 2,
-    minHeight: 2,
-  },
-  chartValue: {
-    fontSize: 14,
-    fontFamily: FontFamily.latoRegular,
-    color: '#FFF',
-    width: 70,
-    textAlign: 'right',
-    fontWeight: '600',
-  },
-
-  // Status Grid
-  statusGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  statusItem: {
-    flex: 1,
-    minWidth: 200,
-    flexDirection: 'row',
+  ringWrap: {
     alignItems: 'center',
-    backgroundColor: '#1A1A1A',
-    borderRadius: 12,
-    padding: 16,
-    gap: 12,
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginVertical: 6,
   },
-  statusDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+  ringCenter: {
+    position: 'absolute',
+    alignItems: 'center',
   },
-  statusText: {
+  ringValue: {
+    color: Color.white0,
+    fontSize: 40,
+    fontFamily: FontFamily.latoBold,
+  },
+  ringUnit: {
+    color: MUTED,
+    fontSize: 18,
+    fontFamily: FontFamily.latoRegular,
+  },
+  batteryStats: {
+    flexDirection: 'row',
+    marginTop: 14,
+  },
+  batteryStat: {
     flex: 1,
+    alignItems: 'center',
   },
-  statusLabel: {
+  statLabel: {
+    color: MUTED,
     fontSize: 12,
     fontFamily: FontFamily.latoRegular,
-    color: '#AAA',
-    marginBottom: 2,
+  },
+  statValue: {
+    color: Color.white0,
+    fontSize: 15,
+    fontFamily: FontFamily.latoBold,
+    marginTop: 2,
+  },
+  balanceBlock: {
+    marginBottom: 16,
+  },
+  balanceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: 8,
+  },
+  balanceTitle: {
+    color: Color.white0,
+    fontSize: 15,
+    fontFamily: FontFamily.latoBold,
+  },
+  balanceTotal: {
+    color: Color.white0,
+    fontSize: 22,
+    fontFamily: FontFamily.latoBold,
+  },
+  balanceTrack: {
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: TRACK,
+    flexDirection: 'row',
+    overflow: 'hidden',
+    gap: 2,
+  },
+  balanceLegend: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 8,
+    gap: 14,
+  },
+  balanceLegendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  balanceLegendText: {
+    color: MUTED,
+    fontSize: 13,
+    fontFamily: FontFamily.latoRegular,
+  },
+  balanceLegendValue: {
+    color: Color.white0,
+    fontFamily: FontFamily.latoBold,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  statusRowDivider: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  statusIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  statusLabel: {
+    flex: 1,
+    color: MUTED,
+    fontSize: 14,
+    fontFamily: FontFamily.latoRegular,
   },
   statusValue: {
-    fontSize: 16,
-    fontFamily: FontFamily.latoRegular,
-    color: '#FFF',
-    fontWeight: '600',
+    fontSize: 14,
+    fontFamily: FontFamily.latoBold,
+    maxWidth: '55%',
+    textAlign: 'right',
   },
 });
 

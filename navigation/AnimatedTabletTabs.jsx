@@ -1,26 +1,22 @@
 // AnimatedTabletTabs.jsx
+// Floating tablet tab bar: icon + label side by side, with a sliding highlight pill behind the active tab.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Dimensions,
-  Animated,
-  Easing,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { FontFamily } from '../GlobalStyles';
+import { View, Text, StyleSheet, Pressable, Animated, Easing, AccessibilityInfo } from 'react-native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { Color, FontFamily } from '../GlobalStyles';
 
-const screenWidth = Dimensions.get('window').width;
+const ACCENT = Color.colorSandybrown;
+const INACTIVE = '#9E9696';
+const BAR_PADDING = 6;
+const BAR_HEIGHT = 64;
 
 const DEFAULT_TABS = [
-  { name: 'Home', icon: 'home-outline' },
-  { name: 'System', icon: 'stats-chart-outline' },
-  { name: 'Air Conditioning', icon: 'snow-outline' },
-  { name: 'Vents', icon: 'cloud-outline' },
-  { name: 'Victron', icon: 'battery-charging-outline' },
-  { name: 'Settings', icon: 'settings-outline' },
+  { name: 'Home', icon: 'home-outline', activeIcon: 'home' },
+  { name: 'System', label: 'Lights', icon: 'lightbulb-outline', activeIcon: 'lightbulb' },
+  { name: 'Air Conditioning', label: 'Climate', icon: 'snowflake' },
+  { name: 'Vents', icon: 'weather-windy' },
+  { name: 'Victron', icon: 'battery-charging-outline', activeIcon: 'battery-charging' },
+  { name: 'Settings', icon: 'cog-outline', activeIcon: 'cog' },
 ];
 
 const AnimatedTabletTabs = ({
@@ -36,87 +32,38 @@ const AnimatedTabletTabs = ({
 
   const initialIndex = Math.max(0, tabs.findIndex((t) => t.name === initialTab));
   const [activeTab, setActiveTab] = useState(tabs[initialIndex]?.name ?? tabs[0].name);
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [barWidth, setBarWidth] = useState(0);
 
-  // Drives BOTH the underline and the glow X position
-  const tabIndicatorAnim = useRef(new Animated.Value(initialIndex)).current;
+  const pillAnim = useRef(new Animated.Value(initialIndex)).current;
+  const activeIndex = Math.max(0, tabs.findIndex((t) => t.name === activeTab));
 
-  // Extra pulse for the glow (opacity/scale) so it feels alive
-  const glowAnim = useRef(new Animated.Value(0)).current;
-
+  // Respect the system "reduce motion" setting
+  const [reduceMotion, setReduceMotion] = useState(false);
   useEffect(() => {
-    const idx = Math.max(0, tabs.findIndex((t) => t.name === activeTab));
-    tabIndicatorAnim.setValue(idx);
-  }, [tabs, activeTab, tabIndicatorAnim]);
+    AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion).catch(() => {});
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+    return () => sub?.remove?.();
+  }, []);
 
-  const perTabWidth = useMemo(() => (screenWidth - 80) / tabs.length, [tabs.length]);
+  // Slide the pill whenever the active tab changes
+  useEffect(() => {
+    Animated.timing(pillAnim, {
+      toValue: activeIndex,
+      duration: reduceMotion ? 0 : 240,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [activeIndex, pillAnim, reduceMotion]);
 
+  // Measured from the real bar so the pill always lines up with its tab
+  const tabWidth = barWidth > 0 ? (barWidth - BAR_PADDING * 2) / tabs.length : 0;
+
+  // Switch the screen immediately; the pill animates alongside
   const switchTab = (name) => {
-    const toIndex = tabs.findIndex((t) => t.name === name);
-    if (toIndex < 0 || name === activeTab) return;
-
-    setIsTransitioning(true);
-
-    // Animate the underline + run a synced glow pulse
-    Animated.parallel([
-      Animated.timing(tabIndicatorAnim, {
-        toValue: toIndex,
-        duration: 220,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.sequence([
-        Animated.timing(glowAnim, {
-          toValue: 1,
-          duration: 110,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(glowAnim, {
-          toValue: 0,
-          duration: 110,
-          easing: Easing.in(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]),
-    ]).start(() => {
-      setActiveTab(name);
-      setIsTransitioning(false);
-      onTabChange?.(name);
-    });
+    if (name === activeTab) return;
+    setActiveTab(name);
+    onTabChange?.(name);
   };
-
-  const INDICATOR_WIDTH_RATIO = 0.95;
-  const indicatorWidth = useMemo(() => perTabWidth * INDICATOR_WIDTH_RATIO, [perTabWidth]);
-  const indicatorCenterOffset = useMemo(
-    () => (perTabWidth - indicatorWidth) / 2,
-    [perTabWidth, indicatorWidth]
-  );
-
-  // Glow geometry (a bit wider/taller than the underline, sits behind icons/labels)
-  const GLOW_WIDTH_RATIO = 0.86;  // a hair narrower than full tab to avoid touching edges
-  const glowWidth = useMemo(() => perTabWidth * GLOW_WIDTH_RATIO, [perTabWidth]);
-  const glowCenterOffset = useMemo(
-    () => (perTabWidth - glowWidth) / 2,
-    [perTabWidth, glowWidth]
-  );
-
-  // Shared X interpolation (keeps glow + indicator perfectly in sync)
-  const sharedTranslateX = tabIndicatorAnim.interpolate({
-    inputRange: [0, tabs.length - 1],
-    outputRange: [glowCenterOffset, perTabWidth * (tabs.length - 1) + glowCenterOffset],
-    extrapolate: 'clamp',
-  });
-
-  // Glow pulse (opacity + scale) tied to glowAnim, so it "breathes" on switch
-  const glowOpacity = glowAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.16, 0.28],
-  });
-  const glowScale = glowAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 1.04],
-  });
 
   const renderContent = () => {
     if (typeof renderScene === 'function') return renderScene(activeTab);
@@ -138,80 +85,54 @@ const AnimatedTabletTabs = ({
       {/* Content Area */}
       <View style={styles.contentWrapper}>{renderContent()}</View>
 
-      {/* Custom Tab Bar */}
+      {/* Tab bar */}
       <View style={styles.tabBarContainer}>
-        <View style={styles.tabBar}>
-          {/* Moving GLOW (behind icons/labels), synced with indicator */}
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.tabGlow,
-              {
-                width: glowWidth,
-                transform: [{ translateX: sharedTranslateX }, { scaleY: glowScale }],
-                opacity: glowOpacity,
-              },
-            ]}
-          />
-
-          {/* Animated Tab Indicator (orange line), shares the same position math */}
-          <Animated.View
-            style={[
-              styles.tabIndicator,
-              {
-                width: indicatorWidth,
-                transform: [
-                  {
-                    translateX: tabIndicatorAnim.interpolate({
-                      inputRange: [0, tabs.length - 1],
-                      outputRange: [
-                        indicatorCenterOffset,
-                        perTabWidth * (tabs.length - 1) + indicatorCenterOffset,
-                      ],
-                      extrapolate: 'clamp',
-                    }),
-                  },
-                ],
-              },
-            ]}
-          />
+        <View
+          style={styles.tabBar}
+          onLayout={(e) => setBarWidth(e.nativeEvent.layout.width)}
+          accessibilityRole="tablist"
+        >
+          {tabWidth > 0 && (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.pill,
+                {
+                  width: tabWidth,
+                  transform: [
+                    {
+                      translateX: pillAnim.interpolate({
+                        inputRange: [0, Math.max(1, tabs.length - 1)],
+                        outputRange: [BAR_PADDING, BAR_PADDING + tabWidth * Math.max(1, tabs.length - 1)],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            />
+          )}
 
           {tabs.map((tab) => {
             const isActive = activeTab === tab.name;
+            const label = tab.label || tab.name;
             return (
-              <TouchableOpacity
+              <Pressable
                 key={tab.name}
-                style={[styles.tabButton, isActive && styles.activeTabButton]}
+                style={({ pressed }) => [styles.tabButton, pressed && !isActive && styles.tabPressed]}
                 onPress={() => switchTab(tab.name)}
-                activeOpacity={0.7}
-                disabled={isTransitioning}
+                accessibilityRole="tab"
+                accessibilityLabel={label}
+                accessibilityState={{ selected: isActive }}
               >
-                <Animated.View
-                  style={[
-                    styles.iconContainer,
-                    { transform: [{ scale: isActive ? 1.1 : 1 }] },
-                  ]}
-                >
-                  <Ionicons
-                    name={tab.icon}
-                    color={isActive ? '#FFB267' : '#FFFFFF'}
-                    size={24}
-                  />
-                </Animated.View>
-
-                <Animated.Text
-                  style={[
-                    styles.tabLabel,
-                    {
-                      color: isActive ? '#FFB267' : '#FFFFFF',
-                      opacity: isActive ? 1 : 0.7,
-                      fontWeight: isActive ? '600' : '400',
-                    },
-                  ]}
-                >
-                  {tab.name === 'Air Conditioning' ? 'AC' : tab.name}
-                </Animated.Text>
-              </TouchableOpacity>
+                <MaterialCommunityIcons
+                  name={isActive ? tab.activeIcon || tab.icon : tab.icon}
+                  color={isActive ? ACCENT : INACTIVE}
+                  size={24}
+                />
+                <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]} numberOfLines={1}>
+                  {label}
+                </Text>
+              </Pressable>
             );
           })}
         </View>
@@ -221,77 +142,67 @@ const AnimatedTabletTabs = ({
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 10, paddingBottom: -10, backgroundColor: '#000' },
-  contentWrapper: { flex: 1, overflow: 'hidden' },
-  contentContainer: { flex: 1 },
-  tabBarContainer: { paddingHorizontal: 10, paddingBottom: 10 },
+  // Side padding kept from the old bar: screens like Victron place cards at fixed coordinates
+  container: {
+    flex: 1,
+    paddingHorizontal: 10,
+    backgroundColor: '#000',
+  },
+  contentWrapper: {
+    flex: 1,
+    overflow: 'hidden',
+  },
+  contentContainer: {
+    flex: 1,
+  },
+  tabBarContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 6,
+    paddingBottom: 14,
+  },
   tabBar: {
-    backgroundColor: '#242124',
-    borderRadius: 15,
-    marginHorizontal: 20,
-    marginBottom: 10,
-    height: 70,
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
+    height: BAR_HEIGHT,
+    padding: BAR_PADDING,
+    borderRadius: 22,
+    backgroundColor: '#211D1D',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 178, 103, 0.12)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-    position: 'relative',
-    overflow: 'hidden', // keeps glow nicely clipped to the bar
-  },
-
-  /* NEW: the moving glow "pill" behind icons/labels */
-  tabGlow: {
-    position: 'absolute',
-    top: 7,
-    bottom: 7,
-    left: 0,
-    borderRadius: 12,
-    backgroundColor: '#FFB267',
-    opacity: 0.2,
-    // Make it feel like a glow without custom libraries
-    shadowColor: '#FFB267',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.45,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
     shadowRadius: 12,
-    elevation: 6,
+    elevation: 8,
   },
-
-  tabIndicator: {
+  pill: {
     position: 'absolute',
-    bottom: 5,
+    top: BAR_PADDING,
     left: 0,
-    height: 3,
-    backgroundColor: '#FFB267',
-    borderRadius: 2,
-    shadowColor: '#FFB267',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 4,
-    elevation: 4,
+    height: BAR_HEIGHT - BAR_PADDING * 2 - 2,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 178, 103, 0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 178, 103, 0.3)',
   },
   tabButton: {
     flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 12,
-    marginHorizontal: 2,
-    minHeight: 60,
+    borderRadius: 16,
   },
-  activeTabButton: {
-    backgroundColor: 'rgba(255, 178, 103, 0.1)',
-    shadowColor: '#FFB267',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+  tabPressed: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
-  iconContainer: { marginBottom: 4, padding: 2 },
-  tabLabel: { fontSize: 10, textAlign: 'center', letterSpacing: 0.3, fontFamily: FontFamily.latoRegular },
+  tabLabel: {
+    color: INACTIVE,
+    fontSize: 15,
+    fontFamily: FontFamily.latoBold,
+    marginLeft: 8,
+  },
+  tabLabelActive: {
+    color: ACCENT,
+  },
 });
 
 export default AnimatedTabletTabs;

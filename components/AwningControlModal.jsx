@@ -7,6 +7,7 @@ import { FontFamily } from "../GlobalStyles";
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import useScreenSize from '../helper/useScreenSize.jsx';
+import AwningScene from './AwningScene';
 /**
  * Enhanced Awning Control Modal with fluid command switching and CAN bus status detection
  * 
@@ -49,6 +50,19 @@ const AwningControlModal = ({ isVisible, onClose }) => {
   
   // Status update timeout ref
   const statusTimeout = useRef(null);
+
+  // Mirror the animated values into state so the SVG scene can redraw from them
+  const [sceneExt, setSceneExt] = useState(0);
+  const [sceneWave, setSceneWave] = useState(0);
+
+  useEffect(() => {
+    const extId = awningExtension.addListener(({ value }) => setSceneExt(value));
+    const waveId = fabricWave.addListener(({ value }) => setSceneWave(value));
+    return () => {
+      awningExtension.removeListener(extId);
+      fabricWave.removeListener(waveId);
+    };
+  }, []);
 
   /**
    * Initialize CAN bus listener for real-time awning status detection
@@ -654,11 +668,7 @@ const AwningControlModal = ({ isVisible, onClose }) => {
         : awningState.position <= 0
           ? 'Retracted'
           : 'Stopped';
-  const fabricWidth = awningExtension.interpolate({ inputRange: [0, 1], outputRange: ['0%', '58%'] });
   const progressWidth = awningExtension.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
-  const postHeight = supportPosts.interpolate({ inputRange: [0, 1], outputRange: [0, 80] });
-  const fabricTilt = fabricWave.interpolate({ inputRange: [-1, 1], outputRange: ['-1deg', '1deg'] });
-  const fabricShake = motorVibration.interpolate({ inputRange: [-3, 3], outputRange: [-0.5, 0.5] });
 
   const controls = [
     { command: 'retract', label: 'Retract', icon: 'arrow-collapse-left', active: awningState.isRetracting },
@@ -712,24 +722,7 @@ const AwningControlModal = ({ isVisible, onClose }) => {
           </View>
 
           {/* Awning visual */}
-          <View style={styles.scene}>
-            <View style={styles.sceneGround} />
-            <View style={styles.rvBody}>
-              <View style={styles.rvWindow} />
-              <View style={styles.rvDoor} />
-            </View>
-            <View style={styles.rollerTube} />
-            <Animated.View
-              style={[
-                styles.fabric,
-                { width: fabricWidth, transform: [{ rotate: fabricTilt }, { translateY: fabricShake }] },
-              ]}
-            >
-              <View style={styles.fabricStripe} />
-              <Animated.View style={[styles.post, { height: postHeight }]} />
-            </Animated.View>
-            <Animated.View style={[styles.shade, { width: fabricWidth, opacity: shadowOpacity }]} />
-          </View>
+          <AwningScene ext={sceneExt} wave={sceneWave} moving={isMoving} />
 
           <View style={styles.progressTrack}>
             <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
@@ -869,97 +862,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  scene: {
-    height: 150,
-    borderRadius: 18,
-    backgroundColor: '#1B1B1B',
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  sceneGround: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 24,
-    backgroundColor: '#2A2626',
-  },
-  rvBody: {
-    position: 'absolute',
-    left: 16,
-    bottom: 24,
-    width: '30%',
-    height: 96,
-    borderTopLeftRadius: 14,
-    borderTopRightRadius: 6,
-    borderBottomLeftRadius: 4,
-    borderBottomRightRadius: 4,
-    backgroundColor: '#3A3434',
-    borderWidth: 1,
-    borderColor: '#4E4747',
-  },
-  rvWindow: {
-    position: 'absolute',
-    top: 14,
-    left: 12,
-    width: '45%',
-    height: 20,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255, 178, 103, 0.35)',
-  },
-  rvDoor: {
-    position: 'absolute',
-    bottom: 0,
-    right: 10,
-    width: 18,
-    height: 50,
-    borderTopLeftRadius: 3,
-    borderTopRightRadius: 3,
-    backgroundColor: '#2A2626',
-  },
-  rollerTube: {
-    position: 'absolute',
-    left: '33%',
-    bottom: 107,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#FFB267',
-  },
-  fabric: {
-    position: 'absolute',
-    left: '35%',
-    bottom: 108,
-    height: 8,
-    borderRadius: 3,
-    backgroundColor: '#FFB267',
-  },
-  fabricStripe: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: -4,
-    height: 4,
-    backgroundColor: '#C9853F',
-    borderBottomLeftRadius: 2,
-    borderBottomRightRadius: 2,
-  },
-  post: {
-    position: 'absolute',
-    right: 0,
-    top: 4,
-    width: 3,
-    backgroundColor: '#9E9696',
-  },
-  shade: {
-    position: 'absolute',
-    left: '35%',
-    bottom: 18,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
   },
   progressTrack: {
     height: 6,

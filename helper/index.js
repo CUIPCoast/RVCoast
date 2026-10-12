@@ -22,7 +22,8 @@ export {
   handleAllLightsOn,
   handleAllLightsOff,
   getLightDisplayName,
-  getLightGroups
+  getLightGroups,
+  getLightIcon
 } from './rvControl/lightHelpers.js';
 
 // Data formatting helpers

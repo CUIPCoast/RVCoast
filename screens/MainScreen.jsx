@@ -6,6 +6,7 @@ import WaterTanks from "../components/WaterTanks.jsx"; // Enhanced version
 import TemperatureDisplay from "../components/TemperatureDisplay"; // New component
 import useTemperature from "../hooks/useTemperature"; // New hook
 import TabletBatteryWidget from "../components/TabletBatteryWidget.jsx";
+import TabletHeader from "../components/TabletHeader";
 import ToggleTile from "../components/ToggleTile";
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import AwningControlModal from "../components/AwningControlModal";
@@ -30,8 +31,6 @@ const MainScreen = () => {
     // Use RV state management for water systems
     const { water } = useRVWater();
 
-    var currentDate = moment().format("MMMM Do, YYYY");
-    var DayOfTheWeek = moment().format("dddd");
 
     const [isModalVisible, setModalVisible] = useState(false);
     const [isOn, setIsOn] = useState(false);
@@ -258,43 +257,23 @@ const MainScreen = () => {
     return (
         <Grid className="bg-black">
             <Row size={10}>
-                <Row className="bg-black" size={9}>
-                    <Col className="m-1 ml-3">
-                        <View style={styles.headerRow}>
-                            <View>
-                                <Text className="text-3xl text-white" style={{fontFamily: FontFamily.latoBold}}>{DayOfTheWeek}</Text>
-                                <Text className="text-lg text-white" style={{fontFamily: FontFamily.latoBold}}>{currentDate}</Text>
-                            </View>
-                    
-                            {/* Error Toggle Button */}
-                            <TouchableOpacity 
-                                style={styles.errorToggleButton}
-                                onPress={() => setShowErrors(!showErrors)}
-                            >
-                                <Ionicons 
-                                    name={showErrors ? "notifications" : "notifications-off"} 
-                                    size={20} 
-                                    color={showErrors ? "#4FC3F7" : "#666"} 
-                                />
-                            </TouchableOpacity>
-                        </View>
-                        
-                    </Col>
-                </Row>
-                <Row className="bg-black" size={1}>
-                    <View className="pt-3 pl-3">
-                        <Image
-                            source={require("../assets/trailer.png")}
-                            style={{
-                                width: 90,
-                                height: 55,
-                                right: 0,
-                                paddingTop: 0,
-                                backgroundColor: "black"
-                            }}
-                        />
-                    </View>
-                </Row>
+                <TabletHeader
+                    style={{ flex: 1 }}
+                    accessory={
+                        <TouchableOpacity
+                            style={styles.errorToggleButton}
+                            onPress={() => setShowErrors(!showErrors)}
+                            accessibilityRole="button"
+                            accessibilityLabel={showErrors ? "Hide alerts" : "Show alerts"}
+                        >
+                            <Ionicons
+                                name={showErrors ? "notifications" : "notifications-off"}
+                                size={20}
+                                color={showErrors ? "#4FC3F7" : "#666"}
+                            />
+                        </TouchableOpacity>
+                    }
+                />
             </Row>
 
             {/* Non-intrusive Error Messages - Fixed Position Overlays */}
@@ -777,7 +756,6 @@ const styles = {
         backgroundColor: 'rgba(255, 255, 255, 0.1)',
         padding: 8,
         borderRadius: 20,
-        marginTop: 5,
     },
     
     // User info styles

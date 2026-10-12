@@ -1,24 +1,22 @@
 // AnimatedMobileTabs.jsx
+// Bottom tab bar for phones: labelled icons with a sliding highlight pill behind the active tab.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Dimensions,
-  Animated,
-  Easing,
-} from 'react-native';
-import {AntDesign } from '@expo/vector-icons';
+import { View, Text, StyleSheet, Pressable, Animated, Easing, AccessibilityInfo } from 'react-native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Color, FontFamily } from '../GlobalStyles';
 
-const screenWidth = Dimensions.get('window').width;
+const ACCENT = Color.colorSandybrown;
+const INACTIVE = '#9E9696';
+const BAR_PADDING = 8;
+const PILL_INSET = 6;
 
 // Default tabs matching your mobile TabNavigator
 const DEFAULT_TABS = [
-  { name: 'Home', icon: 'home' },
-  { name: 'System', icon: 'api' },
-  { name: 'Devices', icon: 'api' },
-  { name: 'Settings', icon: 'setting' },
+  { name: 'Home', icon: 'home-outline', activeIcon: 'home' },
+  { name: 'System', icon: 'lightning-bolt-outline', activeIcon: 'lightning-bolt' },
+  { name: 'Devices', icon: 'lightbulb-group-outline', activeIcon: 'lightbulb-group' },
+  { name: 'Settings', icon: 'cog-outline', activeIcon: 'cog' },
 ];
 
 const AnimatedMobileTabs = ({
@@ -27,56 +25,45 @@ const AnimatedMobileTabs = ({
   onTabChange,
   renderScene,
 }) => {
+  const insets = useSafeAreaInsets();
   const tabs = useMemo(
     () => (tabsProp?.length ? tabsProp : DEFAULT_TABS),
     [tabsProp]
   );
 
-  const initialIndex = Math.max(
-    0,
-    tabs.findIndex((t) => t.name === initialTab)
-  );
-
+  const initialIndex = Math.max(0, tabs.findIndex((t) => t.name === initialTab));
   const [activeTab, setActiveTab] = useState(tabs[initialIndex]?.name ?? tabs[0].name);
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [barWidth, setBarWidth] = useState(0);
 
-  const tabIndicatorAnim = useRef(new Animated.Value(initialIndex)).current;
+  const pillAnim = useRef(new Animated.Value(initialIndex)).current;
+  const activeIndex = Math.max(0, tabs.findIndex((t) => t.name === activeTab));
 
-  // Keep indicator in sync if tabs/activeTab change
+  // Respect the system "reduce motion" setting
+  const [reduceMotion, setReduceMotion] = useState(false);
   useEffect(() => {
-    const idx = Math.max(0, tabs.findIndex((t) => t.name === activeTab));
-    tabIndicatorAnim.setValue(idx);
-  }, [tabs, activeTab, tabIndicatorAnim]);
+    AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion).catch(() => {});
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+    return () => sub?.remove?.();
+  }, []);
 
-  const perTabWidth = useMemo(() => screenWidth / tabs.length, [tabs.length]);
-
-  const switchTab = (name) => {
-    const toIndex = tabs.findIndex((t) => t.name === name);
-    if (toIndex < 0 || name === activeTab) return;
-
-    setIsTransitioning(true);
-    Animated.timing(tabIndicatorAnim, {
-      toValue: toIndex,
-      duration: 220,
+  // Slide the pill whenever the active tab changes
+  useEffect(() => {
+    Animated.timing(pillAnim, {
+      toValue: activeIndex,
+      duration: reduceMotion ? 0 : 240,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
-    }).start(() => {
-      setActiveTab(name);
-      setIsTransitioning(false);
-      onTabChange?.(name);
-    });
+    }).start();
+  }, [activeIndex, pillAnim, reduceMotion]);
+
+  const tabWidth = barWidth > 0 ? (barWidth - BAR_PADDING * 2) / tabs.length : 0;
+
+  // Switch the screen immediately; the pill animates alongside
+  const switchTab = (name) => {
+    if (name === activeTab) return;
+    setActiveTab(name);
+    onTabChange?.(name);
   };
-
-  const INDICATOR_WIDTH_RATIO = 0.6; // 60% of a tab width
-  const indicatorWidth = useMemo(
-    () => perTabWidth * INDICATOR_WIDTH_RATIO,
-    [perTabWidth]
-  );
-
-  const indicatorCenterOffset = useMemo(
-    () => (perTabWidth - indicatorWidth) / 2,
-    [perTabWidth, indicatorWidth]
-  );
 
   // Render active screen
   const renderContent = () => {
@@ -102,112 +89,111 @@ const AnimatedMobileTabs = ({
       {/* Content Area */}
       <View style={styles.contentWrapper}>{renderContent()}</View>
 
-      {/* Custom Tab Bar - at bottom for mobile */}
-      <View style={styles.tabBarContainer}>
-        <View style={styles.tabBar}>
-          {/* Animated Tab Indicator - at top of tab bar */}
+      {/* Tab bar */}
+      <View
+        style={[styles.tabBar, { paddingBottom: Math.max(insets.bottom, 8) }]}
+        onLayout={(e) => setBarWidth(e.nativeEvent.layout.width)}
+        accessibilityRole="tablist"
+      >
+        {tabWidth > 0 && (
           <Animated.View
+            pointerEvents="none"
             style={[
-              styles.tabIndicator,
+              styles.pill,
               {
-                width: indicatorWidth,
+                width: tabWidth - PILL_INSET * 2,
                 transform: [
                   {
-                    translateX: tabIndicatorAnim.interpolate({
-                      inputRange: [0, tabs.length - 1],
+                    translateX: pillAnim.interpolate({
+                      inputRange: [0, Math.max(1, tabs.length - 1)],
                       outputRange: [
-                        indicatorCenterOffset,
-                        perTabWidth * (tabs.length - 1) + indicatorCenterOffset
+                        BAR_PADDING + PILL_INSET,
+                        BAR_PADDING + PILL_INSET + tabWidth * Math.max(1, tabs.length - 1),
                       ],
-                      extrapolate: 'clamp',
                     }),
                   },
                 ],
               },
             ]}
           />
+        )}
 
-          {tabs.map((tab) => {
-            const isActive = activeTab === tab.name;
-            return (
-              <TouchableOpacity
-                key={tab.name}
-                style={[styles.tabButton, isActive && styles.activeTabButton]}
-                onPress={() => switchTab(tab.name)}
-                activeOpacity={0.7}
-                disabled={isTransitioning}
-              >
-                <Animated.View
-                  style={[
-                    styles.iconContainer,
-                    { transform: [{ scale: isActive ? 1.15 : 1 }] },
-                  ]}
-                >
-                  <AntDesign
-                    name={tab.icon}
-                    color={isActive ? '#FFB267' : '#FFFFFF'}
-                    size={24}
-                  />
-                </Animated.View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.name;
+          const label = tab.label || tab.name;
+          return (
+            <Pressable
+              key={tab.name}
+              style={({ pressed }) => [styles.tabButton, pressed && !isActive && styles.tabPressed]}
+              onPress={() => switchTab(tab.name)}
+              accessibilityRole="tab"
+              accessibilityLabel={label}
+              accessibilityState={{ selected: isActive }}
+            >
+              <MaterialCommunityIcons
+                name={isActive ? tab.activeIcon || tab.icon : tab.icon}
+                color={isActive ? ACCENT : INACTIVE}
+                size={24}
+              />
+              <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]} numberOfLines={1}>
+                {label}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: '#000' 
+  container: {
+    flex: 1,
+    backgroundColor: '#000',
   },
-  contentWrapper: { 
-    flex: 1, 
-    overflow: 'hidden' 
+  contentWrapper: {
+    flex: 1,
+    overflow: 'hidden',
   },
-  contentContainer: { 
-    flex: 1 
-  },
-  tabBarContainer: { 
-    backgroundColor: '#211D1D',
-    borderTopWidth: 1,
-    borderTopColor: '#211D1D',
+  contentContainer: {
+    flex: 1,
   },
   tabBar: {
-    backgroundColor: '#211D1D',
-    height: 60,
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    position: 'relative',
+    backgroundColor: '#211D1D',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 178, 103, 0.12)',
+    paddingHorizontal: BAR_PADDING,
+    paddingTop: 8,
   },
-  tabIndicator: {
+  pill: {
     position: 'absolute',
-    top: 0,
+    top: 8,
     left: 0,
-    height: 3,
-    backgroundColor: '#FFB267',
-    borderRadius: 2,
-    shadowColor: '#FFB267',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 4,
-    elevation: 4,
+    height: 54,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 178, 103, 0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 178, 103, 0.3)',
   },
   tabButton: {
-    flex: 1, 
-    alignItems: 'center', 
+    flex: 1,
+    height: 54,
+    alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    minHeight: 60,
+    borderRadius: 16,
   },
-  activeTabButton: {
-    backgroundColor: 'rgba(255, 178, 103, 0.08)',
+  tabPressed: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
-  iconContainer: { 
-    padding: 4 
+  tabLabel: {
+    color: INACTIVE,
+    fontSize: 12,
+    fontFamily: FontFamily.latoBold,
+    marginTop: 3,
+  },
+  tabLabelActive: {
+    color: ACCENT,
   },
 });
 

@@ -1,94 +1,123 @@
 import React, { useState, useEffect } from "react";
-import { StyleSheet, View, Text, Modal, TouchableOpacity, ScrollView, Switch, Alert } from "react-native";
-import { Color, FontFamily } from "../GlobalStyles";
-import { Feather, MaterialIcons } from '@expo/vector-icons';
+import { StyleSheet, View, Text, Modal, TouchableOpacity, ScrollView, Switch, Alert, Platform } from "react-native";
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Platform } from 'react-native';
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Color, FontFamily } from "../GlobalStyles";
+import { getLightIcon } from "../helper/rvControl/lightHelpers";
 import lightScheduler from '../Service/LightSchedulerService';
+
+const ACCENT = Color.colorSandybrown;
+const MUTED = '#9E9696';
+const SURFACE = '#1B1B1B';
+const TRACK = '#2A2626';
+
+// Light groups - matching LightScreenTablet organization
+const ROOMS = [
+  {
+    id: 'kitchen',
+    name: 'Kitchen & Living',
+    icon: 'sofa-outline',
+    lights: ['kitchen_lights', 'dinette_lights', 'under_cab_lights', 'strip_lights', 'awning_lights', 'porch_lights', 'hitch_lights'],
+  },
+  {
+    id: 'bedroom',
+    name: 'Bedroom',
+    icon: 'bed-outline',
+    lights: ['bed_ovhd_light', 'left_reading_lights', 'right_reading_lights', 'vibe_light'],
+  },
+  {
+    id: 'bathroom',
+    name: 'Bathroom',
+    icon: 'shower',
+    lights: ['bath_light', 'vanity_light', 'shower_lights'],
+  },
+];
+
+const lightDisplayNames = {
+  'kitchen_lights': 'Kitchen Light',
+  'bath_light': 'Bathroom Light',
+  'bed_ovhd_light': 'Bed Light',
+  'vibe_light': 'Accent Light',
+  'vanity_light': 'Vanity Light',
+  'awning_lights': 'Awning Lights',
+  'shower_lights': 'Shower Light',
+  'under_cab_lights': 'Cabinet Light',
+  'hitch_lights': 'Hitch Light',
+  'porch_lights': 'Porch Light',
+  'left_reading_lights': 'Left Reading Light',
+  'right_reading_lights': 'Right Reading Light',
+  'dinette_lights': 'Dining Light',
+  'strip_lights': 'Strip Light',
+  'wardrobe_lights': 'Wardrobe Light'
+};
+
+const formatTime = (date) => date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+// Milliseconds until the next occurrence of the given time of day, and whether that is tomorrow
+const untilNext = (time) => {
+  const now = new Date();
+  const target = new Date();
+  target.setHours(time.getHours(), time.getMinutes(), 0, 0);
+  let diff = target.getTime() - now.getTime();
+  const isTomorrow = diff < 0;
+  if (isTomorrow) diff += 24 * 60 * 60 * 1000;
+  return { diff, isTomorrow };
+};
+
+const describeWait = (time) => {
+  const { diff, isTomorrow } = untilNext(time);
+  const totalMinutes = Math.round(diff / 60000);
+  if (totalMinutes < 1) return 'Runs in less than a minute';
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  const parts = [];
+  if (hours) parts.push(`${hours} h`);
+  if (minutes) parts.push(`${minutes} min`);
+  return `Runs ${isTomorrow ? 'tomorrow, ' : ''}in ${parts.join(' ')}`;
+};
 
 /**
  * Modal for scheduling lights in the RV system
- * Allows users to select individual or sets of lights and schedule them to turn on/off
+ * Pick lights (one by one or a whole room), a time, on/off and whether it repeats daily.
+ * Existing schedules are listed at the top and can be paused or deleted.
  *
  * @param {Object} props Component props
  * @param {boolean} props.isVisible Controls whether the modal is visible
  * @param {Function} props.onClose Callback when modal is closed
  */
 const ScheduleLightsModal = ({ isVisible, onClose }) => {
-  // Light groups and names - matching LightScreenTablet organization
-  const lightGroups = {
-    kitchen: [
-      'kitchen_lights',
-      'dinette_lights',
-      'under_cab_lights',
-      'strip_lights',
-      'awning_lights',
-      'porch_lights',
-      'hitch_lights'
-    ],
-    bedroom: [
-      'bed_ovhd_light',
-      'left_reading_lights',
-      'right_reading_lights',
-      'vibe_light'
-    ],
-    bathroom: [
-      'bath_light',
-      'vanity_light',
-      'shower_lights'
-    ]
-  };
-
-  const lightDisplayNames = {
-    'kitchen_lights': 'Kitchen Light',
-    'bath_light': 'Bathroom Light',
-    'bed_ovhd_light': 'Bed Light',
-    'vibe_light': 'Accent Light',
-    'vanity_light': 'Vanity Light',
-    'awning_lights': 'Awning Lights',
-    'shower_lights': 'Shower Light',
-    'under_cab_lights': 'Cabinet Light',
-    'hitch_lights': 'Hitch Light',
-    'porch_lights': 'Porch Light',
-    'left_reading_lights': 'Left Reading Light',
-    'right_reading_lights': 'Right Reading Light',
-    'dinette_lights': 'Dining Light',
-    'strip_lights': 'Strip Light',
-    'wardrobe_lights': 'Wardrobe Light'
-  };
+  const insets = useSafeAreaInsets();
 
   // State management
-  const [selectedTab, setSelectedTab] = useState('individual');
   const [selectedLights, setSelectedLights] = useState([]);
-  const [selectedGroup, setSelectedGroup] = useState(null);
   const [scheduleAction, setScheduleAction] = useState('on'); // 'on' or 'off'
   const [scheduleTime, setScheduleTime] = useState(new Date());
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [isRepeating, setIsRepeating] = useState(false);
+  const [schedules, setSchedules] = useState([]);
 
-  // Get all lights in a flat array
-  const getAllLights = () => {
-    return [...lightGroups.kitchen, ...lightGroups.bedroom, ...lightGroups.bathroom];
-  };
+  const refreshSchedules = () => setSchedules([...lightScheduler.getSchedules()]);
+
+  useEffect(() => {
+    if (isVisible) refreshSchedules();
+  }, [isVisible]);
 
   // Toggle individual light selection
   const toggleLightSelection = (lightId) => {
-    setSelectedLights(prev => {
-      if (prev.includes(lightId)) {
-        return prev.filter(id => id !== lightId);
-      } else {
-        return [...prev, lightId];
-      }
-    });
+    setSelectedLights(prev =>
+      prev.includes(lightId) ? prev.filter(id => id !== lightId) : [...prev, lightId]
+    );
   };
 
-  // Handle group selection
-  const selectGroup = (groupName) => {
-    if (selectedGroup === groupName) {
-      setSelectedGroup(null);
-    } else {
-      setSelectedGroup(groupName);
-    }
+  // Select or clear a whole room
+  const toggleRoom = (room) => {
+    const allSelected = room.lights.every(id => selectedLights.includes(id));
+    setSelectedLights(prev =>
+      allSelected
+        ? prev.filter(id => !room.lights.includes(id))
+        : [...new Set([...prev, ...room.lights])]
+    );
   };
 
   // Handle time change
@@ -100,16 +129,10 @@ const ScheduleLightsModal = ({ isVisible, onClose }) => {
 
   // Handle schedule creation
   const handleCreateSchedule = async () => {
-    let lightsToSchedule = [];
-
-    if (selectedTab === 'individual') {
-      lightsToSchedule = selectedLights;
-    } else if (selectedTab === 'group' && selectedGroup) {
-      lightsToSchedule = lightGroups[selectedGroup];
-    }
+    const lightsToSchedule = selectedLights;
 
     if (lightsToSchedule.length === 0) {
-      Alert.alert('No Lights Selected', 'Please select lights to schedule');
+      Alert.alert('No lights selected', 'Pick at least one light to schedule.');
       return;
     }
 
@@ -125,52 +148,11 @@ const ScheduleLightsModal = ({ isVisible, onClose }) => {
       if (result.success) {
         console.log('✅ Schedule created successfully:', result.schedule);
 
-        // Calculate time until execution - FIXED
-        const now = new Date();
-
-        // Create a date object for today with the selected time
-        const scheduleDateTime = new Date();
-        scheduleDateTime.setHours(scheduleTime.getHours());
-        scheduleDateTime.setMinutes(scheduleTime.getMinutes());
-        scheduleDateTime.setSeconds(0);
-        scheduleDateTime.setMilliseconds(0);
-
-        // Calculate difference in milliseconds
-        let timeDiff = scheduleDateTime.getTime() - now.getTime();
-
-        // If the time has already passed today, it will execute tomorrow
-        const isTomorrow = timeDiff < 0;
-        if (isTomorrow) {
-          timeDiff += 24 * 60 * 60 * 1000; // Add 24 hours
-        }
-
-        const totalSeconds = Math.floor(timeDiff / 1000);
-        const minutes = Math.floor(totalSeconds / 60);
-        const hours = Math.floor(minutes / 60);
-        const remainingMinutes = minutes % 60;
-
-        let timeMessage = '';
-        if (isTomorrow && !isRepeating) {
-          timeMessage = `The schedule will execute tomorrow at ${scheduleTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`;
-        } else if (totalSeconds < 60) {
-          timeMessage = `The lights will turn ${scheduleAction} in ${totalSeconds} second${totalSeconds !== 1 ? 's' : ''}.`;
-        } else if (minutes < 60) {
-          timeMessage = `The lights will turn ${scheduleAction} in ${minutes} minute${minutes !== 1 ? 's' : ''}.`;
-        } else if (hours < 24) {
-          if (remainingMinutes > 0) {
-            timeMessage = `The lights will turn ${scheduleAction} in ${hours} hour${hours !== 1 ? 's' : ''} and ${remainingMinutes} minute${remainingMinutes !== 1 ? 's' : ''}.`;
-          } else {
-            timeMessage = `The lights will turn ${scheduleAction} in ${hours} hour${hours !== 1 ? 's' : ''}.`;
-          }
-        } else {
-          timeMessage = `The lights will turn ${scheduleAction} at ${scheduleTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`;
-        }
-
+        const count = lightsToSchedule.length;
         Alert.alert(
-          'Schedule Created!',
-          `${lightsToSchedule.length} light${lightsToSchedule.length !== 1 ? 's' : ''} scheduled to turn ${scheduleAction.toUpperCase()}\n\n` +
-          `${timeMessage}\n\n` +
-          `Repeating: ${isRepeating ? 'Yes (Daily)' : 'No (One-time)'}`,
+          'Schedule created',
+          `${count} light${count !== 1 ? 's' : ''} will turn ${scheduleAction} at ${formatTime(scheduleTime)}` +
+          `${isRepeating ? ' every day' : ''}.\n\n${describeWait(scheduleTime)}.`,
           [{ text: 'OK', style: 'default' }]
         );
 
@@ -183,17 +165,39 @@ const ScheduleLightsModal = ({ isVisible, onClose }) => {
     } catch (error) {
       console.error('❌ Failed to create schedule:', error);
       Alert.alert(
-        'Error',
-        `Failed to create schedule: ${error.message}`,
+        'Schedule not created',
+        `${error.message}. Check the RV connection and try again.`,
         [{ text: 'OK', style: 'cancel' }]
       );
     }
   };
 
+  const handleToggleSchedule = async (scheduleId) => {
+    await lightScheduler.toggleSchedule(scheduleId);
+    refreshSchedules();
+  };
+
+  const handleDeleteSchedule = (schedule) => {
+    Alert.alert(
+      'Delete schedule?',
+      `Lights will no longer turn ${schedule.action} at ${formatTime(new Date(schedule.time))}.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await lightScheduler.deleteSchedule(schedule.id);
+            refreshSchedules();
+          },
+        },
+      ]
+    );
+  };
+
   // Reset form
   const resetForm = () => {
     setSelectedLights([]);
-    setSelectedGroup(null);
     setScheduleAction('on');
     setScheduleTime(new Date());
     setIsRepeating(false);
@@ -206,77 +210,117 @@ const ScheduleLightsModal = ({ isVisible, onClose }) => {
     onClose();
   };
 
-  // Render individual lights selection
-  const renderIndividualLights = () => {
-    const allLights = getAllLights();
+  const selectedCount = selectedLights.length;
+  const createLabel = selectedCount === 0
+    ? 'Pick lights to schedule'
+    : `Turn ${selectedCount} light${selectedCount !== 1 ? 's' : ''} ${scheduleAction} at ${formatTime(scheduleTime)}`;
+
+  // ——— Existing schedules ———
+  const renderSchedules = () => {
+    if (schedules.length === 0) return null;
 
     return (
-      <View style={styles.lightsContainer}>
-        {allLights.map(lightId => {
-          const isSelected = selectedLights.includes(lightId);
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Your schedules</Text>
+        {schedules.map((schedule) => {
+          const time = new Date(schedule.time);
+          const names = schedule.lights.map((id) => lightDisplayNames[id] || id);
+          const lightsText = names.length <= 2 ? names.join(' and ') : `${names.slice(0, 2).join(', ')} +${names.length - 2} more`;
 
           return (
-            <TouchableOpacity
-              key={lightId}
-              style={[styles.lightItem, isSelected && styles.lightItemSelected]}
-              onPress={() => toggleLightSelection(lightId)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.lightItemContent}>
-                <View style={[styles.lightIcon, isSelected && styles.lightIconSelected]}>
-                  <MaterialIcons name="lightbulb" size={20} color={isSelected ? '#1a1a1a' : 'rgba(255,255,255,0.6)'} />
-                </View>
-                <Text style={[styles.lightName, isSelected && styles.lightNameSelected]}>
-                  {lightDisplayNames[lightId] || lightId}
-                </Text>
+            <View key={schedule.id} style={[styles.scheduleRow, !schedule.enabled && styles.scheduleRowPaused]}>
+              <View style={[styles.scheduleIcon, schedule.action === 'on' ? styles.scheduleIconOn : styles.scheduleIconOff]}>
+                <MaterialCommunityIcons
+                  name={schedule.action === 'on' ? 'lightbulb-on-outline' : 'lightbulb-off-outline'}
+                  size={20}
+                  color={schedule.action === 'on' ? '#1B1B1B' : MUTED}
+                />
               </View>
-              {isSelected && (
-                <Feather name="check-circle" size={20} color="#FFB267" />
-              )}
-            </TouchableOpacity>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.scheduleTime}>
+                  {formatTime(time)}
+                  <Text style={styles.scheduleMeta}>
+                    {`  Turn ${schedule.action}, ${schedule.isRepeating ? 'daily' : 'once'}`}
+                  </Text>
+                </Text>
+                <Text style={styles.scheduleLights} numberOfLines={1}>{lightsText}</Text>
+              </View>
+              <Switch
+                value={schedule.enabled}
+                onValueChange={() => handleToggleSchedule(schedule.id)}
+                trackColor={{ false: TRACK, true: ACCENT }}
+                thumbColor="#FFFFFF"
+                accessibilityLabel={`${schedule.enabled ? 'Pause' : 'Resume'} schedule at ${formatTime(time)}`}
+              />
+              <TouchableOpacity
+                onPress={() => handleDeleteSchedule(schedule)}
+                style={styles.deleteButton}
+                accessibilityRole="button"
+                accessibilityLabel={`Delete schedule at ${formatTime(time)}`}
+              >
+                <MaterialCommunityIcons name="trash-can-outline" size={20} color={MUTED} />
+              </TouchableOpacity>
+            </View>
           );
         })}
       </View>
     );
   };
 
-  // Render group selection
-  const renderGroupSelection = () => {
-    const groups = [
-      { id: 'kitchen', name: 'Kitchen & Living Area', icon: 'home', count: lightGroups.kitchen.length },
-      { id: 'bedroom', name: 'Bedroom', icon: 'moon', count: lightGroups.bedroom.length },
-      { id: 'bathroom', name: 'Bathroom', icon: 'droplet', count: lightGroups.bathroom.length }
-    ];
+  // ——— Light picker grouped by room ———
+  const renderRoom = (room) => {
+    const roomSelected = room.lights.filter((id) => selectedLights.includes(id)).length;
+    const allSelected = roomSelected === room.lights.length;
 
     return (
-      <View style={styles.groupsContainer}>
-        {groups.map(group => {
-          const isSelected = selectedGroup === group.id;
+      <View key={room.id} style={styles.room}>
+        <View style={styles.roomHeader}>
+          <MaterialCommunityIcons name={room.icon} size={18} color={roomSelected ? ACCENT : MUTED} />
+          <Text style={styles.roomName}>{room.name}</Text>
+          {roomSelected > 0 && <Text style={styles.roomCount}>{roomSelected} picked</Text>}
+          <View style={{ flex: 1 }} />
+          <TouchableOpacity
+            onPress={() => toggleRoom(room)}
+            style={[styles.roomToggle, allSelected && styles.roomToggleActive]}
+            accessibilityRole="button"
+            accessibilityLabel={`${allSelected ? 'Clear' : 'Select all'} ${room.name} lights`}
+          >
+            <Text style={[styles.roomToggleText, allSelected && styles.roomToggleTextActive]}>
+              {allSelected ? 'Clear' : 'Select all'}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-          return (
-            <TouchableOpacity
-              key={group.id}
-              style={[styles.groupCard, isSelected && styles.groupCardSelected]}
-              onPress={() => selectGroup(group.id)}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.groupIconContainer, isSelected && styles.groupIconContainerSelected]}>
-                <Feather name={group.icon} size={32} color={isSelected ? '#1a1a1a' : '#FFB267'} />
-              </View>
-              <Text style={[styles.groupName, isSelected && styles.groupNameSelected]}>
-                {group.name}
-              </Text>
-              <Text style={[styles.groupCount, isSelected && styles.groupCountSelected]}>
-                {group.count} lights
-              </Text>
-              {isSelected && (
-                <View style={styles.selectedBadge}>
-                  <Feather name="check" size={16} color="#1a1a1a" />
+        <View style={styles.lightGrid}>
+          {room.lights.map((lightId) => {
+            const isSelected = selectedLights.includes(lightId);
+            return (
+              <TouchableOpacity
+                key={lightId}
+                style={[styles.lightChip, isSelected && styles.lightChipSelected]}
+                onPress={() => toggleLightSelection(lightId)}
+                activeOpacity={0.75}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: isSelected }}
+                accessibilityLabel={lightDisplayNames[lightId] || lightId}
+              >
+                <View style={[styles.lightIcon, isSelected && styles.lightIconSelected]}>
+                  <MaterialCommunityIcons
+                    name={getLightIcon(lightId)}
+                    size={18}
+                    color={isSelected ? '#1B1B1B' : MUTED}
+                  />
                 </View>
-              )}
-            </TouchableOpacity>
-          );
-        })}
+                <Text style={[styles.lightName, isSelected && styles.lightNameSelected]} numberOfLines={2}>
+                  {lightDisplayNames[lightId] || lightId}
+                </Text>
+                {isSelected && (
+                  <MaterialCommunityIcons name="check-circle" size={18} color={ACCENT} style={styles.lightCheck} />
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
     );
   };
@@ -288,116 +332,132 @@ const ScheduleLightsModal = ({ isVisible, onClose }) => {
       animationType="slide"
       onRequestClose={handleClose}
     >
-      <View style={styles.modalContainer}>
-        <View style={styles.modalContent}>
+      <View style={styles.backdrop}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          onPress={handleClose}
+          accessibilityRole="button"
+          accessibilityLabel="Close schedule lights"
+        />
+        <View style={[styles.sheet, { paddingBottom: insets.bottom + 16 }]}>
+          <View style={styles.grabber} />
+
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.modalTitle}>Schedule Lights</Text>
-            <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-              <Feather name="x" size={24} color="#fff" />
+            <View style={styles.headerIcon}>
+              <MaterialCommunityIcons name="calendar-clock" size={22} color={ACCENT} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.title}>Schedule Lights</Text>
+              <Text style={styles.subtitle}>
+                {selectedCount === 0 ? 'Choose a time and the lights to switch' : `${selectedCount} light${selectedCount !== 1 ? 's' : ''} picked`}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.closeIcon}
+              onPress={handleClose}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+            >
+              <MaterialCommunityIcons name="close" size={22} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
 
-          {/* Tab Selection */}
-          <View style={styles.tabContainer}>
-            <TouchableOpacity
-              style={[styles.tab, selectedTab === 'individual' && styles.activeTab]}
-              onPress={() => setSelectedTab('individual')}
-            >
-              <MaterialIcons name="light" size={16} color={selectedTab === 'individual' ? '#1a1a1a' : 'rgba(255,255,255,0.6)'} />
-              <Text style={[styles.tabText, selectedTab === 'individual' && styles.activeTabText]}>
-                Individual
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, selectedTab === 'group' && styles.activeTab]}
-              onPress={() => setSelectedTab('group')}
-            >
-              <Feather name="grid" size={16} color={selectedTab === 'group' ? '#1a1a1a' : 'rgba(255,255,255,0.6)'} />
-              <Text style={[styles.tabText, selectedTab === 'group' && styles.activeTabText]}>
-                Groups
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
+            {renderSchedules()}
 
-          {/* Lights Selection */}
-          <ScrollView style={styles.selectionArea} showsVerticalScrollIndicator={false}>
-            {selectedTab === 'individual' ? renderIndividualLights() : renderGroupSelection()}
+            {/* When */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>When</Text>
+              <View style={styles.whenCard}>
+                <TouchableOpacity
+                  style={styles.timeButton}
+                  onPress={() => setShowTimePicker(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Time ${formatTime(scheduleTime)}, tap to change`}
+                >
+                  <Text style={styles.timeValue}>{formatTime(scheduleTime)}</Text>
+                  <View style={styles.timeEdit}>
+                    <MaterialCommunityIcons name="pencil-outline" size={14} color={ACCENT} />
+                    <Text style={styles.timeEditText}>Change</Text>
+                  </View>
+                </TouchableOpacity>
+                <Text style={styles.timeHint}>{describeWait(scheduleTime)}</Text>
+
+                {showTimePicker && (
+                  <DateTimePicker
+                    value={scheduleTime}
+                    mode="time"
+                    is24Hour={false}
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={onTimeChange}
+                    themeVariant="dark"
+                  />
+                )}
+
+                <View style={styles.segmented}>
+                  {[
+                    { value: 'on', label: 'Turn on', icon: 'lightbulb-on-outline' },
+                    { value: 'off', label: 'Turn off', icon: 'lightbulb-off-outline' },
+                  ].map((option) => {
+                    const active = scheduleAction === option.value;
+                    return (
+                      <TouchableOpacity
+                        key={option.value}
+                        style={[styles.segment, active && styles.segmentActive]}
+                        onPress={() => setScheduleAction(option.value)}
+                        accessibilityRole="radio"
+                        accessibilityState={{ checked: active }}
+                      >
+                        <MaterialCommunityIcons name={option.icon} size={18} color={active ? '#1B1B1B' : MUTED} />
+                        <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{option.label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                <View style={styles.repeatRow}>
+                  <MaterialCommunityIcons name="repeat" size={18} color={isRepeating ? ACCENT : MUTED} />
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <Text style={styles.repeatLabel}>Repeat every day</Text>
+                    <Text style={styles.repeatHint}>{isRepeating ? 'Runs daily until you delete it' : 'Runs once'}</Text>
+                  </View>
+                  <Switch
+                    value={isRepeating}
+                    onValueChange={setIsRepeating}
+                    trackColor={{ false: TRACK, true: ACCENT }}
+                    thumbColor="#FFFFFF"
+                  />
+                </View>
+              </View>
+            </View>
+
+            {/* Which lights */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionTitle}>Lights</Text>
+                {selectedCount > 0 && (
+                  <TouchableOpacity onPress={() => setSelectedLights([])} accessibilityRole="button">
+                    <Text style={styles.clearText}>Clear all</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              {ROOMS.map(renderRoom)}
+            </View>
           </ScrollView>
-
-          {/* Schedule Settings */}
-          <View style={styles.scheduleSettings}>
-            {/* Action Selection */}
-            <View style={styles.settingRow}>
-              <Text style={styles.settingLabel}>Action</Text>
-              <View style={styles.actionButtons}>
-                <TouchableOpacity
-                  style={[styles.actionButton, scheduleAction === 'on' && styles.actionButtonActive]}
-                  onPress={() => setScheduleAction('on')}
-                >
-                  <Feather name="sun" size={16} color={scheduleAction === 'on' ? '#1a1a1a' : 'rgba(255,255,255,0.6)'} />
-                  <Text style={[styles.actionButtonText, scheduleAction === 'on' && styles.actionButtonTextActive]}>
-                    Turn On
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.actionButton, scheduleAction === 'off' && styles.actionButtonActive]}
-                  onPress={() => setScheduleAction('off')}
-                >
-                  <Feather name="moon" size={16} color={scheduleAction === 'off' ? '#1a1a1a' : 'rgba(255,255,255,0.6)'} />
-                  <Text style={[styles.actionButtonText, scheduleAction === 'off' && styles.actionButtonTextActive]}>
-                    Turn Off
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Time Picker */}
-            <View style={styles.settingRow}>
-              <Text style={styles.settingLabel}>Time</Text>
-              <TouchableOpacity
-                style={styles.timePicker}
-                onPress={() => setShowTimePicker(true)}
-              >
-                <Feather name="clock" size={16} color="#FFB267" />
-                <Text style={styles.timeText}>
-                  {scheduleTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {showTimePicker && (
-              <DateTimePicker
-                value={scheduleTime}
-                mode="time"
-                is24Hour={false}
-                display="default"
-                onChange={onTimeChange}
-              />
-            )}
-
-            {/* Repeat Toggle */}
-            <View style={styles.settingRow}>
-              <View style={styles.repeatLabel}>
-                <Feather name="repeat" size={16} color="rgba(255,255,255,0.6)" />
-                <Text style={styles.settingLabel}>Repeat Daily</Text>
-              </View>
-              <Switch
-                value={isRepeating}
-                onValueChange={setIsRepeating}
-                trackColor={{ false: 'rgba(255,255,255,0.2)', true: '#FFB267' }}
-                thumbColor={isRepeating ? '#fff' : '#f4f3f4'}
-              />
-            </View>
-          </View>
 
           {/* Create Button */}
           <TouchableOpacity
-            style={styles.createButton}
+            style={[styles.createButton, selectedCount === 0 && styles.createButtonDisabled]}
             onPress={handleCreateSchedule}
+            disabled={selectedCount === 0}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: selectedCount === 0 }}
           >
-            <Feather name="calendar" size={20} color="#1a1a1a" />
-            <Text style={styles.createButtonText}>Create Schedule</Text>
+            <MaterialCommunityIcons name="calendar-check" size={20} color={selectedCount === 0 ? MUTED : '#1B1B1B'} />
+            <Text style={[styles.createButtonText, selectedCount === 0 && styles.createButtonTextDisabled]} numberOfLines={1}>
+              {createLabel}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -406,275 +466,345 @@ const ScheduleLightsModal = ({ isVisible, onClose }) => {
 };
 
 const styles = StyleSheet.create({
-  modalContainer: {
+  backdrop: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
-  modalContent: {
-    backgroundColor: '#1a1a1a',
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    paddingTop: 24,
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-    height: '75%', // 3/4 of screen height
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+  sheet: {
+    maxHeight: '90%',
+    backgroundColor: '#211D1D',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderColor: 'rgba(255, 178, 103, 0.15)',
+  },
+  grabber: {
+    alignSelf: 'center',
+    width: 40,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    marginBottom: 16,
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: {
-    fontSize: 28,
-    fontFamily: FontFamily.latoBold,
-    fontWeight: '800',
-    color: '#ffffff',
-    letterSpacing: -0.5,
-  },
-  closeButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    marginBottom: 20,
-    gap: 10,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 14,
-    padding: 4,
-  },
-  tab: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    gap: 6,
-  },
-  activeTab: {
-    backgroundColor: '#FFB267',
-  },
-  tabText: {
-    fontSize: 14,
-    fontFamily: FontFamily.latoBold,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.6)',
-    letterSpacing: 0.2,
-  },
-  activeTabText: {
-    color: '#1a1a1a',
-  },
-  selectionArea: {
-    flex: 1,
-    marginBottom: 20,
-  },
-  lightsContainer: {
-    gap: 8,
-  },
-  lightItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  lightItemSelected: {
-    backgroundColor: 'rgba(255, 178, 103, 0.15)',
-    borderColor: '#FFB267',
-  },
-  lightItemContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  lightIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  lightIconSelected: {
-    backgroundColor: '#FFB267',
-  },
-  lightName: {
-    fontSize: 15,
-    fontFamily: FontFamily.latoRegular,
-    color: 'rgba(255,255,255,0.8)',
-    letterSpacing: 0.2,
-  },
-  lightNameSelected: {
-    color: '#ffffff',
-    fontFamily: FontFamily.latoBold,
-    fontWeight: '600',
-  },
-  groupsContainer: {
-    gap: 12,
-  },
-  groupCard: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    padding: 20,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.1)',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  groupCardSelected: {
-    backgroundColor: 'rgba(255, 178, 103, 0.15)',
-    borderColor: '#FFB267',
-  },
-  groupIconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(255, 178, 103, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
     marginBottom: 12,
   },
-  groupIconContainerSelected: {
-    backgroundColor: '#FFB267',
-  },
-  groupName: {
-    fontSize: 18,
-    fontFamily: FontFamily.latoBold,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.8)',
-    marginBottom: 4,
-    letterSpacing: 0.3,
-  },
-  groupNameSelected: {
-    color: '#ffffff',
-  },
-  groupCount: {
-    fontSize: 13,
-    fontFamily: FontFamily.latoRegular,
-    color: 'rgba(255,255,255,0.5)',
-    letterSpacing: 0.2,
-  },
-  groupCountSelected: {
-    color: '#FFB267',
-    fontFamily: FontFamily.latoBold,
-    fontWeight: '600',
-  },
-  selectedBadge: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    width: 28,
-    height: 28,
+  headerIcon: {
+    width: 44,
+    height: 44,
     borderRadius: 14,
-    backgroundColor: '#FFB267',
+    backgroundColor: 'rgba(255, 178, 103, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  title: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontFamily: FontFamily.latoBold,
+  },
+  subtitle: {
+    color: MUTED,
+    fontSize: 14,
+    fontFamily: FontFamily.latoRegular,
+    marginTop: 2,
+  },
+  closeIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  scheduleSettings: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    gap: 16,
+  // Shrinks to fit so the create button stays visible under a long list
+  body: {
+    flexGrow: 0,
+    flexShrink: 1,
   },
-  settingRow: {
+  bodyContent: {
+    paddingBottom: 8,
+  },
+  section: {
+    marginTop: 14,
+  },
+  sectionHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'baseline',
   },
-  settingLabel: {
-    fontSize: 15,
+  sectionTitle: {
+    color: '#FFFFFF',
+    fontSize: 17,
     fontFamily: FontFamily.latoBold,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.8)',
-    letterSpacing: 0.2,
+    marginBottom: 10,
   },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 8,
+  clearText: {
+    color: ACCENT,
+    fontSize: 14,
+    fontFamily: FontFamily.latoBold,
   },
-  actionButton: {
+
+  // Existing schedules
+  scheduleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.1)',
-    gap: 6,
+    backgroundColor: SURFACE,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    paddingVertical: 10,
+    paddingLeft: 12,
+    paddingRight: 6,
+    marginBottom: 8,
   },
-  actionButtonActive: {
-    backgroundColor: '#FFB267',
-    borderColor: '#FFD4A8',
+  scheduleRowPaused: {
+    opacity: 0.55,
   },
-  actionButtonText: {
+  scheduleIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  scheduleIconOn: {
+    backgroundColor: ACCENT,
+  },
+  scheduleIconOff: {
+    backgroundColor: TRACK,
+  },
+  scheduleTime: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontFamily: FontFamily.latoBold,
+  },
+  scheduleMeta: {
+    color: MUTED,
     fontSize: 13,
     fontFamily: FontFamily.latoRegular,
-    color: 'rgba(255,255,255,0.6)',
-    letterSpacing: 0.2,
   },
-  actionButtonTextActive: {
-    color: '#1a1a1a',
-    fontFamily: FontFamily.latoBold,
-    fontWeight: '600',
+  scheduleLights: {
+    color: MUTED,
+    fontSize: 13,
+    fontFamily: FontFamily.latoRegular,
+    marginTop: 2,
   },
-  timePicker: {
+  deleteButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 2,
+  },
+
+  // When
+  whenCard: {
+    backgroundColor: SURFACE,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 178, 103, 0.18)',
+    padding: 16,
+  },
+  timeButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 178, 103, 0.15)',
-    borderWidth: 1.5,
-    borderColor: '#FFB267',
-    gap: 8,
+    justifyContent: 'space-between',
   },
-  timeText: {
-    fontSize: 15,
+  timeValue: {
+    color: '#FFFFFF',
+    fontSize: 44,
+    fontFamily: FontFamily.latoLight,
+    letterSpacing: 0.5,
+  },
+  timeEdit: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 178, 103, 0.12)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  timeEditText: {
+    color: ACCENT,
+    fontSize: 13,
     fontFamily: FontFamily.latoBold,
-    fontWeight: '600',
-    color: '#FFB267',
-    letterSpacing: 0.2,
+    marginLeft: 4,
+  },
+  timeHint: {
+    color: MUTED,
+    fontSize: 13,
+    fontFamily: FontFamily.latoRegular,
+    marginBottom: 14,
+  },
+  segmented: {
+    flexDirection: 'row',
+    backgroundColor: TRACK,
+    borderRadius: 14,
+    padding: 3,
+  },
+  segment: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 11,
+    borderRadius: 11,
+  },
+  segmentActive: {
+    backgroundColor: ACCENT,
+  },
+  segmentText: {
+    color: MUTED,
+    fontSize: 14,
+    fontFamily: FontFamily.latoBold,
+    marginLeft: 6,
+  },
+  segmentTextActive: {
+    color: '#1B1B1B',
+  },
+  repeatRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 14,
   },
   repeatLabel: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontFamily: FontFamily.latoBold,
+  },
+  repeatHint: {
+    color: MUTED,
+    fontSize: 12,
+    fontFamily: FontFamily.latoRegular,
+    marginTop: 1,
+  },
+
+  // Lights
+  room: {
+    marginBottom: 14,
+  },
+  roomHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    marginBottom: 8,
   },
+  roomName: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontFamily: FontFamily.latoBold,
+    marginLeft: 8,
+  },
+  roomCount: {
+    color: ACCENT,
+    fontSize: 13,
+    fontFamily: FontFamily.latoRegular,
+    marginLeft: 8,
+  },
+  roomToggle: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 178, 103, 0.35)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  roomToggleActive: {
+    backgroundColor: 'rgba(255, 178, 103, 0.15)',
+  },
+  roomToggleText: {
+    color: ACCENT,
+    fontSize: 13,
+    fontFamily: FontFamily.latoBold,
+  },
+  roomToggleTextActive: {
+    color: ACCENT,
+  },
+  lightGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 8,
+  },
+  lightChip: {
+    width: '48.5%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: SURFACE,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    paddingVertical: 10,
+    paddingLeft: 10,
+    paddingRight: 28,
+    minHeight: 56,
+  },
+  lightChipSelected: {
+    backgroundColor: 'rgba(255, 178, 103, 0.12)',
+    borderColor: 'rgba(255, 178, 103, 0.6)',
+  },
+  lightIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: TRACK,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  lightIconSelected: {
+    backgroundColor: ACCENT,
+  },
+  lightName: {
+    flex: 1,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 14,
+    fontFamily: FontFamily.latoRegular,
+  },
+  lightNameSelected: {
+    color: '#FFFFFF',
+    fontFamily: FontFamily.latoBold,
+  },
+  lightCheck: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+  },
+
+  // Create
   createButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFB267',
+    backgroundColor: ACCENT,
     paddingVertical: 16,
+    paddingHorizontal: 16,
     borderRadius: 16,
-    gap: 10,
-    shadowColor: '#FFB267',
+    marginTop: 12,
+    shadowColor: ACCENT,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 6,
   },
+  createButtonDisabled: {
+    backgroundColor: TRACK,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
   createButtonText: {
     fontSize: 16,
     fontFamily: FontFamily.latoBold,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    letterSpacing: 0.3,
+    color: '#1B1B1B',
+    marginLeft: 10,
+  },
+  createButtonTextDisabled: {
+    color: MUTED,
   },
 });
 

@@ -36,6 +36,13 @@ const TABS = {
   BATHROOM: "Bathroom",
 };
 
+// Room tabs: icon + which light group they show
+const ROOMS = [
+  { tab: TABS.MAIN, group: 'main', icon: 'silverware-fork-knife' },
+  { tab: TABS.BEDROOM, group: 'bedroom', icon: 'bed' },
+  { tab: TABS.BATHROOM, group: 'bathroom', icon: 'shower' },
+];
+
 // Light IDs to display names mapping
 const lightDisplayNames = {
   'kitchen_lights': 'Kitchen Light',
@@ -525,131 +532,109 @@ const handleWaterHeaterToggle = async () => {
     }
   };
 
-  const renderTabContent = () => {
-    if (selectedTab === TABS.MAIN) {
+  // Counts for the header summary and room tabs
+  const countLightsOn = (ids) => ids.filter((id) => lightStates[id]).length;
+  const allLightIds = Object.values(lightGroups).flat();
+
+  const getSummary = () => {
+    const parts = [];
+    const lightsOn = countLightsOn(allLightIds);
+    if (lightsOn > 0) parts.push(`${lightsOn} ${lightsOn === 1 ? 'light' : 'lights'} on`);
+    if (water.pumpOn) parts.push('water pump running');
+    if (water.heaterOn) parts.push('water heater on');
+    if (isBathroomFanOn || isBayVentFanOn) parts.push('fans running');
+    if (parts.length === 0) return 'Everything is switched off';
+    const text = parts.join(', ');
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  };
+
+  const QUICK_ACTIONS = [
+    { key: 'awning', label: 'Awning', icon: 'awning-outline', onPress: () => setModalVisible(true) },
+    { key: 'fan', label: 'Fan speed', icon: 'fan', onPress: () => setHeaterModalVisible(true) },
+    { key: 'schedule', label: 'Schedule', icon: 'calendar-clock', onPress: () => setScheduleLightsModalVisible(true) },
+    { key: 'add', label: 'Add device', icon: 'plus-circle-outline', onPress: () => setAddDeviceModalVisible(true) },
+  ];
+
+  // Lights section shared by every room tab: master bar + 2-column grid of hold-to-dim tiles
+  const renderLightSection = (groupKey) => {
+    const ids = lightGroups[groupKey];
+    const roomOn = countLightsOn(ids);
+
+    return (
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Lights</Text>
+          <Text style={styles.sectionHint}>
+            {supportsDimming ? 'Tap to switch, hold to dim' : 'Tap to switch'}
+          </Text>
+        </View>
+
+        <MasterLightControl
+          isOn={masterLightOn}
+          onToggleOn={async () => {
+            await handleMasterLightToggle(true);
+          }}
+          onToggleOff={async () => {
+            await handleMasterLightToggle(false);
+          }}
+          isLoading={isLoading}
+          onCount={countLightsOn(allLightIds)}
+          total={allLightIds.length}
+          style={styles.masterControl}
+        />
+
+        <Text style={styles.roomCount}>
+          {roomOn > 0 ? `${roomOn} of ${ids.length} in this room on` : `${ids.length} lights in this room`}
+        </Text>
+
+        <View style={styles.lightGrid}>
+          {ids.map((lightId) => (
+            <SimpleHoldToDimLight
+              key={lightId}
+              name={lightDisplayNames[lightId] || lightId}
+              lightId={lightId}
+              value={localLightBrightness[lightId] || 0}
+              isOn={lightStates[lightId] || false}
+              supportsDimming={supportsDimming}
+              style={styles.lightTile}
+            />
+          ))}
+        </View>
+      </View>
+    );
+  };
+
+  // Room-specific appliances shown above the lights
+  const renderRoomDevices = () => {
+    if (selectedTab === TABS.BEDROOM) {
       return (
-        <>
-          <View className="flex-row items-center justify-between mx-16 h-28">
-            <View className="items-center bg-brown-300 ">
-              <Pressable
-                onPress={() => setModalVisible(true)}
-                style={({ pressed }) => [styles.awningIcon, pressed && { opacity: 0.75 }]}
-                accessibilityRole="button"
-                accessibilityLabel="Open awning controls"
-              >
-                <MaterialCommunityIcons name="awning-outline" size={44} color={Color.colorSandybrown} />
-              </Pressable>
-              <Text className="text-white text-base">
-                Awning Controls
-              </Text>
-            </View>
-          
-            <View className="items-center">
-              <Pressable onPress={() => setHeaterModalVisible(true)}>
-                <Image
-                  source={require("../assets/image-21.png")}
-                  contentFit="cover"
-                />
-              </Pressable>
-              <Text className="text-white text-base">
-                Fan Controls
-              </Text>
-            </View>
-          </View>
-          
-          {/* Master Light Toggle */}
-          <MasterLightControl 
-            isOn={masterLightOn}
-            onToggleOn={async () => {
-              await handleMasterLightToggle(true);
-            }}
-            onToggleOff={async () => {
-              await handleMasterLightToggle(false);
-            }}
-            isLoading={isLoading}
-          />
-          
-          <View style={styles.divider} />
-          
-          <ScrollView 
-            contentContainerStyle={{ paddingBottom: 80 }}
-            style={{ marginHorizontal: 20 }}
-          >
-            {lightGroups.main.map((lightId) => (
-              <SimpleHoldToDimLight
-                key={lightId}
-                name={lightDisplayNames[lightId] || lightId}
-                lightId={lightId}
-                value={localLightBrightness[lightId] || 0}
-                isOn={lightStates[lightId] || false}
-                supportsDimming={supportsDimming}
-              />
-            ))}
-          </ScrollView>
-        </>
-      );
-    } else if (selectedTab === TABS.BEDROOM) {
-      return (
-        <>
-        {/* ───── Water Controls (Bedroom Tab) ───── */}
-         <View style={styles.waterList}>
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Water</Text>
+          <View style={styles.tileRow}>
             <ToggleTile
-              size="row"
               label="Water Heater"
               icon="water-boiler"
               isOn={water.heaterOn}
               onPress={handleWaterHeaterToggle}
               disabled={isLoading}
               onText="Heating"
-              offText="Off"
             />
             <ToggleTile
-              size="row"
               label="Water Pump"
               icon="water-pump"
               isOn={water.pumpOn}
               onPress={handleWaterPumpToggle}
               disabled={isLoading}
-              onText="Running"
-              offText="Off"
             />
-         </View>
-
-         
-         <MasterLightControl 
-            isOn={masterLightOn}
-            onToggleOn={async () => {
-              await handleMasterLightToggle(true);
-            }}
-            onToggleOff={async () => {
-              await handleMasterLightToggle(false);
-            }}
-            isLoading={isLoading}
-          />
-          
-          <View style={styles.divider} />
-          
-          <ScrollView 
-            contentContainerStyle={{ paddingBottom: 80 }}
-            style={{ marginHorizontal: 20 }}
-          >
-            {lightGroups.bedroom.map((lightId) => (
-              <SimpleHoldToDimLight
-                key={lightId}
-                name={lightDisplayNames[lightId] || lightId}
-                lightId={lightId}
-                value={localLightBrightness[lightId] || 0}
-                isOn={lightStates[lightId] || false}
-                supportsDimming={supportsDimming}
-              />
-            ))}
-          </ScrollView>
-        </>
+          </View>
+        </View>
       );
-    } else if (selectedTab === TABS.BATHROOM) {
+    }
+    if (selectedTab === TABS.BATHROOM) {
       return (
-        <View className="">
-          <View style={styles.ventRow}>
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Ventilation</Text>
+          <View style={styles.tileRow}>
             <ToggleTile
               label="Bay Vent"
               icon="hvac"
@@ -665,669 +650,266 @@ const handleWaterHeaterToggle = async () => {
               disabled={isLoading}
             />
           </View>
-    
-          {/* Light Master Control */}
-          <MasterLightControl 
-            isOn={masterLightOn}
-            onToggleOn={async () => {
-              await handleMasterLightToggle(true);
-            }}
-            onToggleOff={async () => {
-              await handleMasterLightToggle(false);
-            }}
-            isLoading={isLoading}
-          />
-    
-          {/* Divider */}
-          <View style={styles.divider} />
-    
-          {/* Light Controls with SimpleHoldToDimLight */}
-          <ScrollView 
-            contentContainerStyle={{ paddingBottom: 80 }}
-            style={{ marginHorizontal: 20 }}
-          >
-            {lightGroups.bathroom.map((lightId) => (
-              <SimpleHoldToDimLight
-                key={lightId}
-                name={lightDisplayNames[lightId] || lightId}
-                lightId={lightId}
-                value={localLightBrightness[lightId] || 0}
-                isOn={lightStates[lightId] || false}
-                supportsDimming={supportsDimming}
-              />
-            ))}
-          </ScrollView>
         </View>
       );
     }
+    return null;
   };
 
-  var logo = <Image
-    className="h-20 w-20 mb-4 mx-14"
-    source={require("../assets/WifiTablet.png")}
-  />;
+  const roomGroupKey = ROOMS.find((room) => room.tab === selectedTab)?.group || 'main';
 
   return (
-    <View>
-      <ScrollView 
+    <View style={styles.screen}>
+      <ScrollView
         overScrollMode="never"
-        contentContainerStyle={{ paddingBottom:120 }} 
+        contentContainerStyle={styles.scrollContent}
         decelerationRate={0.9}
-        className="bg-brown"
+        showsVerticalScrollIndicator={false}
       >
-        <View style={styles.headerContainer}>
-          <Text style={styles.devices1}>Devices</Text>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>Devices</Text>
+          <Text style={styles.summary}>{getSummary()}</Text>
         </View>
-        
-        <View>
-          <View style={styles.tabContainer}>
-            {Object.values(TABS).map((tab) => (
+
+        {/* Quick actions */}
+        <View style={styles.quickRow}>
+          {QUICK_ACTIONS.map((action) => (
+            <Pressable
+              key={action.key}
+              onPress={action.onPress}
+              style={({ pressed }) => [styles.quickAction, pressed && styles.quickActionPressed]}
+              accessibilityRole="button"
+              accessibilityLabel={action.label}
+            >
+              <View style={styles.quickIcon}>
+                <MaterialCommunityIcons name={action.icon} size={26} color={Color.colorSandybrown} />
+              </View>
+              <Text style={styles.quickLabel} numberOfLines={1}>{action.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+
+        {/* Room selector */}
+        <View style={styles.roomTabs}>
+          {ROOMS.map((room) => {
+            const active = selectedTab === room.tab;
+            const onCount = countLightsOn(lightGroups[room.group]);
+            return (
               <TouchableOpacity
-                key={tab}
-                style={[styles.tabButton, selectedTab === tab && styles.activeTabButton]}
-                onPress={() => setSelectedTab(tab)}
+                key={room.tab}
+                style={[styles.roomTab, active && styles.roomTabActive]}
+                onPress={() => setSelectedTab(room.tab)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
               >
-                <Text style={[styles.tabText, selectedTab === tab && styles.activeTabText]}>{tab}</Text>
+                <MaterialCommunityIcons
+                  name={room.icon}
+                  size={18}
+                  color={active ? '#1B1B1B' : '#9E9696'}
+                />
+                <Text style={[styles.roomTabText, active && styles.roomTabTextActive]}>{room.tab}</Text>
+                {onCount > 0 && (
+                  <View style={[styles.roomBadge, active && styles.roomBadgeActive]}>
+                    <Text style={[styles.roomBadgeText, active && styles.roomBadgeTextActive]}>{onCount}</Text>
+                  </View>
+                )}
               </TouchableOpacity>
-            ))}
-          </View>
-
-          {renderTabContent()}
+            );
+          })}
         </View>
 
-        {/* Awning Control Modal */}
-        <AwningControlModal isVisible={isModalVisible} onClose={() => setModalVisible(false)} />
-
-        {/* Heater Control Modal */}
-        <HeaterControlModal isVisible={isHeaterModalVisible} onClose={() => setHeaterModalVisible(false)} />
-
-        {/* Add Device Modal */}
-        <AddDeviceModal isVisible={isAddDeviceModalVisible} onClose={() => setAddDeviceModalVisible(false)} />
-
-        {/* Schedule Lights Modal */}
-        <ScheduleLightsModal isVisible={isScheduleLightsModalVisible} onClose={() => setScheduleLightsModalVisible(false)} />
-
-        {/* Status message */}
-        {showStatus && (
-          <View style={styles.statusContainer}>
-            <Text style={styles.statusMessageText}>{statusMessage}</Text>
-          </View>
-        )}
+        {renderRoomDevices()}
+        {renderLightSection(roomGroupKey)}
       </ScrollView>
-      
-      <View style={styles.buttonContainer} className="bg-brown py-5">
-        <TouchableOpacity
-          style={styles.whiteButton}
-          onPress={() => setScheduleLightsModalVisible(true)}
-        >
-          <Text style={styles.whiteButtonText}>Schedule Lights</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.orangeButton}
-          onPress={() => setAddDeviceModalVisible(true)}
-        >
-          <Text style={styles.orangeButtonText}>Add Device</Text>
-        </TouchableOpacity>
-      </View>
+
+      {/* Status message */}
+      {showStatus && (
+        <View style={styles.toast} pointerEvents="none">
+          <MaterialCommunityIcons name="check-circle-outline" size={16} color={Color.colorSandybrown} />
+          <Text style={styles.toastText}>{statusMessage}</Text>
+        </View>
+      )}
+
+      <AwningControlModal isVisible={isModalVisible} onClose={() => setModalVisible(false)} />
+      <HeaterControlModal isVisible={isHeaterModalVisible} onClose={() => setHeaterModalVisible(false)} />
+      <AddDeviceModal isVisible={isAddDeviceModalVisible} onClose={() => setAddDeviceModalVisible(false)} />
+      <ScheduleLightsModal isVisible={isScheduleLightsModalVisible} onClose={() => setScheduleLightsModalVisible(false)} />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  masterLightContainer: {
-    marginTop: 10,
-    marginHorizontal: 20,
-    backgroundColor: '#1B1B1B',
-    borderRadius: 10,
-    padding: 15,
-  },
-  masterLightContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  masterLightLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  masterLightIcon: {
-    width: 30,
-    height: 30,
-    marginRight: 10,
-  },
-  masterLightText: {
-    color: 'white',
-    fontSize: 16,
-  },
-  masterLightRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    marginVertical: 20,
-    marginHorizontal: 20,
-  },
-  buttonContainer: {
-    position: 'absolute',
-    bottom: 0,
-    width: '100%',
-    paddingHorizontal: 20,
-  },
-  whiteButton: {
-    backgroundColor: 'white',
-    paddingVertical: 20,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 10,
-    width: '100%',
-  },
-  whiteButtonText: {
-    color: 'black',
-    fontSize: 16,
-    fontFamily: FontFamily.latoRegular,
-    fontWeight: '600',
-  },
-  orangeButton: {
-    backgroundColor: '#FFB267',
-    paddingVertical: 18,
-    borderRadius: 16,
-    alignItems: 'center',
-    width: '100%',
-    shadowColor: '#FFB267',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  orangeButtonText: {
-    color: '#1B1B1B',
-    fontSize: 16,
-    fontFamily: FontFamily.latoBold,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  modalContainer: {
+  screen: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: Color.colorGray_200,
   },
-  modalContent: {
-    width: "80%",
-    padding: 20,
-    backgroundColor: "white",
-    borderRadius: 10,
-    alignItems: "center",
-  },
-  modalText: {
-    fontSize: 18,
-    fontFamily: FontFamily.latoRegular,
-    fontWeight: "bold",
-    marginBottom: 10,
-  },
-  screenContainer: {
-    marginTop: 10,
-    flex: 1,
+  scrollContent: {
     paddingHorizontal: 20,
+    paddingTop: 40,
+    paddingBottom: 120,
   },
-  porchLightContainer: {
-    marginTop: 20,
-    padding: 20,
-    backgroundColor: '#1B1B1B',
-    borderRadius: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.85,
-    shadowRadius: 5.84,
-    elevation: 8,
+  header: {
+    marginBottom: 20,
   },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 15,
-  },
-  iconTextContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  text: {
-    color: '#FFF',
-    marginLeft: 10,
-    fontSize: 16,
-  },
-  ellipseIcon: {
-    left: 30,
-    width: 22,
-    height: 22,
-  },
-  headerContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    marginTop: 24,
-  },
-  devices1: {
+  title: {
     fontSize: 32,
     color: Color.colorWhitesmoke_100,
     fontFamily: FontFamily.latoBold,
-    fontWeight: "700",
-    textAlign: "left",
-    top: 20,
-    left: 8,
     letterSpacing: -0.5,
   },
-  wifisolar: {
-    fontSize: FontSize.textXSM_size,
-    color: Color.white0,
-    top: 30,
-    right: 20,
-  },
-  hiDrax: {
-    color: Color.white0,
-    lineHeight: 24,
-    fontSize: 16,
+  summary: {
+    color: '#9E9696',
+    fontSize: 15,
     fontFamily: FontFamily.latoRegular,
-    marginLeft: 28,
-    marginTop: 10,
-    top: 30,
-    opacity: 0.8,
+    marginTop: 4,
   },
-  tabContainer: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    paddingVertical: 12,
-    backgroundColor: 'rgba(30, 30, 30, 0.8)',
-    marginBottom: 20,
-    marginTop: 30,
-    borderRadius: 16,
-    marginHorizontal: 16,
+  quickRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 24,
+  },
+  quickAction: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: '#1B1B1B',
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(255, 178, 103, 0.18)',
+    paddingVertical: 14,
   },
-  tabButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 12,
+  quickActionPressed: {
+    backgroundColor: 'rgba(255, 178, 103, 0.12)',
+    borderColor: 'rgba(255, 178, 103, 0.6)',
   },
-  activeTabButton: {
-    backgroundColor: 'rgba(255, 178, 103, 0.15)',
-    borderBottomWidth: 0,
+  quickIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#2A2626',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
   },
-  tabText: {
-    color: 'rgba(255, 255, 255, 0.6)',
-    fontSize: 16,
+  quickLabel: {
+    color: Color.white0,
+    fontSize: 13,
     fontFamily: FontFamily.latoBold,
-    textAlign: "center",
-    letterSpacing: 0.3,
   },
-  activeTabText: {
+  roomTabs: {
+    flexDirection: 'row',
+    backgroundColor: '#1B1B1B',
+    borderRadius: 18,
+    padding: 4,
+    marginBottom: 20,
+  },
+  roomTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 11,
+    borderRadius: 14,
+  },
+  roomTabActive: {
+    backgroundColor: Color.colorSandybrown,
+  },
+  roomTabText: {
+    color: '#9E9696',
+    fontSize: 14,
+    fontFamily: FontFamily.latoBold,
+    marginLeft: 6,
+  },
+  roomTabTextActive: {
+    color: '#1B1B1B',
+  },
+  roomBadge: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 5,
+    marginLeft: 6,
+    backgroundColor: 'rgba(255, 178, 103, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roomBadgeActive: {
+    backgroundColor: '#1B1B1B',
+  },
+  roomBadgeText: {
+    color: Color.colorSandybrown,
+    fontSize: 11,
+    fontFamily: FontFamily.latoBold,
+  },
+  roomBadgeTextActive: {
     color: Color.colorSandybrown,
   },
-  tabContentText: {
-    fontSize: FontSize.size_mid,
-    color: Color.white0,
-    textAlign: "center",
-    marginTop: 20,
+  section: {
+    marginBottom: 24,
   },
-  FanControls: {
-    marginRight: 20,
-    marginBottom: 10,
-    color: Color.white0,
-    fontSize: FontSize.textXSM_size,
-    fontFamily: FontFamily.latoRegular,
-    fontWeight: "500",
-    textAlign: "center",
-  },
-  fanButtonContainer: {
-    width: 100,
-    height: 120,
-    justifyContent: "center",
-    alignItems: "center",
-    borderRadius: 10,
-    marginBottom: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-    
-  },
-  fanButtonOn: {
-    backgroundColor: "#4CAF50",
-    borderWidth: 2,
-    borderColor: "#388E3C",
-  },
-  fanButtonOff: {
-    backgroundColor: "#FF6B6B",
-    borderWidth: 2,
-    borderColor: "#D32F2F",
-  },
-  disabledButton: {
-    opacity: 0.7,
-  },
-  
-  fanControlsText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontFamily: FontFamily.latoRegular,
-    fontWeight: "600",
-    textAlign: "center",
-    marginTop: 10,
-  },
-
-   waterControlButton: {
-    width: 140,
-    height: 140,
-    borderRadius: 16,
+  sectionHeader: {
+    flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 15,
-    marginHorizontal: 10,
-    backgroundColor: '#8AB9F1',
-    borderWidth: 2,
-    borderColor: '#66B2FF',
-    shadowColor: '#66B2FF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 12,
-    elevation: 8,
+    alignItems: 'baseline',
+    marginBottom: 12,
   },
-  waterControlButtonActive: {
-    backgroundColor: '#005BB5',
-    borderColor: '#99CCFF',
+  sectionTitle: {
+    color: Color.white0,
+    fontSize: 20,
+    fontFamily: FontFamily.latoBold,
   },
-  waterControlButtonInactive: {
-    backgroundColor: '#002147',
-    borderColor: '#224E7A',
+  sectionTitleSpaced: {
+    marginBottom: 12,
   },
-  waterIconCircleActive: {
-    backgroundColor: '#66B2FF',
-  },
-  waterIconCircleInactive: {
-    backgroundColor: '#003153',
-    borderWidth: 1,
-    borderColor: '#224E7A',
-  },
-  title: {
-    fontSize: 18,
+  sectionHint: {
+    color: '#9E9696',
+    fontSize: 12,
     fontFamily: FontFamily.latoRegular,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
   },
-  statusContainer: {
+  tileRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  masterControl: {
+    marginTop: 0,
+    marginHorizontal: 0,
+  },
+  roomCount: {
+    color: '#9E9696',
+    fontSize: 13,
+    fontFamily: FontFamily.latoRegular,
+    marginTop: 16,
+    marginBottom: 10,
+  },
+  lightGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 12,
+  },
+  lightTile: {
+    width: '48%',
+  },
+  toast: {
     position: 'absolute',
-    bottom: 120,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 5,
+    bottom: 110,
     alignSelf: 'center',
-    marginHorizontal: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(27, 27, 27, 0.95)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 178, 103, 0.35)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
     zIndex: 1000,
   },
-  statusMessageText: {
-    color: 'white',
-    fontWeight: 'bold',
-    textAlign: 'center',
+  toastText: {
+    color: Color.white0,
+    fontSize: 14,
+    fontFamily: FontFamily.latoRegular,
+    marginLeft: 8,
   },
-
-  // Fan Controls - Modern Style
-awningIcon: {
-  width: 80,
-  height: 80,
-  borderRadius: 24,
-  backgroundColor: '#1B1B1B',
-  borderWidth: 1,
-  borderColor: 'rgba(255, 178, 103, 0.35)',
-  alignItems: 'center',
-  justifyContent: 'center',
-  marginBottom: 4,
-},
-waterList: {
-  gap: 10,
-  marginHorizontal: 20,
-  marginVertical: 20,
-},
-ventRow: {
-  flexDirection: 'row',
-  gap: 12,
-  marginHorizontal: 20,
-  marginVertical: 20,
-},
-fanControlsContainer: {
-  flexDirection: 'row',
-  justifyContent: 'center',
-  alignItems: 'center',
-  marginVertical: 20,
-  paddingHorizontal: 10,
-},
-modernFanButton: {
-  width: 140,
-  height: 140,
-  borderRadius: 16,
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  padding: 15,
-  marginHorizontal: 10,
-  shadowColor: '#66B2FF',
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.5,
-  shadowRadius: 12,
-  elevation: 8,
-  elevation: 6,
-  borderWidth: 1,
-},
-fanButtonActive: {
-  backgroundColor: '#27303F',
-  borderColor: '#4F7BFA',
-},
-fanButtonInactive: {
-  backgroundColor: '#1E242E',
-  borderColor: '#323845',
-},
-fanIconContainer: {
-  justifyContent: 'center',
-  alignItems: 'center',
-  marginBottom: 12,
-},
-fanIconCircle: {
-  width: 60,
-  height: 60,
-  borderRadius: 30,
-  justifyContent: 'center',
-  alignItems: 'center',
-},
-iconCircleActive: {
-  backgroundColor: '#4F7BFA',
-},
-iconCircleInactive: {
-  backgroundColor: '#2D333F',
-  borderWidth: 1,
-  borderColor: '#3D4452',
-},
-fanButtonLabel: {
-  color: '#FFFFFF',
-  fontSize: 16,
-  fontFamily: FontFamily.latoRegular,
-  fontWeight: '600',
-  marginBottom: 8,
-},
-statusIndicator: {
-  paddingHorizontal: 12,
-  paddingVertical: 4,
-  borderRadius: 12,
-  minWidth: 46,
-  alignItems: 'center',
-},
-statusActive: {
-  backgroundColor: '#4F7BFA',
-},
-statusInactive: {
-  backgroundColor: '#323845',
-},
-statusText: {
-  color: '#FFFFFF',
-  fontSize: 12,
-  fontFamily: FontFamily.latoRegular,
-  fontWeight: '700',
-},
-disabledButton: {
-  opacity: 0.6,
-},
-
-// Modern Water Button Styles
-modernWaterButton: {
-  width: 140,
-  height: 140,
-  borderRadius: 16,
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  padding: 15,
-  marginHorizontal: 10,
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.3,
-  shadowRadius: 8,
-  elevation: 6,
-  borderWidth: 2,
-},
-waterButtonActive: {
-  backgroundColor: '#1E88E5', // Bright blue when active
-  borderColor: '#42A5F5',
-  shadowColor: '#1E88E5',
-},
-waterButtonInactive: {
-  backgroundColor: '#263238', // Dark gray when inactive
-  borderColor: '#37474F',
-  shadowColor: '#000',
-},
-waterIconContainer: {
-  justifyContent: 'center',
-  alignItems: 'center',
-  marginBottom: 12,
-},
-waterIconCircle: {
-  width: 60,
-  height: 60,
-  borderRadius: 30,
-  justifyContent: 'center',
-  alignItems: 'center',
-},
-waterIconCircleActive: {
-  backgroundColor: '#42A5F5', // Light blue circle when active
-},
-waterIconCircleInactive: {
-  backgroundColor: '#37474F', // Dark gray circle when inactive
-  borderWidth: 1,
-  borderColor: '#455A64',
-},
-waterButtonLabel: {
-  fontSize: 14,
-  fontFamily: FontFamily.latoRegular,
-  fontWeight: '600',
-  marginBottom: 8,
-  textAlign: 'center',
-},
-waterStatusIndicator: {
-  paddingHorizontal: 12,
-  paddingVertical: 4,
-  borderRadius: 12,
-  minWidth: 46,
-  alignItems: 'center',
-},
-waterStatusActive: {
-  backgroundColor: '#42A5F5', // Blue status when active
-},
-waterStatusInactive: {
-  backgroundColor: '#37474F', // Gray status when inactive
-  borderWidth: 1,
-  borderColor: '#455A64',
-},
-waterStatusText: {
-  fontSize: 12,
-  fontFamily: FontFamily.latoRegular,
-  fontWeight: '700',
-},
-
-// Mobile Fan Buttons - Circular Design
-mobileFanContainer: {
-  flexDirection: 'row',
-  justifyContent: 'center',
-  alignItems: 'center',
-  paddingHorizontal: 20,
-  paddingVertical: 20,
-  gap: 16,
-},
-mobileFanButton: {
-  width: 120,
-  height: 120,
-  borderRadius: 60,
-  justifyContent: 'center',
-  alignItems: 'center',
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.3,
-  shadowRadius: 8,
-  elevation: 8,
-  borderWidth: 2,
-  position: 'relative',
-},
-mobileFanActive: {
-  backgroundColor: '#667eea',
-  borderColor: '#764ba2',
-},
-mobileFanInactive: {
-  backgroundColor: '#2c3e50',
-  borderColor: '#34495e',
-},
-mobileFanIconCircle: {
-  width: 64,
-  height: 64,
-  borderRadius: 32,
-  justifyContent: 'center',
-  alignItems: 'center',
-  marginBottom: 8,
-  borderWidth: 1.5,
-},
-mobileIconActive: {
-  backgroundColor: 'rgba(255, 255, 255, 0.25)',
-  borderColor: 'rgba(255, 255, 255, 0.4)',
-},
-mobileIconInactive: {
-  backgroundColor: 'rgba(255, 255, 255, 0.08)',
-  borderColor: 'rgba(255, 255, 255, 0.15)',
-},
-mobileFanLabel: {
-  fontSize: 13,
-  fontFamily: FontFamily.latoBold,
-  fontWeight: '700',
-  textAlign: 'center',
-  marginBottom: 4,
-  letterSpacing: 0.3,
-},
-mobileFanStatusDot: {
-  width: 8,
-  height: 8,
-  borderRadius: 4,
-  marginTop: 4,
-  shadowColor: '#4ade80',
-  shadowOpacity: 0.8,
-  shadowRadius: 4,
-  elevation: 3,
-},
-mobileLoadingIndicator: {
-  position: 'absolute',
-  top: 8,
-  right: 8,
-},
-
 });
-
 
 export default Devices;

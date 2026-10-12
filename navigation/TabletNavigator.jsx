@@ -57,12 +57,12 @@ const TabletNavigator = () => {
 
   // Define the same six routes as TabletTabs, with components + Ionicons icon names
   const ROUTES = [
-    { name: 'Home',            icon: 'home-outline',              component: MainScreen },
-    { name: 'System',          icon: 'stats-chart-outline',       component: LightScreenTablet }, // matches your TabletTabs mapping
-    { name: 'Air Conditioning',icon: 'snow-outline',              component: ClimateControl },
-    { name: 'Vents',           icon: 'cloud-outline',             component: Vents },
-    { name: 'Victron',         icon: 'battery-charging-outline',  component: System },            // matches your TabletTabs mapping
-    { name: 'Settings',        icon: 'settings-outline',          component: Settings },
+    { name: 'Home',             icon: 'home-outline',             activeIcon: 'home',             component: MainScreen },
+    { name: 'System',           label: 'Lights', icon: 'lightbulb-outline', activeIcon: 'lightbulb', component: LightScreenTablet },
+    { name: 'Air Conditioning', label: 'Climate', icon: 'snowflake',                                component: ClimateControl },
+    { name: 'Vents',            icon: 'weather-windy',                                             component: Vents },
+    { name: 'Victron',          icon: 'battery-charging-outline', activeIcon: 'battery-charging', component: System },
+    { name: 'Settings',         icon: 'cog-outline',              activeIcon: 'cog',              component: Settings },
   ];
 
   const MainAppContent = () => (
