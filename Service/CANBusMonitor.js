@@ -1,6 +1,7 @@
 // CANBusMonitor.js - Enhanced with state change detection and reduced message frequency
 import { RVControlService } from '../API/rvAPI';
 import { EventEmitter } from 'events';
+import { RVConnection, logRVError } from '../config/rvConnection';
 
 /**
  * Utility class to monitor and parse CAN bus data
@@ -105,7 +106,7 @@ export class CANBusMonitor {
           // Reset retry count on successful poll
           retryCount = 0;
         } catch (error) {
-          console.error('CANBusMonitor: Error fetching CAN bus data:', error);
+          logRVError('CANBusMonitor: Error fetching CAN bus data:', error);
           retryCount++;
           
           // If we've failed too many times, increase the polling interval
@@ -209,11 +210,11 @@ export class CANBusMonitor {
         const data = await response.json();
         return data.canData || [];
       } catch (fetchError) {
-        console.error('CANBusMonitor: Error fetching CAN data from API:', fetchError);
+        logRVError('CANBusMonitor: Error fetching CAN data from API:', fetchError);
         return [];
       }
     } catch (error) {
-      console.error('CANBusMonitor: Error in fetchLatestCANData:', error);
+      logRVError('CANBusMonitor: Error in fetchLatestCANData:', error);
       return [];
     }
   }
@@ -360,6 +361,7 @@ class CANBusListener extends EventEmitter {
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 5;
     this.reconnectDelay = 2000; // Start with 2 second delay
+    this.cancelWaitForServer = null;
     this.lastMessageTimestamp = Date.now();
     this.messageQueue = [];
     this.processingInterval = null;
@@ -406,6 +408,19 @@ class CANBusListener extends EventEmitter {
    * Set up WebSocket connection to the server
    */
   setupWebsocket() {
+    // Don't hammer an unreachable server - connect once it's available
+    if (!RVConnection.isOnline()) {
+      if (!this.cancelWaitForServer) {
+        this.cancelWaitForServer = RVConnection.whenOnline(() => {
+          this.cancelWaitForServer = null;
+          this.reconnectAttempts = 0;
+          this.reconnectDelay = 2000;
+          this.setupWebsocket();
+        });
+      }
+      return;
+    }
+
     try {
       // Derive WebSocket URL from the REST API base URL
       const wsUrl = RVControlService.baseURL.replace(/^http/, 'ws').replace('/api', '');
@@ -897,10 +912,11 @@ class CANBusListener extends EventEmitter {
    * Handle WebSocket error event
    * @param {Event} error - WebSocket error event
    */
-  handleError(error) {
-    console.error('CANBusListener: WebSocket error:', error);
+  handleError() {
+    // handleClose follows and handles reconnecting; the error event itself carries no useful detail
+    logRVError('CANBusListener: WebSocket error');
     this.connected = false;
-    this.emit('error', error);
+    RVConnection.reportFailure();
   }
   
   /**
@@ -947,6 +963,11 @@ class CANBusListener extends EventEmitter {
    * Stop the CAN bus listener
    */
   stop() {
+    if (this.cancelWaitForServer) {
+      this.cancelWaitForServer();
+      this.cancelWaitForServer = null;
+    }
+
     if (this.processingInterval) {
       clearInterval(this.processingInterval);
       this.processingInterval = null;

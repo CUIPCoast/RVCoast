@@ -1,31 +1,207 @@
 // System.jsx
-import React, { useState, useEffect, useRef, useMemo } from "react"; // ✨ CHANGED: added useRef, useMemo
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
-  SafeAreaView,
+  AccessibilityInfo,
+  ActivityIndicator,
+  Animated,
+  Easing,
   ScrollView,
   View,
   Text,
-  Image,
   StyleSheet,
-  TouchableOpacity,
+  Pressable,
   Dimensions,
 } from "react-native";
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SystemCharts from "../components/SystemCharts.jsx";
 
 import Map from "../components/Map";
 import useScreenSize from "../helper/useScreenSize.jsx";
-import VictronEnergyPanel from "../components/VictronEnergyPanel";
 import EnergyFlowDiagram from "../components/EnergyFlowDiagram";
 import { VictronEnergyService } from "../API/VictronEnergyService";
-import BatteryCard from "../components/BatteryCard.jsx";
-import { HorizontalLine, VerticalLine, ConnectionDot } from '../components/Lines.js';
-import PVChargerCard from "../components/PVChargerCard.jsx";
-import VictronPowerCard from "../components/VictronPowerCard.jsx";
-import { LinearGradient } from 'expo-linear-gradient';
-import GlowingCard from '../components/GlowingCards.jsx';
-import { FontFamily } from "../GlobalStyles";
+import TabletHeader from "../components/TabletHeader";
+import { Color, EnergyColor, FontFamily } from "../GlobalStyles";
 
 const { width: screenWidth } = Dimensions.get('window');
+
+// Tablet theme tokens (shared with SystemCharts)
+const MUTED = '#9E9696';
+const CARD = '#211D1D';
+const TRACK = '#2A2626';
+const PAGES = ['Overview', 'Analytics'];
+
+// Mobile battery colors, matching the home battery widget
+const ACCENT = Color.colorSandybrown;
+const CHARGING = '#4ADE80';
+const LOW = '#FF6B6B';
+// Mobile surfaces, matching the mobile Home screen
+const MOBILE_BG = '#211D1D';
+const MOBILE_CARD = '#1B1B1B';
+
+// Energy flow geometry: link lengths are fixed so the dots know how far to travel
+const LINK_GAP = 56;
+const FLOW_SPACER = 40;
+const FLOW_DOTS = 3;
+const FLOW_DOT = 6;
+
+const toNumber = (value) => {
+  const num = parseFloat(value);
+  return Number.isFinite(num) ? num : 0;
+};
+
+// 0-1 or 0-100 -> 0-100
+const normaliseSoc = (soc) => {
+  const num = parseFloat(soc);
+  if (!Number.isFinite(num)) return null;
+  const pct = num > 0 && num <= 1 ? num * 100 : num;
+  return Math.max(0, Math.min(100, pct));
+};
+
+// Split so the number and unit can be styled separately
+const splitWatts = (watts) => {
+  const abs = Math.abs(toNumber(watts));
+  if (abs >= 1000) return { value: (abs / 1000).toFixed(2), unit: 'kW' };
+  return { value: `${Math.round(abs)}`, unit: 'W' };
+};
+
+/**
+ * One device in the energy flow (shore, inverter, battery...).
+ * Lit border + tinted icon when power is moving through it.
+ */
+const EnergyNode = ({ title, icon, color, active, watts, value, unit, subtitle, badge, children }) => {
+  const reading = watts !== undefined ? splitWatts(watts) : { value, unit };
+  const tint = active ? color : MUTED;
+
+  return (
+    <View
+      style={[styles.node, active && { borderColor: `${color}66` }]}
+      accessible
+      accessibilityLabel={`${title}, ${reading.value ?? '--'} ${reading.unit ?? ''}${badge ? `, ${badge}` : ''}${subtitle ? `, ${subtitle}` : ''}`}
+    >
+      <View style={styles.nodeHeader}>
+        <View style={[styles.nodeIcon, { backgroundColor: `${color}22` }]}>
+          <MaterialCommunityIcons name={icon} size={20} color={color} />
+        </View>
+        <Text style={styles.nodeTitle} numberOfLines={1}>{title}</Text>
+        {badge ? (
+          <View style={[styles.badge, { backgroundColor: active ? `${color}26` : TRACK }]}>
+            <Text style={[styles.badgeText, { color: tint }]} numberOfLines={1}>{badge}</Text>
+          </View>
+        ) : null}
+      </View>
+
+      {children || (
+        <View>
+          <Text style={styles.nodeValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>
+            {reading.value ?? '--'}
+            {reading.unit ? <Text style={styles.nodeUnit}> {reading.unit}</Text> : null}
+          </Text>
+          {subtitle ? <Text style={styles.nodeSubtitle} numberOfLines={1}>{subtitle}</Text> : null}
+        </View>
+      )}
+    </View>
+  );
+};
+
+// Respect the system "reduce motion" setting
+const useReduceMotion = () => {
+  const [reduceMotion, setReduceMotion] = useState(false);
+  useEffect(() => {
+    AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion).catch(() => {});
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+    return () => sub?.remove?.();
+  }, []);
+  return reduceMotion;
+};
+
+// One trip along the link: slow at a trickle, faster under heavy load.
+// Rounded to 100 ms so small wattage changes between polls don't restart the loop.
+const flowDuration = (watts) => {
+  const load = Math.min(Math.abs(toNumber(watts)), 2000) / 2000;
+  return Math.round((2000 - load * 1300) / 100) * 100;
+};
+
+/**
+ * Connector between two nodes. When power flows it takes the source color, shows
+ * a chevron for direction (so the state never relies on color alone) and runs
+ * dots along the line, faster as wattage rises.
+ */
+const FlowLink = ({ color, direction, watts, vertical = false, animate = true }) => {
+  const active = !!direction;
+  const length = vertical ? FLOW_SPACER : LINK_GAP;
+  const duration = flowDuration(watts);
+  const progress = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!active || !animate) {
+      progress.stopAnimation();
+      return undefined;
+    }
+    progress.setValue(0);
+    const loop = Animated.loop(
+      Animated.timing(progress, {
+        toValue: 1,
+        duration,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [active, animate, duration, progress]);
+
+  // Up/left run the same track backwards
+  const reverse = direction === 'up' || direction === 'left';
+
+  return (
+    <View
+      style={vertical ? styles.linkVertical : styles.linkHorizontal}
+      importantForAccessibility="no-hide-descendants"
+      accessibilityElementsHidden
+    >
+      <View
+        style={[
+          vertical ? styles.linkLineVertical : styles.linkLineHorizontal,
+          { backgroundColor: active ? `${color}66` : TRACK },
+        ]}
+      />
+      {active && animate &&
+        Array.from({ length: FLOW_DOTS }).map((_, i) => {
+          // Evenly spaced dots sharing one clock
+          const t = Animated.modulo(Animated.add(progress, i / FLOW_DOTS), 1);
+          const offset = t.interpolate({
+            inputRange: [0, 1],
+            outputRange: reverse ? [length - FLOW_DOT, 0] : [0, length - FLOW_DOT],
+          });
+          const opacity = t.interpolate({
+            inputRange: [0, 0.15, 0.85, 1],
+            outputRange: [0, 1, 1, 0],
+          });
+          return (
+            <Animated.View
+              key={i}
+              style={[
+                styles.flowDot,
+                vertical ? styles.flowDotVertical : styles.flowDotHorizontal,
+                {
+                  backgroundColor: color,
+                  opacity,
+                  transform: [vertical ? { translateY: offset } : { translateX: offset }],
+                },
+              ]}
+            />
+          );
+        })}
+      {active && (
+        <View style={[styles.linkChevron, { borderColor: color }]}>
+          <MaterialCommunityIcons name={`chevron-${direction}`} size={16} color={color} />
+        </View>
+      )}
+    </View>
+  );
+};
 
 const System = () => {
   const isTablet = useScreenSize();
@@ -33,299 +209,394 @@ const System = () => {
   const [energyError, setEnergyError] = useState(null);
   const [batteryLevel, setBatteryLevel] = useState(12.5);
   const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const insets = useSafeAreaInsets();
 
-  // ✨ NEW: tab state & refs
+  // Pager state; width is measured so pages line up with the visible area
   const [tabIndex, setTabIndex] = useState(0);
+  const [pageWidth, setPageWidth] = useState(screenWidth);
   const pagerRef = useRef(null);
+  const reduceMotion = useReduceMotion();
 
-  // Helper function to format numbers to 2 decimal places
-  const formatNumber = (value, unit = '') => {
-    if (value === null || value === undefined || value === '--') return '--';
-    const num = parseFloat(value);
-    if (isNaN(num)) return '--';
-    return `${num.toFixed(2)}${unit}`;
-  };
-
-  // Helper function to format power values specifically
-  const formatPower = (value) => {
-    if (value === null || value === undefined) return '--';
-    const num = parseFloat(value);
-    if (isNaN(num)) return '--';
-    return `${num.toFixed(2)}W`;
-  };
+  const fetchVictronData = useCallback(async () => {
+    try {
+      setRefreshing(true);
+      const data = await VictronEnergyService.getAllData();
+      setVictronData(data);
+      setEnergyError(null);
+      setLastUpdated(new Date());
+      if (data && data.battery && data.battery.voltage) {
+        setBatteryLevel(data.battery.voltage);
+      }
+    } catch (error) {
+      console.error("Failed to load Victron data:", error);
+      setEnergyError("Could not connect to the Victron system");
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const fetchVictronData = async () => {
-      try {
-        setRefreshing(true);
-        const data = await VictronEnergyService.getAllData();
-        setVictronData(data);
-        setEnergyError(null);
-        if (data && data.battery && data.battery.voltage) {
-          setBatteryLevel(data.battery.voltage);
-        }
-      } catch (error) {
-        console.error("Failed to load Victron data:", error);
-        setEnergyError("Could not connect to the Victron system");
-      } finally {
-        setRefreshing(false);
-      }
-    };
-
     fetchVictronData();
     const intervalId = setInterval(fetchVictronData, 10000);
     return () => clearInterval(intervalId);
-  }, []);
-  
-  const handleEnergyError = (error) => setEnergyError(error);
+  }, [fetchVictronData]);
 
-  // Whole watts for the big card numbers
-  const wattsText = (value) => {
-    const num = parseFloat(value);
-    return Number.isFinite(num) ? `${Math.round(Math.abs(num))}` : '--';
-  };
-
-  const gridSubtitle = () => {
-    if (!victronData || !victronData.grid) return 'Waiting for data';
-    if (!victronData.grid.isConnected) return 'Shore disconnected';
-    const l1 = victronData.grid.l1Power;
-    const l2 = victronData.grid.l2Power;
-    if (l1 !== 0 || l2 !== 0) return `L1 ${wattsText(l1)} W · L2 ${wattsText(l2)} W`;
-    return 'Shore power connected';
-  };
-
-
-  const getBatteryVoltage = () => {
-    if (!victronData || !victronData.battery) return '0.00';
-    return parseFloat(victronData.battery.voltage || 0).toFixed(2);
-  };
-  const getBatteryCurrent = () => {
-    if (!victronData || !victronData.battery) return '0.00';
-    return parseFloat(victronData.battery.current || 0).toFixed(2);
-  };
   const getSystemStatus = () => {
-    if (!victronData) return { status: 'Unknown', color: '#666' };
-    if (victronData.apiStatus === 'simulation') return { status: 'Simulation', color: '#FF9800' };
-    if (victronData.grid && victronData.grid.isConnected) return { status: 'Shore Power', color: '#4CAF50' };
-    if (victronData.pvCharger && victronData.pvCharger.power > 0) return { status: 'Solar Charging', color: '#FFD700' };
-    return { status: 'Battery Power', color: '#2196F3' };
+    if (energyError) return { status: 'Victron offline', color: EnergyColor.low };
+    if (!victronData) return { status: 'Connecting', color: MUTED };
+    if (victronData.apiStatus === 'simulation') return { status: 'Simulated data', color: Color.colorSandybrown };
+    if (victronData.grid && victronData.grid.isConnected) return { status: 'Shore power', color: EnergyColor.shore };
+    if (victronData.pvCharger && victronData.pvCharger.power > 0) return { status: 'Solar charging', color: EnergyColor.solar };
+    return { status: 'Battery power', color: EnergyColor.battery };
   };
-
-  // ✨ NEW: tab helpers
-  const tabs = [
-    { key: 'overview', title: 'Overview' },
-    { key: 'charts', title: 'Charts (Placeholder)' },
-    { key: 'settings', title: 'Settings (Placeholder)' },
-  ];
 
   const onTabPress = (index) => {
     setTabIndex(index);
     if (pagerRef.current) {
-      pagerRef.current.scrollTo({ x: screenWidth * index, y: 0, animated: true });
+      pagerRef.current.scrollTo({ x: pageWidth * index, y: 0, animated: true });
     }
   };
 
   const onHorizontalScroll = (e) => {
     const x = e.nativeEvent.contentOffset.x;
-    const newIndex = Math.round(x / screenWidth);
+    const newIndex = Math.round(x / pageWidth);
     if (newIndex !== tabIndex) setTabIndex(newIndex);
   };
 
-  // ✨ Static image sources - defined once, never changes
-  const victronImageSource = require('../assets/victron.png');
-  const smartSolarImageSource = require('../assets/smartsolar.png');
+  // —————————————————— OVERVIEW (tablet) ——————————————————
+  const renderOverview = () => {
+    const grid = victronData?.grid || {};
+    const battery = victronData?.battery || {};
+    const gridConnected = !!grid.isConnected;
+    const gridW = gridConnected ? toNumber(grid.power) : 0;
+    const solarW = toNumber(victronData?.pvCharger?.power);
+    const acW = toNumber(victronData?.acLoads?.power);
+    const dcW = toNumber(victronData?.dcSystem?.power);
+    const battW = toNumber(battery.power); // + charging, - discharging
+    const isCharging = battW > 1;
+    const isDischarging = battW < -1;
+    const soc = normaliseSoc(battery.soc);
+    const socColor = soc !== null && soc <= 20 ? EnergyColor.low : EnergyColor.battery;
+    const pvState = victronData?.pvCharger?.state;
+    const status = getSystemStatus();
 
-  // ✨ NEW: Overview page extracted so it's tidy inside the pager
-  const OverviewPage = () => (
-    <SafeAreaView style={[styles.tabletContainer, { width: screenWidth }]}>
+    // Inverter <-> battery: charging from shore flows down, inverting for AC loads flows up
+    const inverterBatteryDirection =
+      isCharging && gridW > 1 ? 'down' : isDischarging && acW > 1 ? 'up' : null;
 
-      {/* ————————————— DIAGRAM CONTAINER ————————————— */}
-      <View style={styles.diagramContainer}>
-        {/* ————————————— CONNECTION LINES (drawn first so cards sit on top) ————————————— */}
-        <ConnectionDot top={87} left={330} />
-        <ConnectionDot top={88} left={490} />
-        <HorizontalLine top={86} left={245} width={250} />
-        <ConnectionDot top={88} left={670} />
-        <ConnectionDot top={88} left={832} />
-        <HorizontalLine top={86} left={560} width={450} />
-        <ConnectionDot top={210} left={576} />
-        <VerticalLine top={215} left={575} height={220} />
-        <ConnectionDot top={432} left={576} />
-        <HorizontalLine top={431} left={389} width={180} />
-        <ConnectionDot top={432} left={384} />
-        <ConnectionDot top={432} left={310} />
-        <HorizontalLine top={431} left={314} width={65} />
-        <VerticalLine top={438} left={383} height={120} />
-        <ConnectionDot top={557} left={384} />
-        <HorizontalLine top={556} left={384} width={75} />
-        <ConnectionDot top={557} left={464} />
-        <HorizontalLine top={431} left={578} width={165} />
-        <ConnectionDot top={433} left={744} />
-        <VerticalLine top={438} left={743} height={70} />
-        <ConnectionDot top={513} left={744} />
-        <HorizontalLine top={512} left={738} width={75} />
-        <ConnectionDot top={513} left={815} />
+    const gridDetail = () => {
+      if (!victronData) return 'Waiting for data';
+      if (!gridConnected) return 'Plug in to use shore power';
+      const l1 = toNumber(grid.l1Power);
+      const l2 = toNumber(grid.l2Power);
+      if (l1 !== 0 || l2 !== 0) return `L1 ${Math.round(l1)} W · L2 ${Math.round(l2)} W`;
+      return 'Shore power connected';
+    };
 
-        {/* ————————————— TOP ROW OF CARDS ————————————— */}
-        <View style={styles.panelRow}>
-          <GlowingCard glowColor="#D32F2F" style={styles.cardWrapper}>
-            <VictronPowerCard
-              style={styles.redCard}
-              title="Grid Power"
-              icon="transmission-tower"
-              badge={victronData?.grid?.isConnected ? 'Connected' : 'Unplugged'}
-              value={victronData?.grid?.isConnected ? wattsText(victronData.grid.power) : '--'}
-              unit={victronData?.grid?.isConnected ? 'W' : null}
-              subtitle={gridSubtitle()}
-              colors={['#F0524F', '#8E1B1B']}
-              glow="#FF6B6B"
-            />
-          </GlowingCard>
+    return (
+      <View style={[styles.page, { width: pageWidth }]}>
+        <TabletHeader title="Energy Overview" style={styles.header} />
 
-          <View collapsable={false} key="victron-container">
-            <GlowingCard glowColor="#6CB4EE" style={styles.cardWrapper}>
-              <LinearGradient
-                colors={['#64B5F6', '#0D47A1']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.blueCard}
-              >
-                <Image
-                  source={victronImageSource}
-                  style={styles.victronImage}
-                  resizeMode="contain"
-                  fadeDuration={0}
-                  defaultSource={victronImageSource}
-                />
-                {/* Caption sits below the photo so it never covers the device */}
-                <View style={styles.victronCaption}>
-                  <Text style={styles.victronTitle} numberOfLines={1}>Inverter / Charger</Text>
-                  <Text style={styles.victronState} numberOfLines={1}>
-                    {victronData?.systemOverview?.state || 'MultiPlus'}
-                  </Text>
-                </View>
-              </LinearGradient>
-            </GlowingCard>
+        <View style={styles.subtitleRow}>
+          <Text style={styles.subtitle}>Live readings from your Victron system, every 10 seconds</Text>
+          <View style={[styles.statusPill, { backgroundColor: `${status.color}1F`, borderColor: `${status.color}55` }]}>
+            <View style={[styles.statusDot, { backgroundColor: status.color }]} />
+            <Text style={[styles.statusPillText, { color: status.color }]}>{status.status}</Text>
+            {refreshing && <Text style={styles.statusUpdating}> · Updating</Text>}
           </View>
+        </View>
 
-          <GlowingCard glowColor="#228B22" style={styles.cardWrapper}>
-            <VictronPowerCard
-              style={styles.greenCard}
+        {/* Victron layout: AC bus on top, DC bus below, inverter and battery linked in the middle */}
+        <View style={styles.flow}>
+          <View style={styles.flowRow}>
+            <EnergyNode
+              title="Shore Power"
+              icon="transmission-tower"
+              color={EnergyColor.shore}
+              active={gridW > 1}
+              watts={gridConnected ? gridW : undefined}
+              value="--"
+              badge={victronData ? (gridConnected ? 'Connected' : 'Unplugged') : null}
+              subtitle={gridDetail()}
+            />
+            <FlowLink color={EnergyColor.shore} direction={gridW > 1 ? 'right' : null} watts={gridW} animate={!reduceMotion} />
+            <EnergyNode
+              title="Inverter / Charger"
+              icon="sine-wave"
+              color={EnergyColor.inverter}
+              active={!!victronData}
+              value={victronData?.systemOverview?.state || '--'}
+              subtitle="MultiPlus"
+            />
+            <FlowLink color={EnergyColor.acLoads} direction={acW > 1 ? 'right' : null} watts={acW} animate={!reduceMotion} />
+            <EnergyNode
               title="AC Loads"
               icon="home-lightning-bolt-outline"
-              value={victronData ? wattsText(victronData.acLoads.power) : '--'}
-              unit={victronData ? 'W' : null}
-              subtitle="Outlets and appliances, L1 + L2"
-              colors={['#43C46B', '#1B5E20']}
-              glow="#A0FF9F"
+              color={EnergyColor.acLoads}
+              active={acW > 1}
+              watts={victronData ? acW : undefined}
+              value="--"
+              subtitle="Outlets and appliances"
             />
-          </GlowingCard>
-        </View>
+          </View>
 
-        {/* ————————————— BOTTOM ROW OF CARDS ————————————— */}
-        <View style={styles.panelRow}>
-          <BatteryCard
-            soc={victronData?.battery ? victronData.battery.soc : null}
-            power={victronData?.battery?.power}
-            voltage={victronData?.battery?.voltage}
-          />
-          
-          <GlowingCard glowColor="#228B22" style={styles.cardWrapper}>
-            <VictronPowerCard
-              compact
-              style={styles.darkerGreenCard}
-              title="DC Power"
+          {/* Vertical link sits under the center column */}
+          <View style={styles.flowSpacerRow}>
+            <View style={styles.flowCell} />
+            <View style={styles.linkGap} />
+            <View style={[styles.flowCell, styles.flowCellCenter]}>
+              <FlowLink vertical color={EnergyColor.battery} direction={inverterBatteryDirection} watts={battW} animate={!reduceMotion} />
+            </View>
+            <View style={styles.linkGap} />
+            <View style={styles.flowCell} />
+          </View>
+
+          <View style={styles.flowRow}>
+            <EnergyNode
+              title="Solar"
+              icon="solar-power"
+              color={EnergyColor.solar}
+              active={solarW > 1}
+              watts={victronData ? solarW : undefined}
+              value="--"
+              badge={victronData ? (solarW > 1 ? 'Producing' : 'Idle') : null}
+              subtitle={pvState ? `Charger: ${pvState.charAt(0).toUpperCase()}${pvState.slice(1)}` : 'SmartSolar charger'}
+            />
+            <FlowLink color={EnergyColor.solar} direction={solarW > 1 ? 'right' : null} watts={solarW} animate={!reduceMotion} />
+            <EnergyNode
+              title="Battery"
+              icon={isCharging ? 'battery-charging-high' : 'battery-high'}
+              color={socColor}
+              active={soc !== null}
+              badge={soc === null ? null : isCharging ? 'Charging' : isDischarging ? 'Discharging' : 'Idle'}
+            >
+              <View>
+                <Text style={styles.nodeValue}>
+                  {soc === null ? '--' : Math.round(soc)}
+                  <Text style={styles.nodeUnit}> %</Text>
+                </Text>
+                <View style={styles.socTrack}>
+                  <View style={[styles.socFill, { width: `${soc ?? 0}%`, backgroundColor: socColor }]} />
+                </View>
+                <View style={styles.socFooter}>
+                  <Text style={styles.nodeSubtitle}>
+                    {isCharging ? '+' : isDischarging ? '−' : ''}
+                    {splitWatts(battW).value} {splitWatts(battW).unit}
+                  </Text>
+                  <Text style={styles.nodeSubtitle}>
+                    {battery.voltage !== undefined ? `${toNumber(battery.voltage).toFixed(1)} V` : '-- V'}
+                  </Text>
+                </View>
+              </View>
+            </EnergyNode>
+            <FlowLink color={EnergyColor.dcLoads} direction={dcW > 1 ? 'right' : null} watts={dcW} animate={!reduceMotion} />
+            <EnergyNode
+              title="DC Loads"
               icon="current-dc"
-              value={victronData ? wattsText(victronData.dcSystem.power) : '--'}
-              unit={victronData ? 'W' : null}
+              color={EnergyColor.dcLoads}
+              active={dcW > 1}
+              watts={victronData ? dcW : undefined}
+              value="--"
               subtitle="Lights, pumps and fans"
-              colors={['#2E9E55', '#0B3D1A']}
-              glow="#66FF99"
             />
-          </GlowingCard>
-
-          <View collapsable={false} key="pvcharger-container">
-            <GlowingCard glowColor="#FFBF00" style={styles.cardWrapper}>
-              <PVChargerCard
-                power={victronData ? victronData.pvCharger.power : null}
-                state={victronData?.pvCharger?.state}
-                imageSource={smartSolarImageSource}
-                cardOffset={{ top: 110, left: -100 }}
-                imageOffset={{ top: 160, left: -174 }}
-              />
-            </GlowingCard>
           </View>
         </View>
-
       </View>
-    </SafeAreaView>
-  );
+    );
+  };
 
-
-
-  // —————————————————— TABLET VIEW WITH SWIPEABLE TABS ——————————————————
- if (isTablet) {
-  return (
-    <View style={styles.tabletRoot}>
-      {/* Pager wrapper so we can absolutely-position dots on top */}
-      <View style={styles.pagerWrapper}>
-        <ScrollView
-          ref={pagerRef}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          onMomentumScrollEnd={onHorizontalScroll}
-          scrollEventThrottle={16}
+  // —————————————————— TABLET VIEW WITH SWIPEABLE PAGES ——————————————————
+  if (isTablet) {
+    return (
+      <View style={styles.tabletRoot}>
+        <View
+          style={styles.pagerWrapper}
+          onLayout={(e) => setPageWidth(e.nativeEvent.layout.width)}
         >
-          <OverviewPage />
-          <SystemCharts />
-         
-          
-        </ScrollView>
+          <ScrollView
+            ref={pagerRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={onHorizontalScroll}
+            scrollEventThrottle={16}
+          >
+            {renderOverview()}
+            <SystemCharts width={pageWidth} />
+          </ScrollView>
 
-        {/* ——— Bottom dots ——— */}
-        <View style={styles.pagerDotsContainer}>
-          {[0, 1].map((i) => (
-            <TouchableOpacity
-              key={i}
-              onPress={() => onTabPress(i)}
-              style={[styles.pagerDot, tabIndex === i && styles.pagerDotActive]}
-              accessibilityRole="button"
-              accessibilityLabel={`Go to page ${i + 1}`}
-            />
-          ))}
+          {/* Page indicator */}
+          <View style={styles.pagerDotsContainer} pointerEvents="box-none">
+            {PAGES.map((label, i) => (
+              <Pressable
+                key={label}
+                onPress={() => onTabPress(i)}
+                style={styles.pagerDotHit}
+                accessibilityRole="button"
+                accessibilityLabel={`Show ${label}`}
+                accessibilityState={{ selected: tabIndex === i }}
+              >
+                <View style={[styles.pagerDot, tabIndex === i && styles.pagerDotActive]} />
+              </Pressable>
+            ))}
+          </View>
         </View>
       </View>
-    </View>
-  );
-}
+    );
+  }
 
   // —————————————————— MOBILE VIEW ——————————————————
+  const status = getSystemStatus();
+  const battery = victronData?.battery || {};
+  const overview = victronData?.systemOverview || {};
+  const soc = normaliseSoc(battery.soc);
+  const battW = toNumber(battery.power); // + charging, - discharging
+  const isCharging = battW > 1;
+  const isDischarging = battW < -1;
+  const isLow = soc !== null && soc <= 20;
+  const battColor = isLow ? LOW : isCharging ? CHARGING : ACCENT;
+  const battState = soc === null ? 'Waiting' : isCharging ? 'Charging' : isDischarging ? 'Discharging' : 'Idle';
+  const battPower = splitWatts(battW);
+  const battCurrent = toNumber(battery.current);
+
+  const batteryStats = [
+    { label: 'Voltage', value: battery.voltage !== undefined ? `${toNumber(battery.voltage).toFixed(1)} V` : '--' },
+    { label: 'Current', value: battery.current !== undefined ? `${battCurrent > 0 ? '+' : ''}${battCurrent.toFixed(1)} A` : '--' },
+    { label: 'Power', value: victronData ? `${isCharging ? '+' : isDischarging ? '−' : ''}${battPower.value} ${battPower.unit}` : '--' },
+  ];
+
+  const inverterRows = [
+    { icon: 'sine-wave', label: 'State', value: overview.state },
+    { icon: 'swap-horizontal', label: 'AC mode', value: overview.mode },
+    { icon: 'current-ac', label: 'AC input limit', value: overview.acLimit !== undefined ? `${overview.acLimit} A` : null },
+    { icon: 'chip', label: 'Device', value: overview.name },
+  ];
+
+  const updatedText = lastUpdated
+    ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+    : 'Waiting for first reading';
+
   return (
-    <SafeAreaView style={styles.mobileContainer}>
-      <ScrollView 
+    <View style={[styles.mobileRoot, { paddingTop: insets.top + 12 }]}>
+      <ScrollView
         overScrollMode="never"
         contentContainerStyle={styles.mobileContent}
         showsVerticalScrollIndicator={false}
-        decelerationRate={0.8}
       >
+        {/* Header: title, live status, refresh */}
         <View style={styles.mobileHeader}>
           <View style={styles.headerLeft}>
-            <Text style={styles.mobileHeaderTitle}>RV Energy System</Text>
-            <View style={styles.statusRow}>
-              <View style={[styles.statusDot, { backgroundColor: getSystemStatus().color }]} />
-              <Text style={styles.statusText}>{getSystemStatus().status}</Text>
-              {refreshing && <Text style={styles.refreshText}>Updating...</Text>}
+            <Text style={styles.mobileTitle}>Energy</Text>
+            <View style={styles.mobileStatusRow}>
+              <View style={[styles.mobileStatusPill, { backgroundColor: `${status.color}1F` }]}>
+                <View style={[styles.statusDot, { backgroundColor: status.color }]} />
+                <Text style={[styles.mobileStatusText, { color: status.color }]}>{status.status}</Text>
+              </View>
+              <Text style={styles.mobileUpdated} numberOfLines={1}>{updatedText}</Text>
             </View>
           </View>
-         
+          <Pressable
+            onPress={fetchVictronData}
+            disabled={refreshing}
+            style={({ pressed }) => [styles.refreshButton, pressed && styles.refreshButtonPressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Refresh energy readings"
+            accessibilityState={{ busy: refreshing }}
+          >
+            {refreshing
+              ? <ActivityIndicator size="small" color={ACCENT} />
+              : <Ionicons name="refresh" size={20} color={ACCENT} />}
+          </Pressable>
         </View>
 
-        <VictronEnergyPanel 
-          onError={handleEnergyError} 
-          refreshInterval={10000} 
-        />
+        {/* Offline banner */}
+        {energyError && (
+          <View style={styles.offlineBanner}>
+            <View style={styles.offlineIcon}>
+              <Ionicons name="cloud-offline-outline" size={18} color={LOW} />
+            </View>
+            <View style={styles.offlineBody}>
+              <Text style={styles.offlineTitle}>Victron system offline</Text>
+              <Text style={styles.offlineText}>
+                {victronData ? 'Showing the last readings we received.' : 'Waiting for the Cerbo GX to respond.'}
+              </Text>
+            </View>
+            <Pressable
+              onPress={fetchVictronData}
+              disabled={refreshing}
+              style={({ pressed }) => [styles.retryPill, pressed && { opacity: 0.7 }]}
+              accessibilityRole="button"
+              accessibilityLabel="Retry connecting to the Victron system"
+            >
+              <Text style={styles.retryPillText}>Retry</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {/* Battery */}
+        <View
+          style={[styles.batteryCard, { borderColor: `${battColor}40` }]}
+          accessible
+          accessibilityLabel={soc === null
+            ? 'Battery, waiting for data'
+            : `Battery ${Math.round(soc)} percent, ${battState}${battery.timeToGo ? `, ${battery.timeToGo} remaining` : ''}`}
+        >
+          <View style={styles.batteryTop}>
+            <View style={[styles.batteryIcon, { backgroundColor: `${battColor}24` }]}>
+              <MaterialCommunityIcons name={isCharging ? 'battery-charging-high' : 'battery-high'} size={20} color={battColor} />
+            </View>
+            <Text style={styles.batteryLabel}>House battery</Text>
+            <View style={[styles.batteryBadge, { backgroundColor: soc === null ? TRACK : `${battColor}24` }]}>
+              <Text style={[styles.batteryBadgeText, { color: soc === null ? MUTED : battColor }]}>{battState}</Text>
+            </View>
+          </View>
+
+          <View style={styles.batteryReadout}>
+            <Text style={styles.batteryPercent}>
+              {soc === null ? '--' : Math.round(soc)}
+              <Text style={styles.batteryPercentUnit}>%</Text>
+            </Text>
+            {battery.timeToGo ? (
+              <Text style={styles.batteryTimeToGo}>
+                {isCharging ? 'Full in' : 'Lasts'} <Text style={styles.batteryTimeToGoValue}>{battery.timeToGo}</Text>
+              </Text>
+            ) : null}
+          </View>
+
+          <View style={styles.batteryTrack}>
+            <View style={[styles.batteryFill, { width: `${soc ?? 0}%`, backgroundColor: battColor }]} />
+          </View>
+
+          <View style={styles.batteryStats}>
+            {batteryStats.map((stat, i) => (
+              <View key={stat.label} style={[styles.batteryStat, i > 0 && styles.batteryStatDivider]}>
+                <Text style={styles.batteryStatLabel}>{stat.label}</Text>
+                <Text style={styles.batteryStatValue}>{stat.value}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
         <EnergyFlowDiagram energyData={victronData} />
+
+        {/* Inverter / charger details */}
+        <Text style={styles.sectionLabel}>Inverter / Charger</Text>
+        <View style={styles.listCard}>
+          {inverterRows.map((row, i) => (
+            <View key={row.label} style={styles.listRow}>
+              <View style={styles.listIcon}>
+                <MaterialCommunityIcons name={row.icon} size={18} color={ACCENT} />
+              </View>
+              <View style={[styles.listInner, i < inverterRows.length - 1 && styles.listDivider]}>
+                <Text style={styles.listLabel}>{row.label}</Text>
+                <Text style={[styles.listValue, !row.value && { color: MUTED }]} numberOfLines={1}>
+                  {row.value || '--'}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
 
         <View style={styles.mapSection}>
           <Text style={styles.mapTitle}>Live Location</Text>
@@ -333,268 +604,497 @@ const System = () => {
             <Map />
           </View>
         </View>
-
-        {energyError && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{energyError}</Text>
-            <TouchableOpacity 
-              style={styles.retryButton}
-              onPress={() => window.location.reload()}
-            >
-              <Text style={styles.retryText}>Retry Connection</Text>
-            </TouchableOpacity>
-          </View>
-        )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  // ✨ NEW: tablet root & tab bar styles
+  // ——— Tablet ———
   tabletRoot: {
     flex: 1,
     backgroundColor: "#000",
   },
-  tabBar: {
-    flexDirection: 'row',
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    paddingBottom: 4,
-    backgroundColor: '#000',
-    borderBottomWidth: 1,
-    borderBottomColor: '#222',
-  },
-  tabBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginRight: 8,
-    borderRadius: 10,
-  },
-  tabBtnActive: {
-    backgroundColor: '#121212',
-  },
-  tabLabel: {
-    color: '#AAA',
-    fontSize: 16,
-    fontFamily: FontFamily.latoRegular,
-    fontWeight: '600',
-  },
-  tabLabelActive: {
-    color: '#FFF',
-  },
-  activeUnderline: {
-    marginTop: 6,
-    height: 2,
-    backgroundColor: '#FF8C00',
-    borderRadius: 2,
-  },
-
-  // Tablet styles (existing)
-  tabletContainer: {
+  pagerWrapper: {
     flex: 1,
-    backgroundColor: "#000",
-    padding: 16,
-    top:20,
-    right:10,
-  },
-  diagramContainer: {
-    bottom: 15,
-    marginTop: 60, // space where the header used to be; cards and lines move together
     position: 'relative',
   },
-  panelRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 16,
-    zIndex: 1,
-  },
-
-
-  // Top row cards
-  // Card size/position must stay put: the connection lines below are drawn at fixed coordinates
-  redCard: {
-    marginHorizontal: 8,
-    width: 310,
-    height: 240,
-    position: "relative",
-  },
-  blueCard: {
-    borderRadius: 20,
-    marginHorizontal: 12,
-    width: 180,
-    height: 200,
-    right:12,
-    padding: 3,
-    backgroundColor: "#0D47A1",
-    shadowColor: "#6CB4EE",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 16,
-    elevation: 10,
-  },
-  victronImage: {
+  page: {
     flex: 1,
-    width: '100%',
-    backgroundColor: '#2459B5', // matches the photo's own background so the letterbox blends in
-    borderTopLeftRadius: 17,
-    borderTopRightRadius: 17,
+    backgroundColor: '#000',
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 48, // room for the page indicator
   },
-  victronCaption: {
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    backgroundColor: 'rgba(5, 25, 60, 0.85)',
-    borderBottomLeftRadius: 17,
-    borderBottomRightRadius: 17,
+  header: {
+    marginHorizontal: -24,
   },
-  victronTitle: {
-    color: "#FFFFFF",
-    fontSize: 15,
+  subtitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  subtitle: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: FontFamily.latoRegular,
+    color: MUTED,
+    marginRight: 12,
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  statusPillText: {
+    fontSize: 13,
     fontFamily: FontFamily.latoBold,
   },
-  victronState: {
-    color: "rgba(255, 255, 255, 0.8)",
-    fontSize: 12,
+  statusUpdating: {
+    color: MUTED,
+    fontSize: 13,
     fontFamily: FontFamily.latoRegular,
-    marginTop: 1,
-  },
-  greenCard: {
-    marginHorizontal: 8,
-    width: 310,
-    height: 240,
-    position: "relative",
-    right:20,
-  },
-  darkerGreenCard: {
-    marginTop: 155,
-    marginHorizontal: 8,
-    right: 27,
-    top: 60,
-    width: 220,
-    height: 130,
-  },
-  cardTitle: {
-    color: "#fff",
-    fontSize: 18,
-    fontFamily: FontFamily.latoRegular,
-    fontWeight: "600",
-    marginBottom: 8,
-  },
-  cardValue: {
-    color: "#fff",
-    fontSize: 24,
-    fontFamily: FontFamily.latoRegular,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-  cardSubtitle: {
-    color: "#fff",
-    fontSize: 12,
-    marginTop: 4,
-  },
-  victronLogo: {
-    width: 80,
-    height: 15,
-    marginTop: 8,
-    tintColor: '#fff',
   },
 
-  // ——— Mobile styles - Modernized ———
-  mobileContainer: {
+  // Energy flow grid: three equal columns with fixed-width links between them
+  flow: {
     flex: 1,
-    backgroundColor: "#211D1D",
+  },
+  flowRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  flowSpacerRow: {
+    height: FLOW_SPACER,
+    flexDirection: 'row',
+  },
+  flowCell: {
+    flex: 1,
+  },
+  flowCellCenter: {
+    alignItems: 'center',
+  },
+  linkGap: {
+    width: LINK_GAP,
+  },
+
+  node: {
+    flex: 1,
+    minHeight: 160,
+    backgroundColor: CARD,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    padding: 18,
+    justifyContent: 'space-between',
+  },
+  nodeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  nodeIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  nodeTitle: {
+    flex: 1,
+    color: Color.white0,
+    fontSize: 17,
+    fontFamily: FontFamily.latoBold,
+  },
+  badge: {
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginLeft: 8,
+  },
+  badgeText: {
+    fontSize: 12,
+    fontFamily: FontFamily.latoBold,
+  },
+  nodeValue: {
+    color: Color.white0,
+    fontSize: 40,
+    fontFamily: FontFamily.latoBold,
+  },
+  nodeUnit: {
+    color: MUTED,
+    fontSize: 18,
+    fontFamily: FontFamily.latoRegular,
+  },
+  nodeSubtitle: {
+    color: MUTED,
+    fontSize: 13,
+    fontFamily: FontFamily.latoRegular,
+    marginTop: 2,
+  },
+  socTrack: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: TRACK,
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  socFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  socFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+
+  linkHorizontal: {
+    width: LINK_GAP,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  linkVertical: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  linkLineHorizontal: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 2,
+    borderRadius: 1,
+  },
+  linkLineVertical: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 2,
+    borderRadius: 1,
+  },
+  flowDot: {
+    position: 'absolute',
+    width: FLOW_DOT,
+    height: FLOW_DOT,
+    borderRadius: FLOW_DOT / 2,
+  },
+  flowDotHorizontal: {
+    left: 0,
+    top: '50%',
+    marginTop: -FLOW_DOT / 2,
+  },
+  flowDotVertical: {
+    top: 0,
+    left: '50%',
+    marginLeft: -FLOW_DOT / 2,
+  },
+  linkChevron: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    backgroundColor: '#000',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Page indicator: small dots, 44pt touch targets
+  pagerDotsContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pagerDotHit: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pagerDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#3A3434',
+  },
+  pagerDotActive: {
+    width: 24,
+    backgroundColor: Color.colorSandybrown,
+  },
+
+  // ——— Mobile (matches the mobile Home screen: brown page, dark cards, sandy accent) ———
+  mobileRoot: {
+    flex: 1,
+    backgroundColor: MOBILE_BG,
   },
   mobileContent: {
-    paddingHorizontal: 20,
-    paddingVertical: 24,
-    paddingBottom: 48,
+    paddingHorizontal: 16,
+    paddingBottom: 32,
   },
   mobileHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 28,
     paddingHorizontal: 4,
+    marginBottom: 16,
   },
   headerLeft: { flex: 1 },
-  mobileHeaderTitle: {
+  mobileTitle: {
     color: '#FFFFFF',
-    fontSize: 28,
+    fontSize: 32,
     fontFamily: FontFamily.latoBold,
-    fontWeight: '700',
-    marginBottom: 6,
     letterSpacing: -0.5,
   },
-  statusRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-  statusDot: { width: 10, height: 10, borderRadius: 5, marginRight: 10, shadowColor: '#4CAF50', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 4, elevation: 4 },
-  statusText: { color: '#DDDDDD', fontSize: 15, fontWeight: '600', fontFamily: FontFamily.latoRegular, letterSpacing: 0.2 },
-  refreshText: { color: '#FFB267', fontSize: 13, marginLeft: 10, fontStyle: 'italic', fontWeight: '500' },
-  mobileLogo: { width: 52, height: 34, backgroundColor: '#FFFFFF', borderRadius: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 3 },
+  mobileStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  mobileStatusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+  },
+  mobileStatusText: {
+    fontSize: 12,
+    fontFamily: FontFamily.latoBold,
+  },
+  mobileUpdated: {
+    flexShrink: 1,
+    color: MUTED,
+    fontSize: 12,
+    fontFamily: FontFamily.latoRegular,
+    marginLeft: 10,
+  },
+  refreshButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 178, 103, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  refreshButtonPressed: {
+    backgroundColor: 'rgba(255, 178, 103, 0.24)',
+  },
 
-  // Map, errors - Modernized
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: MOBILE_CARD,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 107, 0.35)',
+    padding: 12,
+    marginBottom: 12,
+  },
+  offlineIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
+    backgroundColor: 'rgba(255, 107, 107, 0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  offlineBody: { flex: 1 },
+  offlineTitle: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontFamily: FontFamily.latoBold,
+  },
+  offlineText: {
+    color: MUTED,
+    fontSize: 13,
+    fontFamily: FontFamily.latoRegular,
+    marginTop: 2,
+  },
+  retryPill: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 178, 103, 0.14)',
+    marginLeft: 10,
+  },
+  retryPillText: {
+    color: ACCENT,
+    fontSize: 14,
+    fontFamily: FontFamily.latoBold,
+  },
+
+  batteryCard: {
+    backgroundColor: MOBILE_CARD,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 16,
+  },
+  batteryTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  batteryIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  batteryLabel: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: FontFamily.latoBold,
+  },
+  batteryBadge: {
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  batteryBadgeText: {
+    fontSize: 12,
+    fontFamily: FontFamily.latoBold,
+  },
+  batteryReadout: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  batteryPercent: {
+    color: '#FFFFFF',
+    fontSize: 48,
+    fontFamily: FontFamily.latoBold,
+  },
+  batteryPercentUnit: {
+    color: MUTED,
+    fontSize: 22,
+    fontFamily: FontFamily.latoRegular,
+  },
+  batteryTimeToGo: {
+    color: MUTED,
+    fontSize: 13,
+    fontFamily: FontFamily.latoRegular,
+  },
+  batteryTimeToGoValue: {
+    color: '#FFFFFF',
+    fontFamily: FontFamily.latoBold,
+  },
+  batteryTrack: {
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: TRACK,
+    overflow: 'hidden',
+    marginTop: 6,
+  },
+  batteryFill: {
+    height: '100%',
+    borderRadius: 5,
+  },
+  batteryStats: {
+    flexDirection: 'row',
+    marginTop: 14,
+  },
+  batteryStat: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  batteryStatDivider: {
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderLeftColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  batteryStatLabel: {
+    color: MUTED,
+    fontSize: 12,
+    fontFamily: FontFamily.latoRegular,
+  },
+  batteryStatValue: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontFamily: FontFamily.latoBold,
+    marginTop: 2,
+  },
+
+  sectionLabel: {
+    color: MUTED,
+    fontSize: 12,
+    fontFamily: FontFamily.latoBold,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginLeft: 4,
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  listCard: {
+    backgroundColor: MOBILE_CARD,
+    borderRadius: 16,
+    paddingLeft: 14,
+    overflow: 'hidden',
+    marginBottom: 20,
+  },
+  listRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 52,
+  },
+  listIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
+    backgroundColor: 'rgba(255, 178, 103, 0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  listInner: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    minHeight: 52,
+    paddingRight: 14,
+  },
+  listDivider: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  listLabel: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontFamily: FontFamily.latoRegular,
+    marginRight: 12,
+  },
+  listValue: {
+    maxWidth: '55%',
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontFamily: FontFamily.latoBold,
+    textAlign: 'right',
+  },
+
+  // Map - Modernized
   mapSection: { marginBottom: 24, marginTop: 8 },
   mapTitle: { color: '#FFFFFF', fontSize: 20, fontFamily: FontFamily.latoBold, fontWeight: '700', marginBottom: 16, letterSpacing: 0.3 },
   mapContainer: { borderRadius: 16, overflow: 'hidden', height: 260, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 6 },
-  errorContainer: { backgroundColor: '#F44336', borderRadius: 16, padding: 20, marginBottom: 24, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.2)', shadowColor: '#F44336', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
-  errorText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600', textAlign: 'center', marginBottom: 14, fontFamily: FontFamily.latoRegular, letterSpacing: 0.2 },
-  retryButton: { backgroundColor: '#FFFFFF', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4, elevation: 3 },
-  retryText: { color: '#F44336', fontSize: 15, fontWeight: '700', fontFamily: FontFamily.latoBold, letterSpacing: 0.3 },
-
-  // Simple/legacy blocks (unchanged but kept for compatibility)
-  simplePanelContainer: { backgroundColor: '#211D1D', borderRadius: 15, padding: 16, marginBottom: 20 },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  title: { fontSize: 18, fontWeight: 'bold', color: 'white' },
-  viewDetailText: { fontSize: 12, color: '#FFB267' },
-  simpleEnergyData: { flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap' },
-  energyItem: { alignItems: 'center', paddingHorizontal: 5, marginBottom: 12, width: '48%' },
-  energyValue: { fontSize: 24, fontWeight: 'bold', color: 'white' },
-  energyLabel: { fontSize: 12, color: '#999', marginTop: 4 },
-  energyDetail: { fontSize: 10, color: '#999', marginTop: 2 },
-  loadingContainer: { padding: 20, alignItems: 'center' },
-  loadingText: { color: '#999' },
-  tanksContainer: { backgroundColor: '#211D1D', borderRadius: 15, padding: 16, marginBottom: 20 },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: 'white', marginBottom: 12 },
-
-  // ✨ NEW: placeholder text styles
-  placeholderTitle: {
-    color: '#FFF',
-    fontSize: 24,
-    fontFamily: FontFamily.latoRegular,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  placeholderText: {
-    color: '#AAA',
-    fontSize: 14,
-  },
-  // Container that lets dots float above the pager
-pagerWrapper: {
-  flex: 1,
-  position: 'relative',
-},
-
-// Dots row at the bottom
-pagerDotsContainer: {
-  position: 'absolute',
-  bottom: 12,
-  left: 0,
-  right: 0,
-  flexDirection: 'row',
-  justifyContent: 'center',
-  alignItems: 'center',
-  gap: 10,
-},
-
-pagerDot: {
-  width: 10,
-  height: 10,
-  borderRadius: 5,
-  backgroundColor: '#3A3A3A',
-},
-
-pagerDotActive: {
-  backgroundColor: '#FF8C00',
-},
 });
 
 export default System;

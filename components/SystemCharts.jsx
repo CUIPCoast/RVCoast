@@ -1,5 +1,5 @@
 // components/SystemCharts.jsx - Energy analytics: live trend chart, battery ring, power in/out balance
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, useWindowDimensions, ScrollView, TouchableOpacity } from 'react-native';
 import Svg, { Path, Line, Circle, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -12,7 +12,13 @@ const CARD = '#211D1D';
 const TRACK = '#2A2626';
 const HISTORY_LENGTH = 36; // 36 readings x 5 s = 3 minutes
 const POLL_MS = 5000;
-const CHART_HEIGHT = 200;
+const CHART_HEIGHT = 200; // stacked (narrow) layout; the wide layout sizes the chart to fit
+
+// Wide layout scales its contents to the space the cards get.
+// Baseline is the grid size the 1x styles were designed for.
+const BASE_GRID = { width: 1200, height: 560 };
+const MIN_SCALE = 0.8;
+const MAX_SCALE = 1.5;
 
 const SERIES = [
   { key: 'solar', label: 'Solar', color: EnergyColor.solar },
@@ -40,13 +46,26 @@ const formatWatts = (watts) => {
   return `${Math.round(abs)} W`;
 };
 
-const SystemCharts = () => {
-  const { width } = useWindowDimensions();
+// width: page width when hosted in a pager (defaults to the window width)
+const SystemCharts = ({ width: pageWidth }) => {
+  const { width: windowWidth } = useWindowDimensions();
+  const width = pageWidth || windowWidth;
   const isWide = width >= 720;
   const [victronData, setVictronData] = useState(null);
   const [powerHistory, setPowerHistory] = useState({ solar: [], battery: [], grid: [], loads: [] });
   const [hiddenSeries, setHiddenSeries] = useState({});
-  const [chartWidth, setChartWidth] = useState(0);
+  const [chartSize, setChartSize] = useState({ width: 0, height: 0 });
+  const [gridSize, setGridSize] = useState({ width: 0, height: 0 });
+  const [ringBox, setRingBox] = useState({ width: 0, height: 0 });
+
+  // Rounded to 0.05 so tiny layout changes don't restyle the page
+  const scale = useMemo(() => {
+    if (!isWide || !gridSize.height) return 1;
+    const raw = Math.min(gridSize.height / BASE_GRID.height, gridSize.width / BASE_GRID.width);
+    return Math.min(MAX_SCALE, Math.max(MIN_SCALE, Math.round(raw * 20) / 20));
+  }, [isWide, gridSize]);
+  const styles = useMemo(() => createStyles(scale), [scale]);
+  const sz = (n) => Math.round(n * scale);
 
   // Fetch Victron data and update power history
   useEffect(() => {
@@ -106,15 +125,17 @@ const SystemCharts = () => {
   const visibleSeries = SERIES.filter((s) => !hiddenSeries[s.key]);
   const maxValue = Math.max(1, ...visibleSeries.flatMap((s) => powerHistory[s.key])) * 1.15;
   // Right-aligned so the newest reading always sits at "Now"
+  const chartWidth = chartSize.width;
+  const chartHeight = isWide ? chartSize.height : CHART_HEIGHT;
   const pointX = (i) => (chartWidth / (HISTORY_LENGTH - 1)) * (HISTORY_LENGTH - powerHistory.solar.length + i);
-  const pointY = (v) => CHART_HEIGHT - (v / maxValue) * (CHART_HEIGHT - 8);
+  const pointY = (v) => chartHeight - (v / maxValue) * (chartHeight - 8);
 
   const linePath = (values) =>
     values.map((v, i) => `${i === 0 ? 'M' : 'L'}${pointX(i).toFixed(1)},${pointY(v).toFixed(1)}`).join(' ');
   const areaPath = (values) =>
     values.length < 2
       ? ''
-      : `${linePath(values)} L${pointX(values.length - 1).toFixed(1)},${CHART_HEIGHT} L${pointX(0).toFixed(1)},${CHART_HEIGHT} Z`;
+      : `${linePath(values)} L${pointX(values.length - 1).toFixed(1)},${chartHeight} L${pointX(0).toFixed(1)},${chartHeight} Z`;
 
   const trendCard = (
     <View style={[styles.card, isWide && { flex: 2 }]}>
@@ -146,9 +167,12 @@ const SystemCharts = () => {
         })}
       </View>
 
-      <View style={styles.chart} onLayout={(e) => setChartWidth(e.nativeEvent.layout.width)}>
-        {chartWidth > 0 && (
-          <Svg width={chartWidth} height={CHART_HEIGHT}>
+      <View
+        style={isWide ? styles.chartFill : styles.chart}
+        onLayout={(e) => setChartSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
+      >
+        {chartWidth > 0 && chartHeight > 0 && (
+          <Svg width={chartWidth} height={chartHeight}>
             <Defs>
               {SERIES.map((s) => (
                 <SvgGradient key={s.key} id={`fill-${s.key}`} x1="0" y1="0" x2="0" y2="1">
@@ -158,9 +182,9 @@ const SystemCharts = () => {
               ))}
             </Defs>
             {[0.25, 0.5, 0.75].map((f) => (
-              <Line key={f} x1="0" x2={chartWidth} y1={CHART_HEIGHT * f} y2={CHART_HEIGHT * f} stroke={TRACK} strokeWidth="1" strokeDasharray="4 6" />
+              <Line key={f} x1="0" x2={chartWidth} y1={chartHeight * f} y2={chartHeight * f} stroke={TRACK} strokeWidth="1" strokeDasharray="4 6" />
             ))}
-            <Line x1="0" x2={chartWidth} y1={CHART_HEIGHT - 0.5} y2={CHART_HEIGHT - 0.5} stroke="#3A3434" strokeWidth="1" />
+            <Line x1="0" x2={chartWidth} y1={chartHeight - 0.5} y2={chartHeight - 0.5} stroke="#3A3434" strokeWidth="1" />
             {visibleSeries.map((s) => {
               const values = powerHistory[s.key];
               if (values.length < 2) return null;
@@ -189,8 +213,10 @@ const SystemCharts = () => {
   );
 
   // ——— Battery ring ———
-  const RING = 168;
-  const STROKE = 14;
+  const RING = isWide && ringBox.height
+    ? Math.max(96, Math.floor(Math.min(ringBox.width, ringBox.height)))
+    : 168;
+  const STROKE = Math.round(RING * 0.085);
   const radius = (RING - STROKE) / 2;
   const circumference = 2 * Math.PI * radius;
   const ringColor = soc !== null && soc <= 20 ? EnergyColor.low : EnergyColor.battery;
@@ -202,7 +228,7 @@ const SystemCharts = () => {
         <View style={[styles.statePill, { backgroundColor: `${ringColor}26` }]}>
           <MaterialCommunityIcons
             name={isCharging ? 'battery-charging-high' : isDischarging ? 'battery-arrow-down' : 'battery'}
-            size={14}
+            size={sz(14)}
             color={ringColor}
           />
           <Text style={[styles.statePillText, { color: ringColor }]}>
@@ -211,7 +237,10 @@ const SystemCharts = () => {
         </View>
       </View>
 
-      <View style={styles.ringWrap}>
+      <View
+        style={isWide ? styles.ringFill : styles.ringWrap}
+        onLayout={isWide ? (e) => setRingBox({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height }) : undefined}
+      >
         <Svg width={RING} height={RING}>
           <Circle cx={RING / 2} cy={RING / 2} r={radius} stroke={TRACK} strokeWidth={STROKE} fill="none" />
           <Circle
@@ -228,9 +257,9 @@ const SystemCharts = () => {
           />
         </Svg>
         <View style={styles.ringCenter}>
-          <Text style={styles.ringValue}>
+          <Text style={[styles.ringValue, isWide && { fontSize: Math.round(RING * 0.26) }]}>
             {soc === null ? '--' : Math.round(soc)}
-            <Text style={styles.ringUnit}>%</Text>
+            <Text style={[styles.ringUnit, isWide && { fontSize: Math.round(RING * 0.11) }]}>%</Text>
           </Text>
           <Text style={styles.cardHint}>{battery.timeToGo ? `${isCharging ? 'Full in' : 'Lasts'} ${battery.timeToGo}` : 'State of charge'}</Text>
         </View>
@@ -278,7 +307,7 @@ const SystemCharts = () => {
 
   const net = totalIn - totalOut;
   const balanceCard = (
-    <View style={[styles.card, isWide && { flex: 2 }]}>
+    <View style={[styles.card, isWide && { flex: 2, justifyContent: 'space-between' }]}>
       <View style={styles.cardHeader}>
         <Text style={styles.cardTitle}>Where power comes from and goes</Text>
       </View>
@@ -335,10 +364,11 @@ const SystemCharts = () => {
       <View style={styles.cardHeader}>
         <Text style={styles.cardTitle}>System status</Text>
       </View>
+      <View style={isWide && styles.statusList}>
       {statusRows.map((row, i) => (
-        <View key={row.label} style={[styles.statusRow, i > 0 && styles.statusRowDivider]}>
+        <View key={row.label} style={[styles.statusRow, isWide && styles.statusRowCompact, i > 0 && styles.statusRowDivider]}>
           <View style={[styles.statusIcon, { backgroundColor: `${row.color}22` }]}>
-            <MaterialCommunityIcons name={row.icon} size={18} color={row.color} />
+            <MaterialCommunityIcons name={row.icon} size={sz(18)} color={row.color} />
           </View>
           <Text style={styles.statusLabel}>{row.label}</Text>
           <Text style={[styles.statusValue, { color: row.color === MUTED ? MUTED : Color.white0 }]} numberOfLines={1}>
@@ -346,14 +376,43 @@ const SystemCharts = () => {
           </Text>
         </View>
       ))}
+      </View>
     </View>
   );
+
+  const header = (
+    <>
+      <TabletHeader title="Energy Analytics" style={styles.header} />
+      <Text style={styles.subtitle}>Live readings from your Victron system, every 5 seconds</Text>
+    </>
+  );
+
+  // Wide (tablet landscape): two rows that split the screen height, no scrolling
+  if (isWide) {
+    return (
+      <View style={[styles.container, styles.containerFit, { width }]}>
+        {header}
+        <View
+          style={styles.gridArea}
+          onLayout={(e) => setGridSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
+        >
+          <View style={[styles.gridRow, styles.gridFill]}>
+            {trendCard}
+            {batteryCard}
+          </View>
+          <View style={[styles.gridRow, styles.gridFill, styles.gridLast]}>
+            {balanceCard}
+            {statusCard}
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { width }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <TabletHeader title="Energy Analytics" style={styles.header} />
-        <Text style={styles.subtitle}>Live readings from your Victron system, every 5 seconds</Text>
+        {header}
 
         <View style={[styles.grid, isWide && styles.gridRow]}>
           {trendCard}
@@ -368,12 +427,41 @@ const SystemCharts = () => {
   );
 };
 
-const styles = StyleSheet.create({
+// k scales card contents; page chrome (header, subtitle, gutters) stays fixed
+const createStyles = (k = 1) => {
+  const f = (n) => Math.round(n * k);
+  return StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
     paddingHorizontal: 24,
     paddingTop: 12,
+  },
+  // Bottom padding leaves room for the pager dots
+  containerFit: {
+    paddingBottom: 44,
+  },
+  gridFill: {
+    flex: 1,
+    gap: f(16),
+    marginBottom: f(16),
+  },
+  gridArea: {
+    flex: 1,
+  },
+  gridLast: {
+    marginBottom: 0,
+  },
+  statusList: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  statusRowCompact: {
+    paddingVertical: f(6),
+  },
+  chartFill: {
+    flex: 1,
+    minHeight: 80,
   },
   scrollContent: {
     paddingBottom: 48,
@@ -389,8 +477,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   grid: {
-    gap: 16,
-    marginBottom: 16,
+    gap: f(16),
+    marginBottom: f(16),
   },
   gridRow: {
     flexDirection: 'row',
@@ -398,56 +486,56 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: CARD,
-    borderRadius: 20,
+    borderRadius: f(20),
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.06)',
-    padding: 18,
+    padding: f(16),
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: f(10),
   },
   cardTitle: {
     color: Color.white0,
-    fontSize: 18,
+    fontSize: f(18),
     fontFamily: FontFamily.latoBold,
   },
   cardHint: {
     color: MUTED,
-    fontSize: 13,
+    fontSize: f(13),
     fontFamily: FontFamily.latoRegular,
-    marginTop: 2,
+    marginTop: f(2),
   },
   legend: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 14,
+    gap: f(8),
+    marginBottom: f(10),
   },
   legendChip: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    borderRadius: f(12),
+    paddingHorizontal: f(10),
+    paddingVertical: f(6),
   },
   legendSwatch: {
-    width: 10,
-    height: 10,
-    borderRadius: 3,
-    marginRight: 6,
+    width: f(10),
+    height: f(10),
+    borderRadius: f(3),
+    marginRight: f(6),
   },
   legendLabel: {
     color: Color.white0,
-    fontSize: 13,
+    fontSize: f(13),
     fontFamily: FontFamily.latoRegular,
-    marginRight: 8,
+    marginRight: f(8),
   },
   legendValue: {
-    fontSize: 13,
+    fontSize: f(13),
     fontFamily: FontFamily.latoBold,
   },
   chart: {
@@ -462,30 +550,30 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     color: MUTED,
-    fontSize: 11,
+    fontSize: f(11),
     fontFamily: FontFamily.latoRegular,
   },
   axisRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 6,
+    marginTop: f(6),
   },
   axisText: {
     color: MUTED,
-    fontSize: 11,
+    fontSize: f(11),
     fontFamily: FontFamily.latoRegular,
   },
   statePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    borderRadius: f(10),
+    paddingHorizontal: f(10),
+    paddingVertical: f(4),
   },
   statePillText: {
-    fontSize: 12,
+    fontSize: f(12),
     fontFamily: FontFamily.latoBold,
-    marginLeft: 4,
+    marginLeft: f(4),
   },
   ringWrap: {
     alignItems: 'center',
@@ -493,23 +581,30 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginVertical: 6,
   },
+  // Wide layout: takes the card's spare height; the ring is sized to fit it
+  ringFill: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: f(4),
+  },
   ringCenter: {
     position: 'absolute',
     alignItems: 'center',
   },
   ringValue: {
     color: Color.white0,
-    fontSize: 40,
+    fontSize: f(40),
     fontFamily: FontFamily.latoBold,
   },
   ringUnit: {
     color: MUTED,
-    fontSize: 18,
+    fontSize: f(18),
     fontFamily: FontFamily.latoRegular,
   },
   batteryStats: {
     flexDirection: 'row',
-    marginTop: 14,
+    marginTop: f(10),
   },
   batteryStat: {
     flex: 1,
@@ -517,47 +612,47 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     color: MUTED,
-    fontSize: 12,
+    fontSize: f(12),
     fontFamily: FontFamily.latoRegular,
   },
   statValue: {
     color: Color.white0,
-    fontSize: 15,
+    fontSize: f(15),
     fontFamily: FontFamily.latoBold,
-    marginTop: 2,
+    marginTop: f(2),
   },
   balanceBlock: {
-    marginBottom: 16,
+    marginBottom: f(12),
   },
   balanceHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'baseline',
-    marginBottom: 8,
+    marginBottom: f(8),
   },
   balanceTitle: {
     color: Color.white0,
-    fontSize: 15,
+    fontSize: f(15),
     fontFamily: FontFamily.latoBold,
   },
   balanceTotal: {
     color: Color.white0,
-    fontSize: 22,
+    fontSize: f(22),
     fontFamily: FontFamily.latoBold,
   },
   balanceTrack: {
-    height: 18,
-    borderRadius: 9,
+    height: f(18),
+    borderRadius: f(9),
     backgroundColor: TRACK,
     flexDirection: 'row',
     overflow: 'hidden',
-    gap: 2,
+    gap: f(2),
   },
   balanceLegend: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginTop: 8,
-    gap: 14,
+    marginTop: f(8),
+    gap: f(14),
   },
   balanceLegendItem: {
     flexDirection: 'row',
@@ -565,7 +660,7 @@ const styles = StyleSheet.create({
   },
   balanceLegendText: {
     color: MUTED,
-    fontSize: 13,
+    fontSize: f(13),
     fontFamily: FontFamily.latoRegular,
   },
   balanceLegendValue: {
@@ -575,32 +670,33 @@ const styles = StyleSheet.create({
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: f(10),
   },
   statusRowDivider: {
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.05)',
   },
   statusIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+    width: f(32),
+    height: f(32),
+    borderRadius: f(10),
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: f(12),
   },
   statusLabel: {
     flex: 1,
     color: MUTED,
-    fontSize: 14,
+    fontSize: f(14),
     fontFamily: FontFamily.latoRegular,
   },
   statusValue: {
-    fontSize: 14,
+    fontSize: f(14),
     fontFamily: FontFamily.latoBold,
     maxWidth: '55%',
     textAlign: 'right',
   },
 });
+};
 
 export default SystemCharts;

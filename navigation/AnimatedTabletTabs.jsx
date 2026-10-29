@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Animated, Easing, AccessibilityInfo } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Color, FontFamily } from '../GlobalStyles';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 const ACCENT = Color.colorSandybrown;
 const INACTIVE = '#9E9696';
@@ -83,7 +84,9 @@ const AnimatedTabletTabs = ({
   return (
     <View style={styles.container}>
       {/* Content Area */}
-      <View style={styles.contentWrapper}>{renderContent()}</View>
+      <View style={styles.contentWrapper}>
+        <ErrorBoundary key={activeTab} name={activeTab}>{renderContent()}</ErrorBoundary>
+      </View>
 
       {/* Tab bar */}
       <View style={styles.tabBarContainer}>

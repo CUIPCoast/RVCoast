@@ -21,6 +21,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { VictronEnergyService } from "../API/VictronEnergyService";
 import { useRVWater } from '../API/RVStateManager/RVStateHooks';
 import rvStateManager from '../API/RVStateManager/RVStateManager';
+import useRVConnection from '../hooks/useRVConnection';
+
+const CONNECTION_BADGE = {
+    online: { icon: 'checkmark-circle', color: '#4ADE80', bg: 'rgba(74, 222, 128, 0.12)', label: 'RV System Connected' },
+    checking: { icon: 'sync-circle', color: '#FFB267', bg: 'rgba(255, 178, 103, 0.12)', label: 'Connecting to RV...' },
+    offline: { icon: 'close-circle', color: '#EF5350', bg: 'rgba(239, 83, 80, 0.12)', label: 'RV System Offline' },
+};
 
 
 const MainScreen = () => {
@@ -30,7 +37,7 @@ const MainScreen = () => {
 
     // Use RV state management for water systems
     const { water } = useRVWater();
-
+    const connectionBadge = CONNECTION_BADGE[useRVConnection()];
 
     const [isModalVisible, setModalVisible] = useState(false);
     const [isOn, setIsOn] = useState(false);
@@ -339,9 +346,9 @@ const MainScreen = () => {
                         elevation: 6,}}
                     size={30}>
                         <View style={styles.statusCard}>
-                            <View style={styles.connectionStatus}>
-                                <Ionicons name="checkmark-circle" size={16} color="#4ADE80" />
-                                <Text style={styles.connectionText}>RV System Connected</Text>
+                            <View style={[styles.connectionStatus, { backgroundColor: connectionBadge.bg }]}>
+                                <Ionicons name={connectionBadge.icon} size={16} color={connectionBadge.color} />
+                                <Text style={[styles.connectionText, { color: connectionBadge.color }]}>{connectionBadge.label}</Text>
                             </View>
 
                             {/* Weather Information */}

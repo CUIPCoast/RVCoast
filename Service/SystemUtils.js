@@ -1,5 +1,6 @@
 // utils/SystemUtils.js
 import { RVControlService } from '../API/rvAPI';
+import { logRVError } from '../config/rvConnection';
 
 /**
  * Utility to handle system-wide functionality and status
@@ -19,7 +20,7 @@ export const SystemUtils = {
         canInterface: response.canInterface
       };
     } catch (error) {
-      console.error('Failed to get system status:', error);
+      logRVError('Failed to get system status:', error);
       return {
         success: false,
         error: error.message
@@ -39,7 +40,7 @@ export const SystemUtils = {
         data: response.data
       };
     } catch (error) {
-      console.error('Failed to get available commands:', error);
+      logRVError('Failed to get available commands:', error);
       return {
         success: false,
         error: error.message
@@ -60,7 +61,7 @@ export const SystemUtils = {
         result: response
       };
     } catch (error) {
-      console.error('Failed to execute raw command:', error);
+      logRVError('Failed to execute raw command:', error);
       return {
         success: false,
         error: error.message
@@ -121,7 +122,7 @@ export const SystemUtils = {
           };
       }
     } catch (error) {
-      console.error(`Failed to check support for feature ${featureName}:`, error);
+      logRVError(`Failed to check support for feature ${featureName}:`, error);
       return {
         success: false,
         error: error.message

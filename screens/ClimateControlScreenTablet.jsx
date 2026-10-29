@@ -1,7 +1,7 @@
 // screens/ClimateControlScreenTablet.jsx - Fixed temperature synchronization and persistence
 import React, { useState, useEffect, useRef } from 'react';
 import TabletHeader from "../components/TabletHeader";
-import { StyleSheet, View, Text, Image, TouchableOpacity, TouchableWithoutFeedback, Keyboard, ScrollView } from "react-native";
+import { StyleSheet, View, Text, TouchableOpacity, TouchableWithoutFeedback, Keyboard } from "react-native";
 import { Color, isDarkMode } from "../GlobalStyles";
 import useScreenSize from "../helper/useScreenSize.jsx";
 import { Col, Row, Grid } from "react-native-easy-grid";
@@ -12,7 +12,7 @@ import { ClimateService } from '../API/RVControlServices.js';
 import { RVControlService } from "../API/rvAPI";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { FontFamily } from '../GlobalStyles';
 // Import RV State Management hooks
 import { useRVClimate } from "../API/RVStateManager/RVStateHooks";
@@ -69,8 +69,6 @@ const ClimateControlScreenTablet = () => {
   
   var now = moment().format();
 
-  const moonImage = require("../assets/moon.png");
-  const sunImage = require("../assets/sun.png");
   
   const features = [
     { label: "Cool", fanSpeed: "High" },
@@ -868,11 +866,23 @@ const ClimateControlScreenTablet = () => {
             >
               {/* Truma Logo and Auxiliary Box */}
               <View style={{ width: "50%", height: "100px", alignItems: "center" }}>
-                <Image
-                  source={require("../assets/truma-logo-333-100.png")}
-                  className="h-30 w-30 left-3"
-                  style={{ resizeMode: "contain", marginBottom: 220 }}
-                />
+                {/* Same height as the old logo image so the Auxiliary box below doesn't move */}
+                <View
+                  className="h-30 left-3"
+                  style={styles.trumaLockup}
+                  accessible
+                  accessibilityRole="header"
+                  accessibilityLabel="Truma climate system"
+                >
+                  <View style={styles.trumaRow}>
+                    <View style={styles.trumaBadge}>
+                      <MaterialCommunityIcons name="thermostat" size={22} color={Color.colorSandybrown} />
+                    </View>
+                    <Text style={styles.trumaWordmark}>TRUMA</Text>
+                  </View>
+                  <View style={styles.trumaRule} />
+                  <Text style={styles.trumaCaption}>CLIMATE SYSTEM</Text>
+                </View>
 
                 <View style={{ flexDirection: "row", alignItems: "flex-start", marginTop: 10 }}>
                   {/* Auxiliary Box */}
@@ -959,48 +969,18 @@ const ClimateControlScreenTablet = () => {
                         marginLeft: 10,
                         alignItems: "center"
                       }}>
-                        <Text style={{ 
-                          color: "white", 
-                          fontSize: 14,
-                          marginBottom: 5,
-                          textAlign: "center"
-                        }}>
-                          Fan Speed
-                        </Text>
-                        <View style={styles.fanSpeedContainer}>
-                          <ScrollView 
-                            horizontal={false}
-                            contentContainerStyle={styles.fanSpeedScrollContent}
-                            showsVerticalScrollIndicator={false}
-                          >
-                            <FanSpeedButton 
-                              speed="High" 
-                              onPress={() => handleFanSpeedPress("High")} 
+                        <Text style={styles.fanSpeedTitle}>Fan Speed</Text>
+                        <View style={styles.fanSpeedContainer} accessibilityRole="radiogroup">
+                          {FAN_SPEEDS.map((option, index) => (
+                            <FanSpeedButton
+                              key={option.speed}
+                              {...option}
+                              onPress={() => handleFanSpeedPress(option.speed)}
                               isLoading={isLoading}
-                              isActive={speed === "High"}
+                              isActive={option.speed === "Auto" ? isAutoModeActive : speed === option.speed}
+                              isLast={index === FAN_SPEEDS.length - 1}
                             />
-                            
-                            <FanSpeedButton 
-                              speed="Med" 
-                              onPress={() => handleFanSpeedPress("Med")} 
-                              isLoading={isLoading}
-                              isActive={speed === "Med"}
-                            />
-                            
-                            <FanSpeedButton 
-                              speed="Low" 
-                              onPress={() => handleFanSpeedPress("Low")} 
-                              isLoading={isLoading}
-                              isActive={speed === "Low"}
-                            />
-                            
-                            <FanSpeedButton 
-                              speed="Auto" 
-                              onPress={() => handleFanSpeedPress("Auto")} 
-                              isLoading={isLoading}
-                              isActive={isAutoModeActive}
-                            />
-                          </ScrollView>
+                          ))}
                         </View>
                       </View>
                     </View>
@@ -1008,36 +988,31 @@ const ClimateControlScreenTablet = () => {
                   
                   <View style={styles.fixedToggleContainer}>
                     {/* Day/Night Toggle */}
-                    <TouchableOpacity
+                    <ToggleTile
+                      size="row"
+                      label={isNightToggled ? "Night Mode" : "Day Mode"}
+                      icon={isNightToggled ? "weather-night" : "weather-sunny"}
+                      isOn={isNightToggled}
                       onPress={handleNightPress}
                       disabled={isLoading}
-                      style={[
-                        styles.toggleBase,
-                        isNightToggled && styles.toggleActiveDay
-                      ]}
-                      activeOpacity={0.8}
-                    >
-                      <Image source={isNightToggled ? moonImage : sunImage} style={styles.toggleIcon} />
-                      <Text style={styles.toggleText}>
-                        {isNightToggled ? 'Night Mode' : 'Day Mode'}
-                      </Text>
-                    </TouchableOpacity>
+                      onText="Quiet operation"
+                      offText="Normal operation"
+                      showPill={false}
+                      style={styles.modeTile}
+                    />
 
                     {/* Dehumidify Toggle */}
-                    <TouchableOpacity
+                    <ToggleTile
+                      size="row"
+                      label="Dehumidify"
+                      icon="water-percent"
+                      isOn={isDehumidToggled}
                       onPress={handleDehumidPress}
                       disabled={isLoading}
-                      style={[
-                        styles.toggleBase,
-                        isDehumidToggled && styles.toggleActiveDehumid
-                      ]}
-                      activeOpacity={0.8}
-                    >
-                      <Image source={require("../assets/drop.png")} style={styles.toggleIcon} />
-                      <Text style={styles.toggleText}>
-                        Dehumidify
-                      </Text>
-                    </TouchableOpacity>
+                      onText="Active"
+                      offText="Off"
+                      style={styles.modeTile}
+                    />
                   </View>
                 </View>
               </View>
@@ -1050,29 +1025,79 @@ const ClimateControlScreenTablet = () => {
   return null;
 }
 
-const FanSpeedButton = ({ speed, onPress, isLoading, isActive }) => {
-  const getBackgroundColor = () => {
-    return isActive 
-      ? '#4CAF50'
-      : '#242124';
-  };
-  
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      disabled={isLoading}
-      style={[
-        styles.fanSpeedButton,
-        { backgroundColor: getBackgroundColor() }
-      ]}
-      activeOpacity={0.7}
-    >
-      <Text style={{ color: "white", fontSize: 16 }}>{speed}</Text>
-    </TouchableOpacity>
-  );
-};
+const FAN_SPEEDS = [
+  { speed: "High", icon: "fan-speed-3" },
+  { speed: "Med", icon: "fan-speed-2" },
+  { speed: "Low", icon: "fan-speed-1" },
+  { speed: "Auto", icon: "fan-auto" },
+];
+
+// Vertical segmented control styled to match ToggleTile (dark tile, sandybrown accent).
+const FanSpeedButton = ({ speed, icon, onPress, isLoading, isActive, isLast }) => (
+  <TouchableOpacity
+    onPress={onPress}
+    disabled={isLoading}
+    style={[
+      styles.fanSpeedButton,
+      !isLast && styles.fanSpeedButtonSpacing,
+      isActive ? styles.fanSpeedButtonOn : styles.fanSpeedButtonOff,
+      isLoading && styles.fanSpeedButtonDisabled,
+    ]}
+    activeOpacity={0.75}
+    accessibilityRole="radio"
+    accessibilityLabel={`Fan speed ${speed}`}
+    accessibilityState={{ selected: isActive, disabled: isLoading }}
+  >
+    <MaterialCommunityIcons name={icon} size={20} color={isActive ? Color.colorSandybrown : '#9E9696'} />
+    <Text style={[styles.fanSpeedText, { color: isActive ? Color.white0 : '#9E9696' }]}>{speed}</Text>
+  </TouchableOpacity>
+);
 
 const styles = StyleSheet.create({
+  // Truma wordmark lockup (replaces the old logo image)
+  trumaLockup: {
+    width: 260,
+    top: 28, // visual nudge only; doesn't move the Auxiliary box
+    marginBottom: 220,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trumaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  trumaBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 178, 103, 0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 178, 103, 0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  trumaWordmark: {
+    color: Color.white0,
+    fontSize: 32,
+    fontFamily: FontFamily.latoBold,
+    letterSpacing: 7,
+    marginRight: -7, // letterSpacing trails the last letter; keeps the lockup optically centered
+  },
+  trumaRule: {
+    width: 36,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: Color.colorSandybrown,
+    marginTop: 8,
+  },
+  trumaCaption: {
+    color: '#9E9696',
+    fontSize: 11,
+    fontFamily: FontFamily.latoBold,
+    letterSpacing: 3,
+    marginTop: 12,
+  },
   container: {
     flex: 1,
     justifyContent: "center",
@@ -1176,7 +1201,7 @@ const styles = StyleSheet.create({
   fixedToggleContainer: {
     position: 'absolute',
     top: 20,
-    left: 400,
+    left: 360,
     zIndex: 1000,
     alignItems: 'center',
   },
@@ -1210,59 +1235,56 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.latoRegular,
     fontWeight: "bold",
   },
-  fanSpeedContainer: {
-    width: 80,
-    height: 195,
-    marginTop:5,
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    borderRadius: 5,
-    overflow: 'hidden',
+  fanSpeedTitle: {
+    color: '#9E9696',
+    fontSize: 12,
+    fontFamily: FontFamily.latoBold,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 6,
+    textAlign: 'center',
   },
-  fanSpeedScrollContent: {
-    alignItems: 'center',
-    paddingVertical: 2,
+  fanSpeedContainer: {
+    alignSelf: 'stretch',
+    padding: 4,
+    backgroundColor: '#1B1B1B',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   fanSpeedButton: {
-    padding: 10,
-    borderRadius: 5,
-    alignItems: "center",
-    justifyContent: "center",
-    width: 76,
-    margin: 2,
-  },
-  toggleBase: {
+    minHeight: 46,
+    borderRadius: 12,
+    borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-start',
-    width: 180,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 30,
-    marginVertical: 10,
-    backgroundColor: '#2C2C2E',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
+    justifyContent: 'center',
+    paddingHorizontal: 6,
   },
-  toggleActiveDay: {
-    backgroundColor: '#FFBA00',
+  fanSpeedButtonSpacing: {
+    marginBottom: 4,
   },
-  toggleActiveDehumid: {
-    backgroundColor: '#00B9E8',
+  fanSpeedButtonOn: {
+    backgroundColor: 'rgba(255, 178, 103, 0.12)',
+    borderColor: 'rgba(255, 178, 103, 0.6)',
   },
-  toggleIcon: {
-    width: 26,
-    height: 26,
-    marginRight: 12,
-    tintColor: 'white',
+  fanSpeedButtonOff: {
+    backgroundColor: '#2A2626',
+    borderColor: 'transparent',
   },
-  toggleText: {
-    color: 'white',
-    fontSize: 17,
-    fontFamily: FontFamily.latoRegular,
-    fontWeight: '600',
+  fanSpeedButtonDisabled: {
+    opacity: 0.7,
+  },
+  fanSpeedText: {
+    fontSize: 14,
+    fontFamily: FontFamily.latoBold,
+    fontWeight: '700',
+    marginLeft: 6,
+  },
+  modeTile: {
+    width: 220,
+    marginVertical: 8,
   },
 });
 

@@ -5,6 +5,7 @@ import { View, Text, StyleSheet, Pressable, Animated, Easing, AccessibilityInfo 
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Color, FontFamily } from '../GlobalStyles';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 const ACCENT = Color.colorSandybrown;
 const INACTIVE = '#9E9696';
@@ -87,7 +88,9 @@ const AnimatedMobileTabs = ({
   return (
     <View style={styles.container}>
       {/* Content Area */}
-      <View style={styles.contentWrapper}>{renderContent()}</View>
+      <View style={styles.contentWrapper}>
+        <ErrorBoundary key={activeTab} name={activeTab}>{renderContent()}</ErrorBoundary>
+      </View>
 
       {/* Tab bar */}
       <View

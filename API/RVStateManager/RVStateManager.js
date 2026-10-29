@@ -2,6 +2,7 @@
 
 import { createCANBusListener } from '../../Service/CANBusListener';
 import { RVControlService } from '../rvAPI';
+import { RV_WS_URL, RVConnection, logRVError } from '../../config/rvConnection';
 
 // For React Native environments
 let AsyncStorage, NetInfo;
@@ -432,9 +433,20 @@ class RVStateManager {
   
   // Set up WebSocket for multi-device synchronization
   setupSyncSocket() {
+    // Don't hammer an unreachable server - connect once it's available
+    if (!RVConnection.isOnline()) {
+      if (!this.cancelWaitForServer) {
+        this.cancelWaitForServer = RVConnection.whenOnline(() => {
+          this.cancelWaitForServer = null;
+          this.setupSyncSocket();
+        });
+      }
+      return;
+    }
+
     try {
       // Use your existing server's WebSocket endpoint
-      const wsUrl = 'ws://192.168.8.200:3000'; // Match your server.js configuration
+      const wsUrl = RV_WS_URL; // Configured in config/rvConnection.js
       
       console.log(`RVStateManager: Connecting to WebSocket at ${wsUrl}`);
       this.syncSocket = new WebSocket(wsUrl);
@@ -516,8 +528,9 @@ class RVStateManager {
         }
       };
       
-      this.syncSocket.onerror = (error) => {
-        console.error('RVStateManager: WebSocket error:', error);
+      this.syncSocket.onerror = () => {
+        logRVError('RVStateManager: WebSocket error');
+        RVConnection.reportFailure();
         this.state.isOnline = false;
         this.setRVLinked(false);
       };
@@ -775,6 +788,11 @@ class RVStateManager {
   
   // Clean up resources
   destroy() {
+    if (this.cancelWaitForServer) {
+      this.cancelWaitForServer();
+      this.cancelWaitForServer = null;
+    }
+
     if (this.canBusListener) {
       this.canBusListener.stop();
     }

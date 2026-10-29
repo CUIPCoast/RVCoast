@@ -1,8 +1,8 @@
 import axios from 'axios';
+import { RV_API_URL, attachRVConnectionInterceptors, logRVError } from '../config/rvConnection';
 
-// Set your Raspberry Pi's IP address and port
-// You'll need to change this to your Raspberry Pi's actual IP on your network
-const API_URL = 'http://192.168.8.200:3000/api';
+// Server address lives in config/rvConnection.js
+const API_URL = RV_API_URL;
 
 // Create an instance of axios with the base URL
 const api = axios.create({
@@ -10,15 +10,19 @@ const api = axios.create({
   timeout: 15000, // 5 second timeout
 });
 
+attachRVConnectionInterceptors(api);
+
 // API service for RV Control
 export const RVControlService = {
+  baseURL: API_URL,
+
   // Get all available commands
   getCommands: async () => {
     try {
       const response = await api.get('/commands');
       return response.data;
     } catch (error) {
-      console.error('Error fetching commands:', error);
+      logRVError('Error fetching commands:', error);
       throw error;
     }
   },
@@ -29,7 +33,7 @@ export const RVControlService = {
       const response = await api.post('/execute', { command });
       return response.data;
     } catch (error) {
-      console.error(`Error executing command ${command}:`, error);
+      logRVError(`Error executing command ${command}:`, error);
       throw error;
     }
   },
@@ -40,7 +44,7 @@ export const RVControlService = {
       const response = await api.post('/raw', { canCommand });
       return response.data;
     } catch (error) {
-      console.error(`Error executing raw command ${canCommand}:`, error);
+      logRVError(`Error executing raw command ${canCommand}:`, error);
       throw error;
     }
   },
@@ -55,7 +59,7 @@ export const RVControlService = {
       });
       return response.data;
     } catch (error) {
-      console.error(`Error setting brightness for ${lightId}:`, error);
+      logRVError(`Error setting brightness for ${lightId}:`, error);
       throw error;
     }
   },
@@ -66,7 +70,7 @@ export const RVControlService = {
       const response = await api.post('/cancel-dimming', { lightId });
       return response.data;
     } catch (error) {
-      console.error(`Error cancelling dimming for ${lightId}:`, error);
+      logRVError(`Error cancelling dimming for ${lightId}:`, error);
       throw error;
     }
   },
@@ -77,7 +81,7 @@ export const RVControlService = {
       const response = await api.get('/brightness-status');
       return response.data;
     } catch (error) {
-      console.error('Error getting brightness status:', error);
+      logRVError('Error getting brightness status:', error);
       throw error;
     }
   },
@@ -94,7 +98,7 @@ export const RVControlService = {
       const response = await api.post('/light-control', requestData);
       return response.data;
     } catch (error) {
-      console.error(`Error controlling light ${lightId}:`, error);
+      logRVError(`Error controlling light ${lightId}:`, error);
       throw error;
     }
   },
@@ -105,7 +109,7 @@ export const RVControlService = {
       const response = await api.post('/brightness', { lightId, level });
       return response.data;
     } catch (error) {
-      console.error(`Error setting brightness for ${lightId}:`, error);
+      logRVError(`Error setting brightness for ${lightId}:`, error);
       throw error;
     }
   },
@@ -116,7 +120,7 @@ export const RVControlService = {
       const response = await api.get('/status');
       return response.data;
     } catch (error) {
-      console.error('Error fetching system status:', error);
+      logRVError('Error fetching system status:', error);
       throw error;
     }
   }
@@ -165,7 +169,7 @@ export const RVControls = {
         await RVControlService.setBrightnessRamp(setting.lightId, setting.brightness);
         await new Promise(resolve => setTimeout(resolve, 500)); // 500ms delay between lights
       } catch (error) {
-        console.error(`Error setting mood lighting for ${setting.lightId}:`, error);
+        logRVError(`Error setting mood lighting for ${setting.lightId}:`, error);
       }
     }
   },
@@ -189,7 +193,7 @@ export const RVControls = {
         await RVControlService.setBrightnessRamp(setting.lightId, setting.brightness);
         await new Promise(resolve => setTimeout(resolve, 500));
       } catch (error) {
-        console.error(`Error setting evening lighting for ${setting.lightId}:`, error);
+        logRVError(`Error setting evening lighting for ${setting.lightId}:`, error);
       }
     }
   },
@@ -268,7 +272,7 @@ export const LightDimmer = {
       
       return result;
     } catch (error) {
-      console.error(`Error ramping ${lightId}:`, error);
+      logRVError(`Error ramping ${lightId}:`, error);
       throw error;
     }
   },
@@ -287,7 +291,7 @@ export const LightDimmer = {
           onProgress ? (current, target) => onProgress(setting.lightId, current, target) : null
         );
       } catch (error) {
-        console.error(`Error ramping ${setting.lightId}:`, error);
+        logRVError(`Error ramping ${setting.lightId}:`, error);
         return { success: false, lightId: setting.lightId, error: error.message };
       }
     });
@@ -322,7 +326,7 @@ export const LightDimmer = {
     try {
       return await RVControlService.cancelDimming(lightId);
     } catch (error) {
-      console.error(`Error cancelling dimming for ${lightId}:`, error);
+      logRVError(`Error cancelling dimming for ${lightId}:`, error);
       throw error;
     }
   },
@@ -334,7 +338,7 @@ export const LightDimmer = {
     try {
       return await RVControlService.getBrightnessStatus();
     } catch (error) {
-      console.error('Error getting brightness status:', error);
+      logRVError('Error getting brightness status:', error);
       throw error;
     }
   }

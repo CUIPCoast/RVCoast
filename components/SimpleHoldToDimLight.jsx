@@ -372,13 +372,7 @@ const SimpleHoldToDimLight = ({
   const brightness = Math.max(0, Math.min(100, Math.round(localBrightness)));
   const showOn = localIsOn && !error;
 
-  const getStatusText = () => {
-    if (error) return error;
-    if (isToggling) return localIsOn ? "Turning off..." : "Turning on...";
-    if (isDimming) return dimmingDirection === 'up' ? "Brightening ↑" : "Dimming ↓";
-    if (!localIsOn) return "Tap to turn on";
-    return supportsDimming ? "Hold to dim" : "Tap to turn off";
-  };
+  
 
   // Icon circle fades with brightness so dim lights read as dim
   const iconCircleColor = showOn
@@ -434,15 +428,7 @@ const SimpleHoldToDimLight = ({
 
       <View>
         <Text style={styles.name} numberOfLines={2}>{name}</Text>
-        <Text
-          style={[
-            styles.status,
-            { color: error ? "#FF6B6B" : showOn ? "#FFB267" : "#9E9696" },
-          ]}
-          numberOfLines={1}
-        >
-          {getStatusText()}
-        </Text>
+        
       </View>
 
       {/* Brightness track */}
@@ -529,11 +515,7 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.latoBold,
     marginTop: 12,
   },
-  status: {
-    fontSize: 12,
-    fontFamily: FontFamily.latoRegular,
-    marginTop: 2,
-  },
+  
   track: {
     height: 4,
     borderRadius: 2,

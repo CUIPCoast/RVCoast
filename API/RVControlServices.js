@@ -1,5 +1,6 @@
 // services/rvControlServices.js
 import { RVControlService } from '../API/rvAPI';
+import { logRVError } from '../config/rvConnection';
 
 /**
  * Service module for Awning control functionality
@@ -23,7 +24,7 @@ export const AwningService = {
       console.log('✅ Awning extend command sent successfully');
       return { success: true, result, command: 'extend', instance: 9 };
     } catch (error) {
-      console.error('❌ Failed to extend awning:', error);
+      logRVError('❌ Failed to extend awning:', error);
       return { success: false, error: error.message };
     }
   },
@@ -46,7 +47,7 @@ export const AwningService = {
       console.log('✅ Awning retract command sent successfully');
       return { success: true, result, command: 'retract', instance: 10 };
     } catch (error) {
-      console.error('❌ Failed to retract awning:', error);
+      logRVError('❌ Failed to retract awning:', error);
       return { success: false, error: error.message };
     }
   },
@@ -69,7 +70,7 @@ export const AwningService = {
       console.log('✅ Awning stop commands sent successfully');
       return { success: true, command: 'stop', instances: [9, 10] };
     } catch (error) {
-      console.error('❌ Failed to stop awning:', error);
+      logRVError('❌ Failed to stop awning:', error);
       return { success: false, error: error.message };
     }
   },
@@ -102,7 +103,7 @@ export const AwningService = {
       console.log('✅ Emergency stop commands sent');
       return { success: true, command: 'emergency_stop' };
     } catch (error) {
-      console.error('❌ Emergency stop failed:', error);
+      logRVError('❌ Emergency stop failed:', error);
       return { success: false, error: error.message };
     }
   },
@@ -124,7 +125,7 @@ export const AwningService = {
       console.log('✅ Extend motor test started (5 seconds)');
       return { success: true, test: 'extend_motor', duration: 5 };
     } catch (error) {
-      console.error('❌ Extend motor test failed:', error);
+      logRVError('❌ Extend motor test failed:', error);
       return { success: false, error: error.message };
     }
   },
@@ -143,7 +144,7 @@ export const AwningService = {
       console.log('✅ Retract motor test started (5 seconds)');
       return { success: true, test: 'retract_motor', duration: 5 };
     } catch (error) {
-      console.error('❌ Retract motor test failed:', error);
+      logRVError('❌ Retract motor test failed:', error);
       return { success: false, error: error.message };
     }
   },
@@ -172,7 +173,7 @@ export const AwningService = {
         }
       };
     } catch (error) {
-      console.error('❌ Failed to get awning status:', error);
+      logRVError('❌ Failed to get awning status:', error);
       return { success: false, error: error.message };
     }
   }
@@ -203,7 +204,7 @@ export const WaterService = {
       const result = await RVControlService.executeCommand('water_pump_toggle');
       return { success: true, result };
     } catch (error) {
-      console.error('Failed to toggle water pump:', error);
+      logRVError('Failed to toggle water pump:', error);
       return { success: false, error: error.message };
     }
   },
@@ -218,7 +219,7 @@ export const WaterService = {
       const result = await RVControlService.executeCommand('water_heater_toggle');
       return { success: true, result };
     } catch (error) {
-      console.error('Failed to toggle water heater:', error);
+      logRVError('Failed to toggle water heater:', error);
       return { success: false, error: error.message };
     }
   }
@@ -238,7 +239,7 @@ export const ClimateService = {
       const result = await RVControlService.executeCommand('night_setting');
       return { success: true, result };
     } catch (error) {
-      console.error('Failed to set night mode:', error);
+      logRVError('Failed to set night mode:', error);
       return { success: false, error: error.message };
     }
   },
@@ -253,7 +254,7 @@ export const ClimateService = {
       const result = await RVControlService.executeCommand('dehumid_setting');
       return { success: true, result };
     } catch (error) {
-      console.error('Failed to set dehumidify mode:', error);
+      logRVError('Failed to set dehumidify mode:', error);
       return { success: false, error: error.message };
     }
   },
@@ -268,7 +269,7 @@ export const ClimateService = {
       const result = await RVControlService.executeCommand('cool_setting');
       return { success: true, result };
     } catch (error) {
-      console.error('Failed to toggle cooling:', error);
+      logRVError('Failed to toggle cooling:', error);
       return { success: false, error: error.message };
     }
   },
@@ -283,7 +284,7 @@ export const ClimateService = {
       const result = await RVControlService.executeCommand('complete_cool_off');
       return { success: true, result };
     } catch (error) {
-      console.error('Failed to turn off cooling:', error);
+      logRVError('Failed to turn off cooling:', error);
       return { success: false, error: error.message };
     }
   },
@@ -298,7 +299,7 @@ export const ClimateService = {
       const result = await RVControlService.executeCommand('toe_kick');
       return { success: true, result };
     } catch (error) {
-      console.error('Failed to toggle toe kick:', error);
+      logRVError('Failed to toggle toe kick:', error);
       return { success: false, error: error.message };
     }
   },
@@ -313,7 +314,7 @@ export const ClimateService = {
       const result = await RVControlService.executeCommand('toe_kick_off');
       return { success: true, result };
     } catch (error) {
-      console.error('Failed to turn off toe kick:', error);
+      logRVError('Failed to turn off toe kick:', error);
       return { success: false, error: error.message };
     }
   },
@@ -328,7 +329,7 @@ export const ClimateService = {
       const result = await RVControlService.executeCommand('furnace_on');
       return { success: true, result };
     } catch (error) {
-      console.error('Failed to toggle furnace:', error);
+      logRVError('Failed to toggle furnace:', error);
       return { success: false, error: error.message };
     }
   },
@@ -343,7 +344,7 @@ export const ClimateService = {
       const result = await RVControlService.executeCommand('furnace_off');
       return { success: true, result };
     } catch (error) {
-      console.error('Failed to turn off furnace:', error);
+      logRVError('Failed to turn off furnace:', error);
       return { success: false, error: error.message };
     }
   },
@@ -370,7 +371,7 @@ export const ClimateService = {
       
       return { success: true };
     } catch (error) {
-      console.error('Failed to set auto mode:', error);
+      logRVError('Failed to set auto mode:', error);
       return { success: false, error: error.message };
     }
   },
@@ -385,7 +386,7 @@ export const ClimateService = {
       const result = await RVControlService.executeCommand('high_fan');
       return { success: true, result };
     } catch (error) {
-      console.error('Failed to set high fan speed:', error);
+      logRVError('Failed to set high fan speed:', error);
       return { success: false, error: error.message };
     }
   },
@@ -400,7 +401,7 @@ export const ClimateService = {
       const result = await RVControlService.executeCommand('medium_fan');
       return { success: true, result };
     } catch (error) {
-      console.error('Failed to set medium fan speed:', error);
+      logRVError('Failed to set medium fan speed:', error);
       return { success: false, error: error.message };
     }
   },
@@ -427,7 +428,7 @@ export const ClimateService = {
       
       return { success: true };
     } catch (error) {
-      console.error('Failed to set low fan speed:', error);
+      logRVError('Failed to set low fan speed:', error);
       return { success: false, error: error.message };
     }
   },
@@ -441,7 +442,7 @@ export const ClimateService = {
       const result = await RVControlService.executeCommand('temp_increase');
       return { success: true, result };
     } catch (error) {
-      console.error('Failed to increase temperature:', error);
+      logRVError('Failed to increase temperature:', error);
       return { success: false, error: error.message };
     }
   },
@@ -455,7 +456,7 @@ export const ClimateService = {
       const result = await RVControlService.executeCommand('temp_decrease');
       return { success: true, result };
     } catch (error) {
-      console.error('Failed to decrease temperature:', error);
+      logRVError('Failed to decrease temperature:', error);
       return { success: false, error: error.message };
     }
   }
@@ -474,7 +475,7 @@ export const LightService = {
       const result = await RVControlService.executeCommand('all_lights_on');
       return { success: true, result };
     } catch (error) {
-      console.error('Failed to turn all lights on:', error);
+      logRVError('Failed to turn all lights on:', error);
       return { success: false, error: error.message };
     }
   },
@@ -488,7 +489,7 @@ export const LightService = {
       const result = await RVControlService.executeCommand('all_lights_off');
       return { success: true, result };
     } catch (error) {
-      console.error('Failed to turn all lights off:', error);
+      logRVError('Failed to turn all lights off:', error);
       return { success: false, error: error.message };
     }
   },
@@ -503,7 +504,7 @@ export const LightService = {
       const result = await RVControlService.executeCommand(lightCommand);
       return { success: true, result };
     } catch (error) {
-      console.error(`Failed to toggle light (${lightCommand}):`, error);
+      logRVError(`Failed to toggle light (${lightCommand}):`, error);
       return { success: false, error: error.message };
     }
   }
@@ -522,7 +523,7 @@ export const FanService = {
       const result = await RVControlService.executeCommand('bath_fan_toggle');
       return { success: true, result };
     } catch (error) {
-      console.error('Failed to toggle bathroom fan:', error);
+      logRVError('Failed to toggle bathroom fan:', error);
       return { success: false, error: error.message };
     }
   },
@@ -536,7 +537,7 @@ export const FanService = {
       const result = await RVControlService.executeCommand('bay_vent_fan_toggle');
       return { success: true, result };
     } catch (error) {
-      console.error('Failed to toggle bay vent fan:', error);
+      logRVError('Failed to toggle bay vent fan:', error);
       return { success: false, error: error.message };
     }
   }
@@ -555,7 +556,7 @@ export const BarLiftService = {
       const result = await RVControlService.executeCommand('bar_lift_up');
       return { success: true, result };
     } catch (error) {
-      console.error('Failed to lift bar up:', error);
+      logRVError('Failed to lift bar up:', error);
       return { success: false, error: error.message };
     }
   },
@@ -569,7 +570,7 @@ export const BarLiftService = {
       const result = await RVControlService.executeCommand('bar_lift_down');
       return { success: true, result };
     } catch (error) {
-      console.error('Failed to lower bar down:', error);
+      logRVError('Failed to lower bar down:', error);
       return { success: false, error: error.message };
     }
   }

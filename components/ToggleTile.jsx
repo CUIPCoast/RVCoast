@@ -13,7 +13,7 @@ const ToggleTile = ({
   disabled,
   size = 'compact',
   onText = 'Running',
-  offText = 'Tap to turn on',
+  offText = 'Off',
   showPill = true,
   style,
 }) => {

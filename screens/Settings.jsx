@@ -1,20 +1,15 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, SectionList, Image, TouchableOpacity, Alert, ScrollView } from 'react-native';
-import GroupComponent from '../components/GroupComponent';
-import ToggleSwitch from '../components/ToggleSwitch.jsx';
+import { Alert } from 'react-native';
 import RVConnectionModal from '../components/RVConnectionModal';
 import TabletSettings from '../components/TabletSettings';
-import { Color, Gap, FontSize, FontFamily, isDarkMode } from '../GlobalStyles';
+import MobileSettings from '../components/MobileSettings';
 import { useScreenSize, handleSettingsToggle, handleSettingsItemPress } from '../helper';
 import { useAuth } from '../components/AuthContext';
-import moment from 'moment';
-import { Ionicons } from '@expo/vector-icons';
 
 
 
 const Settings = () => {
   const isTablet = useScreenSize();
-  const isDark = isDarkMode;
   const { user, logout, disconnectFromRV } = useAuth();
   const [showRVModal, setShowRVModal] = useState(false);
   const [toggles, setToggles] = useState({
@@ -168,334 +163,21 @@ const Settings = () => {
     );
   }
 
-  // Mobile View
   return (
-    <View style={[styles.settings, styles.settingsLayout]}>
-      <View style={[styles.mobileHeader, { backgroundColor: isDark ? '#1B1B1B' : Color.colorWhitesmoke_100 }]}>
-        <Text style={[styles.screenTitle, { color: isDark ? Color.colorWhitesmoke_100 : Color.colorGray_200 }]}>
-          Settings
-        </Text>
-      </View>
-      
-      <SectionList
+    <>
+      <MobileSettings
         sections={sections}
-        keyExtractor={item => item.key}
-        stickySectionHeadersEnabled={true}
-        renderSectionHeader={({ section: { title } }) => (
-          <View style={[styles.sectionHeaderContainer, { backgroundColor: isDark ? '#1B1B1B' : Color.colorWhitesmoke_100 }]}>
-            <Text style={[styles.sectionHeader, { color: isDark ? Color.colorWhitesmoke_100 : Color.colorGray_200 }]}>
-              {title}
-            </Text>
-          </View>
-        )}
-        renderItem={({ item }) => {
-          if (item.type === 'link' || item.type === 'action' || item.type === 'info') {
-            return (
-              <TouchableOpacity style={styles.row} onPress={() => handleItemPress(item)}>
-                <Text style={[styles.label, { color: isDark ? Color.colorWhitesmoke_100 : Color.colorGray_200 }]}>
-                  {item.label}
-                </Text>
-                <Text style={[styles.arrow, { color: isDark ? Color.colorWhitesmoke_100 : Color.colorGray_200 }]}>
-                  {item.type === 'info' ? 'ℹ️' : '›'}
-                </Text>
-              </TouchableOpacity>
-            );
-          }
-
-          if (item.type === 'toggle') {
-            const notificationKeys = ['notifyMessages', 'notifyReminders'];
-            const disabled = notificationKeys.includes(item.key) && !toggles.pushNotifications;
-
-            return (
-              <View style={styles.row}>
-                <Text
-                  style={[styles.label, {
-                    color: isDark ? Color.colorWhitesmoke_100 : Color.colorGray_200,
-                    opacity: disabled ? 0.5 : 1,
-                  }]}
-                >
-                  {item.label}
-                </Text>
-                <View style={styles.toggleContainer}>
-                  <ToggleSwitch
-                    isOn={disabled ? false : toggles[item.key]}
-                    setIsOn={() => onToggle(item.key)}
-                    disabled={disabled}
-                  />
-                </View>
-              </View>
-            );
-          }
-
-          return null;
-        }}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-        contentContainerStyle={styles.sectionListContent}
+        toggles={toggles}
+        onToggle={onToggle}
+        onItemPress={handleItemPress}
+        user={user}
       />
-      
-      {/* RV Connection Modal */}
-      <RVConnectionModal 
-        visible={showRVModal} 
-        onClose={() => setShowRVModal(false)} 
+      <RVConnectionModal
+        visible={showRVModal}
+        onClose={() => setShowRVModal(false)}
       />
-    </View>
+    </>
   );
 };
-
-const styles = StyleSheet.create({
-  // Mobile Styles - Modernized
-  settingsLayout: {
-    width: '100%',
-    paddingTop: 64,
-    overflow: 'hidden',
-  },
-  settings: {
-    flex: 1,
-    backgroundColor: '#1B1B1B',
-  },
-  mobileHeader: {
-    paddingHorizontal: 24,
-    paddingBottom: 24,
-    alignItems: 'center',
-  },
-  screenTitle: {
-    fontSize: 32,
-    fontFamily: FontFamily.latoBold,
-    fontWeight: '700',
-    textAlign: 'center',
-    numberOfLines: 1,
-    adjustsFontSizeToFit: true,
-    minimumFontScale: 0.8,
-    letterSpacing: -0.5,
-  },
-  sectionHeaderContainer: {
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderBottomWidth: 0,
-    backgroundColor: 'rgba(30, 30, 30, 0.6)',
-  },
-  sectionHeader: {
-    fontSize: 16,
-    fontFamily: FontFamily.latoBold,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    opacity: 0.8,
-  },
-  sectionListContent: {
-    paddingBottom: 32,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 18,
-    paddingHorizontal: 20,
-    minHeight: 60,
-    backgroundColor: 'rgba(40, 40, 40, 0.4)',
-    marginHorizontal: 16,
-    marginVertical: 1,
-    borderRadius: 12,
-  },
-  label: {
-    fontSize: 16,
-    fontFamily: FontFamily.latoRegular,
-    fontWeight: '500',
-    flex: 1,
-    letterSpacing: 0.2,
-  },
-  arrow: {
-    fontSize: 20,
-    marginLeft: 12,
-    opacity: 0.6,
-  },
-  toggleContainer: {
-    marginLeft: 'auto',
-  },
-  separator: {
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    marginLeft: 20,
-    marginRight: 20,
-  },
-
-  // Tablet Styles
-  tabletContainer: {
-    flex: 1,
-    paddingTop: 40,
-  },
-  tabletHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: Color.colorGray_100,
-  },
-  tabletHeaderLeft: {
-    flex: 1,
-  },
-  tabletHeaderCenter: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  tabletHeaderRight: {
-    flex: 1,
-    alignItems: 'flex-end',
-  },
-  tabletDay: {
-    fontSize: FontSize.size_5xl,
-    fontFamily: FontFamily.latoBold,
-    fontWeight: 'bold',
-  },
-  tabletDate: {
-    fontSize: FontSize.size_lg,
-    fontFamily: FontFamily.latoRegular,
-    marginTop: 4,
-  },
-  tabletTitle: {
-    fontSize: FontSize.size_9xl,
-    fontFamily: FontFamily.latoBold,
-    fontWeight: 'bold',
-  },
-  tabletLogo: {
-    width: 60,
-    height: 60,
-  },
-  tabletScrollView: {
-    flex: 1,
-    paddingHorizontal: 40,
-  },
-  tabletProfileCard: {
-    borderRadius: 16,
-    padding: 24,
-    marginVertical: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  tabletProfileContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  tabletProfileAvatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: Color.colorGray_200,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  tabletProfileInitials: {
-    fontSize: FontSize.size_5xl,
-    fontFamily: FontFamily.latoBold,
-    fontWeight: 'bold',
-  },
-  tabletProfileInfo: {
-    flex: 1,
-    marginLeft: 20,
-  },
-  tabletProfileName: {
-    fontSize: FontSize.size_5xl,
-    fontFamily: FontFamily.latoBold,
-    fontWeight: 'bold',
-  },
-  tabletProfileEmail: {
-    fontSize: FontSize.size_lg,
-    fontFamily: FontFamily.latoRegular,
-    marginTop: 4,
-  },
-  tabletProfileEditButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Color.colorGray_100,
-  },
-  tabletProfileEditText: {
-    fontSize: FontSize.size_md,
-    fontFamily: FontFamily.latoRegular,
-  },
-  tabletGrid: {
-    flexDirection: 'row',
-    gap: 20,
-    marginBottom: 20,
-  },
-  tabletGridColumn: {
-    flex: 1,
-    gap: 20,
-  },
-  tabletCard: {
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  tabletCardTitle: {
-    fontSize: FontSize.size_3xl,
-    fontFamily: FontFamily.latoBold,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  tabletCardItem: {
-    borderBottomWidth: 1,
-    borderBottomColor: Color.colorGray_100,
-    paddingVertical: 12,
-  },
-  tabletToggleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  tabletTouchableRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  tabletItemLabel: {
-    fontSize: FontSize.size_lg,
-    fontFamily: FontFamily.latoRegular,
-    flex: 1,
-  },
-  tabletArrow: {
-    fontSize: 18,
-    marginLeft: 10,
-  },
-  tabletFooter: {
-    paddingVertical: 40,
-    alignItems: 'center',
-  },
-  tabletFooterText: {
-    fontSize: FontSize.size_sm,
-    fontFamily: FontFamily.latoRegular,
-    color: '#FFFFFF',
-  },
-  
-  // RV Connection Badge Styles
-  rvConnectionBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 5,
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
-  },
-  rvConnectionText: {
-    color: '#4CAF50',
-    fontSize: 12,
-    fontFamily: FontFamily.latoRegular,
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-});
 
 export default Settings;

@@ -102,16 +102,14 @@ const WaterTanks =({ name, tankType, trackColor }) => {
           setLastUpdate(new Date());
         });
 
+        // The CAN listener reconnects on its own once the RV server is reachable
         canListener.current.on('disconnected', () => {
           console.log(`TankHeaterControl: CAN listener disconnected for ${name}`);
           setIsConnected(false);
-          scheduleReconnect();
         });
 
-        canListener.current.on('error', (error) => {
-          console.error(`TankHeaterControl: CAN listener error for ${name}:`, error);
+        canListener.current.on('error', () => {
           setIsConnected(false);
-          scheduleReconnect();
         });
 
         // Start the listener

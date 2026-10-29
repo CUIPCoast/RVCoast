@@ -5,9 +5,27 @@ import RootNavigator from "../navigation/RootNavigator";
 import TabletNavigator from "../navigation/TabletNavigator";
 import { AuthProvider, useAuth } from "../components/AuthContext";
 import { useScreenSize } from "../helper";
+import deviceDetection from "../helper/deviceDetection";
+import * as ScreenOrientation from "expo-screen-orientation";
 
 
 LogBox.ignoreAllLogs();
+
+// Don't let uncaught JS errors open the full-screen dev error overlay; just log them.
+// Render errors are caught by ErrorBoundary around each tab instead.
+if (global.ErrorUtils) {
+  global.ErrorUtils.setGlobalHandler((error, isFatal) => {
+    console.error(`[${isFatal ? "Fatal" : "Uncaught"} error]`, error);
+  });
+}
+
+// Tablet UI is built for landscape only — lock it as early as possible, before first render.
+// Phones keep the default orientation behavior.
+if (deviceDetection.isTablet()) {
+  ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE).catch((error) =>
+    console.warn("Failed to lock tablet orientation:", error)
+  );
+}
 
 const AppContent = () => {
   const { isLoading } = useAuth();

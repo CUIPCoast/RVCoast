@@ -1,5 +1,6 @@
 // Service/AwningCANListener.js - Enhanced CAN bus monitoring specifically for awning control
 import { EventEmitter } from 'events';
+import { RV_HTTP_URL, RVConnection, logRVError } from '../config/rvConnection';
 
 /**
  * Enhanced CAN Bus Listener specifically for awning motor control and position feedback
@@ -14,7 +15,9 @@ class AwningCANListener extends EventEmitter {
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 5;
     this.reconnectDelay = 2000;
-    this.baseUrl = 'http://192.168.8.200:3000'; // Match your server.js configuration
+    this.baseUrl = RV_HTTP_URL; // Configured in config/rvConnection.js
+    this.cancelWaitForServer = null;
+    this.stopped = false;
     
     // Awning-specific state tracking
     this.awningState = {
@@ -85,6 +88,20 @@ class AwningCANListener extends EventEmitter {
    * Set up WebSocket connection
    */
   setupWebSocket() {
+    if (this.stopped) return;
+
+    // Don't hammer an unreachable server - connect once it's available
+    if (!RVConnection.isOnline()) {
+      if (!this.cancelWaitForServer) {
+        this.cancelWaitForServer = RVConnection.whenOnline(() => {
+          this.cancelWaitForServer = null;
+          this.reconnectAttempts = 0;
+          this.setupWebSocket();
+        });
+      }
+      return;
+    }
+
     try {
       const wsUrl = this.baseUrl.replace(/^http/, 'ws');
       
@@ -145,10 +162,11 @@ class AwningCANListener extends EventEmitter {
         }
       };
       
-      this.ws.onerror = (error) => {
-        console.error('AwningCANListener: WebSocket error:', error);
+      this.ws.onerror = () => {
+        // onclose follows and handles reconnecting; the error event itself carries no useful detail
+        logRVError('AwningCANListener: WebSocket error');
         this.connected = false;
-        this.emit('error', error);
+        RVConnection.reportFailure();
       };
       
     } catch (error) {
@@ -577,6 +595,11 @@ class AwningCANListener extends EventEmitter {
    * Stop the listener
    */
   stop() {
+    this.stopped = true;
+    if (this.cancelWaitForServer) {
+      this.cancelWaitForServer();
+      this.cancelWaitForServer = null;
+    }
     if (this.ws) {
       this.ws.close(1000, 'Awning listener stopping');
       this.ws = null;

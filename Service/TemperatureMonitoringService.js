@@ -1,6 +1,7 @@
 // Service/TemperatureMonitoringService.js - Real-time temperature monitoring from CAN bus
 import { createCANBusListener } from './CANBusListener';
 import { EventEmitter } from 'events';
+import { logRVError } from '../config/rvConnection';
 
 /**
  * Service to monitor real-time temperature data from RV climate control system
@@ -64,18 +65,21 @@ class TemperatureMonitoringService extends EventEmitter {
         this.emit('connected');
       });
 
+      // The CAN listener reconnects on its own once the RV server is reachable
       this.canListener.on('disconnected', () => {
         console.log('TemperatureMonitoringService: CAN listener disconnected');
         this.connected = false;
         this.emit('disconnected');
-        this.scheduleReconnect();
       });
 
       this.canListener.on('error', (error) => {
-        console.error('TemperatureMonitoringService: CAN listener error:', error);
+        logRVError('TemperatureMonitoringService: CAN listener error:', error);
         this.connected = false;
         this.emit('error', error);
-        this.scheduleReconnect();
+      });
+
+      this.canListener.on('maxReconnectAttemptsReached', () => {
+        this.emit('maxReconnectAttemptsReached');
       });
 
       // Start the listener

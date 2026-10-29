@@ -1,5 +1,6 @@
 // API/VictronEnergyService.js - Fixed version with SOC range correction
 import { VictronAPI } from './VictronAPI';
+import { logRVError } from '../config/rvConnection';
 
 // Configuration
 const CONFIG = {
@@ -213,7 +214,7 @@ const checkApiAvailability = async () => {
     console.log('Victron API available:', connectionStatus.apiAvailable);
     return connectionStatus.apiAvailable;
   } catch (error) {
-    console.error('Error checking API availability:', error);
+    logRVError('Error checking API availability:', error);
     connectionStatus.apiAvailable = false;
     return false;
   }
@@ -251,7 +252,7 @@ const fetchVictronData = async () => {
     
     return true;
   } catch (error) {
-    console.error('Error fetching Victron data:', error);
+    logRVError('Error fetching Victron data:', error);
     
     connectionStatus.connected = false;
     connectionStatus.failCount++;
@@ -320,7 +321,7 @@ export const VictronEnergyService = {
       
       return true;
     } catch (error) {
-      console.error('Failed to initialize Victron service:', error);
+      logRVError('Failed to initialize Victron service:', error);
       
       // Fall back to simulation
       console.log('Falling back to simulation mode');
@@ -355,7 +356,7 @@ export const VictronEnergyService = {
       if (victronData) victronData.battery = data;
       return data;
     } catch (error) {
-      console.error('Error getting battery status:', error);
+      logRVError('Error getting battery status:', error);
       
       // Fall back to cached or simulated data
       if (victronData && victronData.battery) {
@@ -384,7 +385,7 @@ export const VictronEnergyService = {
       if (victronData) victronData.acLoads = data;
       return data;
     } catch (error) {
-      console.error('Error getting AC loads data:', error);
+      logRVError('Error getting AC loads data:', error);
       
       // Fall back to cached or simulated data
       if (victronData && victronData.acLoads) {
@@ -410,7 +411,7 @@ export const VictronEnergyService = {
       if (victronData) victronData.pvCharger = data;
       return data;
     } catch (error) {
-      console.error('Error getting PV charger data:', error);
+      logRVError('Error getting PV charger data:', error);
       
       // Fall back to cached or simulated data
       if (victronData && victronData.pvCharger) {
@@ -436,7 +437,7 @@ export const VictronEnergyService = {
       if (victronData) victronData.dcSystem = data;
       return data;
     } catch (error) {
-      console.error('Error getting DC system data:', error);
+      logRVError('Error getting DC system data:', error);
       
       // Fall back to cached or simulated data
       if (victronData && victronData.dcSystem) {
@@ -468,7 +469,7 @@ export const VictronEnergyService = {
         return data;
       }
     } catch (error) {
-      console.error('Error getting grid data:', error);
+      logRVError('Error getting grid data:', error);
       
       // Fall back to simulated data
       return simulatedData.grid;
@@ -491,7 +492,7 @@ export const VictronEnergyService = {
       if (victronData) victronData.systemOverview = data;
       return data;
     } catch (error) {
-      console.error('Error getting system overview:', error);
+      logRVError('Error getting system overview:', error);
       
       // Fall back to cached or simulated data
       if (victronData && victronData.systemOverview) {
@@ -623,7 +624,7 @@ export const VictronEnergyService = {
         apiStatus: 'simulation'
       };
     } catch (error) {
-      console.error('Error getting all Victron data:', error);
+      logRVError('Error getting all Victron data:', error);
       
       // If API fails, switch to simulation mode
       useSimulation = true;
@@ -724,7 +725,7 @@ export const VictronEnergyService = {
       
       return true;
     } catch (error) {
-      console.error('Error connecting to Victron API:', error);
+      logRVError('Error connecting to Victron API:', error);
       
       // Fall back to simulation
       useSimulation = true;
@@ -789,7 +790,7 @@ export const VictronEnergyService = {
       
       return true;
     } catch (error) {
-      console.error('Error updating configuration:', error);
+      logRVError('Error updating configuration:', error);
       return false;
     }
   },
@@ -815,7 +816,7 @@ export const VictronEnergyService = {
 
 // Auto-initialize when imported
 VictronEnergyService.initialize().catch(error => {
-  console.error('Failed to initialize VictronEnergyService:', error);
+  logRVError('Failed to initialize VictronEnergyService:', error);
   // Always ensure simulation is running if initialization fails
   useSimulation = true;
   startSimulation();

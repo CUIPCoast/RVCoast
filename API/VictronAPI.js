@@ -3,6 +3,7 @@ import axios from 'axios';
 
 // Use the same base URL as your RV control API
 import { RVControlService } from './rvAPI'; 
+import { attachRVConnectionInterceptors, logRVError } from '../config/rvConnection';
 
 // Extract the base URL from the RV control API or use fallback
 // This is more robust in determining the correct base URL
@@ -26,6 +27,8 @@ const api = axios.create({
   timeout: 10000, // 10 second timeout for slower connections
 });
 
+attachRVConnectionInterceptors(api);
+
 // Log configuration on startup
 console.log(`VictronAPI configured with baseURL: ${api.defaults.baseURL}`);
 
@@ -43,18 +46,18 @@ export const VictronAPI = {
       const response = await api.get('/all');
       return response.data.data;
     } catch (error) {
-      console.error('Error fetching Victron data:', error);
+      logRVError('Error fetching Victron data:', error);
       
       // Enhanced error logging for debugging
       if (error.response) {
         // The request was made and the server responded with a status code
         // that falls out of the range of 2xx
-        console.error('Error response data:', error.response.data);
-        console.error('Error response status:', error.response.status);
-        console.error('Error response headers:', error.response.headers);
+        logRVError('Error response data:', error.response.data);
+        logRVError('Error response status:', error.response.status);
+        logRVError('Error response headers:', error.response.headers);
       } else if (error.request) {
         // The request was made but no response was received
-        console.error('No response received, request details:', error.request);
+        logRVError('No response received, request details:', error.request);
       }
       
       throw error;
@@ -71,7 +74,7 @@ export const VictronAPI = {
       const response = await api.get('/battery');
       return response.data.data;
     } catch (error) {
-      console.error('Error fetching battery data:', error);
+      logRVError('Error fetching battery data:', error);
       throw error;
     }
   },
@@ -85,7 +88,7 @@ export const VictronAPI = {
       const response = await api.get('/pv');
       return response.data.data;
     } catch (error) {
-      console.error('Error fetching PV charger data:', error);
+      logRVError('Error fetching PV charger data:', error);
       throw error;
     }
   },
@@ -99,7 +102,7 @@ export const VictronAPI = {
       const response = await api.get('/ac-loads');
       return response.data.data;
     } catch (error) {
-      console.error('Error fetching AC loads data:', error);
+      logRVError('Error fetching AC loads data:', error);
       throw error;
     }
   },
@@ -113,7 +116,7 @@ export const VictronAPI = {
       const response = await api.get('/dc-system');
       return response.data.data;
     } catch (error) {
-      console.error('Error fetching DC system data:', error);
+      logRVError('Error fetching DC system data:', error);
       throw error;
     }
   },
@@ -127,7 +130,7 @@ export const VictronAPI = {
       const response = await api.get('/grid');
       return response.data.data;
     } catch (error) {
-      console.error('Error fetching grid data:', error);
+      logRVError('Error fetching grid data:', error);
       throw error;
     }
   },
@@ -141,7 +144,7 @@ export const VictronAPI = {
       const response = await api.get('/system');
       return response.data.data;
     } catch (error) {
-      console.error('Error fetching system overview:', error);
+      logRVError('Error fetching system overview:', error);
       throw error;
     }
   },
@@ -155,7 +158,7 @@ export const VictronAPI = {
       const response = await api.get('/status');
       return response.data;
     } catch (error) {
-      console.error('Error fetching API status:', error);
+      logRVError('Error fetching API status:', error);
       throw error;
     }
   },
@@ -170,7 +173,7 @@ export const VictronAPI = {
       const response = await api.post('/simulation', { enabled });
       return response.data;
     } catch (error) {
-      console.error('Error toggling simulation mode:', error);
+      logRVError('Error toggling simulation mode:', error);
       throw error;
     }
   },
@@ -185,7 +188,7 @@ export const VictronAPI = {
       const response = await api.post('/config', config);
       return response.data;
     } catch (error) {
-      console.error('Error updating configuration:', error);
+      logRVError('Error updating configuration:', error);
       throw error;
     }
   },
@@ -199,7 +202,7 @@ export const VictronAPI = {
       const response = await api.post('/reconnect');
       return response.data;
     } catch (error) {
-      console.error('Error reconnecting to Victron system:', error);
+      logRVError('Error reconnecting to Victron system:', error);
       throw error;
     }
   },
@@ -215,7 +218,7 @@ export const VictronAPI = {
       console.log('Victron API is available');
       return true;
     } catch (error) {
-      console.error('Victron API is not available:', error.message);
+      logRVError('Victron API is not available:', error.message);
       return false;
     }
   }
