@@ -12,6 +12,12 @@ const TANK_COLORS = {
   black: '#6B6363',
 };
 
+// Tanks shown at a fixed level instead of the live CAN reading (live values don't match the RV yet).
+const STATIC_LEVELS = {
+  fresh: 25,
+  gray: 25,
+};
+
 // Fresh water is a problem when low; gray/black waste is a problem when high.
 const getLevelStatus = (tankType, pct) => {
   if (tankType === 'fresh') {
@@ -52,9 +58,9 @@ const WaterTanks =({ name, tankType, trackColor }) => {
   useEffect(() => {
     const initializeTankLevels = () => {
       if (tankType === "fresh") {
-        setPercentage(25); // Current fresh water level
+        setPercentage(STATIC_LEVELS.fresh); // Current fresh water level
       } else if (tankType === "gray") {
-        setPercentage(0); // Current gray water level
+        setPercentage(STATIC_LEVELS.gray); // Current gray water level
       } else if (tankType === "black") {
         setPercentage(0); // Assuming black tank is also empty
       }
@@ -148,6 +154,9 @@ const WaterTanks =({ name, tankType, trackColor }) => {
   };
 
   const handleTankStatusMessage = (message) => {
+    // Static tanks keep their fixed level
+    if (STATIC_LEVELS[tankType] !== undefined) return;
+
     try {
       // Parse tank status from CAN message
       const tankInstance = message.instance;

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { FontFamily } from '../GlobalStyles';
 
 // Tablet home battery tile, styled to the app theme (dark brown + sandy orange).
@@ -25,7 +25,7 @@ const formatWatts = (watts) => {
   return `${Math.round(abs)} W`;
 };
 
-const TabletBatteryWidget = ({ soc, power = 0, voltage }) => {
+const TabletBatteryWidget = ({ soc, power = 0, voltage, shorePower = false }) => {
   const level = normaliseSoc(soc);
   const watts = parseFloat(power) || 0;
   const isCharging = watts > 1;
@@ -41,13 +41,22 @@ const TabletBatteryWidget = ({ soc, power = 0, voltage }) => {
       style={styles.container}
       accessible
       accessibilityLabel={
-        level === null
+        (level === null
           ? 'Battery, waiting for data'
-          : `Battery ${Math.round(level)} percent, ${stateLabel}, ${formatWatts(watts)}`
+          : `Battery ${Math.round(level)} percent, ${stateLabel}, ${formatWatts(watts)}`) +
+        (shorePower ? ', shore power connected' : '')
       }
     >
       <View style={styles.header}>
-        <Text style={styles.title}>Battery</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>Battery</Text>
+          {shorePower && (
+            <View style={styles.shoreBadge}>
+              <MaterialCommunityIcons name="power-plug" size={14} color="#1B1B1B" />
+              <Text style={styles.shoreText}>Shore</Text>
+            </View>
+          )}
+        </View>
         {voltage ? <Text style={styles.voltage}>{voltage}</Text> : null}
       </View>
 
@@ -101,10 +110,29 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   title: {
     color: '#FFFFFF',
     fontFamily: FontFamily.latoBold,
     fontSize: 14,
+  },
+  shoreBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    backgroundColor: ACCENT,
+  },
+  shoreText: {
+    color: '#1B1B1B',
+    fontFamily: FontFamily.latoBold,
+    fontSize: 12,
+    marginLeft: 3,
   },
   voltage: {
     color: '#9E9696',

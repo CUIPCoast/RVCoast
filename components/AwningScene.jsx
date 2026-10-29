@@ -4,9 +4,8 @@
 //   wave:   -1 .. 1 valance flutter
 //   moving: true while the motor runs
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import Svg, { Rect, Circle, Line, Polygon, Ellipse, Defs, LinearGradient, Stop, G } from 'react-native-svg';
-import { FontFamily } from '../GlobalStyles';
 
 const W = 340;
 const H = 170;
@@ -145,11 +144,6 @@ const AwningScene = ({ ext = 0, wave = 0, moving = false }) => {
         <Circle cx={ROLLER.x} cy={ROLLER.y} r={ROLLER.r} fill="#2E2929" stroke={moving ? '#FFB267' : '#9E9696'} strokeWidth="2" />
         <Line x1={ROLLER.x} y1={ROLLER.y} x2={spoke.x} y2={spoke.y} stroke={moving ? '#FFB267' : '#9E9696'} strokeWidth="1.5" strokeLinecap="round" />
       </Svg>
-
-      <View style={styles.badge} pointerEvents="none">
-        <Text style={styles.percent}>{Math.round(e * 100)}%</Text>
-        <Text style={styles.percentLabel}>extended</Text>
-      </View>
     </View>
   );
 };
@@ -162,22 +156,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  badge: {
-    position: 'absolute',
-    top: 10,
-    right: 14,
-    alignItems: 'flex-end',
-  },
-  percent: {
-    color: '#FFFFFF',
-    fontSize: 26,
-    fontFamily: FontFamily.latoBold,
-  },
-  percentLabel: {
-    color: '#9E9696',
-    fontSize: 12,
-    fontFamily: FontFamily.latoRegular,
   },
 });
 

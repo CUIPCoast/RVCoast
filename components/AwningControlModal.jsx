@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, Text, Modal, TouchableOpacity, Animated, Easing } from 'react-native';
+import { StyleSheet, View, Text, Modal, TouchableOpacity } from 'react-native';
 import { Color } from '../GlobalStyles';
 import { AwningService } from '../API/RVControlServices';
 import { createAwningCANListener } from '../Service/AwningCANListener';
@@ -7,7 +7,11 @@ import { FontFamily } from "../GlobalStyles";
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import useScreenSize from '../helper/useScreenSize.jsx';
-import AwningScene from './AwningScene';
+
+// How long the real awning takes to fully extend / retract (ms) - adjust to match the RV.
+const AWNING_EXTEND_DURATION = 25000;
+const AWNING_RETRACT_DURATION = 25000;
+
 /**
  * Enhanced Awning Control Modal with fluid command switching and CAN bus status detection
  * 
@@ -33,36 +37,11 @@ const AwningControlModal = ({ isVisible, onClose }) => {
     lastCommandTime: null
   });
 
-  // Animation refs
-  const awningExtension = useRef(new Animated.Value(0)).current;
-  const fabricWave = useRef(new Animated.Value(0)).current;
-  const motorVibration = useRef(new Animated.Value(0)).current;
-  const shadowOpacity = useRef(new Animated.Value(0)).current;
-  const supportPosts = useRef(new Animated.Value(0)).current;
-  
-  // Animation references for cleanup
-  const fabricWaveAnimation = useRef(null);
-  const motorVibrationAnimation = useRef(null);
-  const currentMainAnimation = useRef(null);
-  
   // CAN bus listener for real-time status updates
   const canBusListener = useRef(null);
   
   // Status update timeout ref
   const statusTimeout = useRef(null);
-
-  // Mirror the animated values into state so the SVG scene can redraw from them
-  const [sceneExt, setSceneExt] = useState(0);
-  const [sceneWave, setSceneWave] = useState(0);
-
-  useEffect(() => {
-    const extId = awningExtension.addListener(({ value }) => setSceneExt(value));
-    const waveId = fabricWave.addListener(({ value }) => setSceneWave(value));
-    return () => {
-      awningExtension.removeListener(extId);
-      fabricWave.removeListener(waveId);
-    };
-  }, []);
 
   /**
    * Initialize CAN bus listener for real-time awning status detection
@@ -133,16 +112,13 @@ const AwningControlModal = ({ isVisible, onClose }) => {
       lastCommandTime: state.timestamp
     }));
     
-    // Update animations based on real state - but don't override user commands
+    // Update status based on real state - but don't override user commands
     if (state.isExtending && !awningState.isExtending) {
       updateStatus('CAN: Extending detected', 0);
-      animateExtend();
     } else if (state.isRetracting && !awningState.isRetracting) {
       updateStatus('CAN: Retracting detected', 0);
-      animateRetract();
     } else if (state.isStopped && (awningState.isExtending || awningState.isRetracting)) {
       updateStatus('CAN: Motors stopped', 3000);
-      stopAnimation();
     }
   };
 
@@ -167,12 +143,6 @@ const AwningControlModal = ({ isVisible, onClose }) => {
       ...prev,
       position: positionEvent.position / 100
     }));
-    
-    // Update animation position to match real position
-    const targetValue = positionEvent.position / 100;
-    awningExtension.setValue(targetValue);
-    shadowOpacity.setValue(targetValue);
-    supportPosts.setValue(targetValue);
   };
 
   /**
@@ -194,15 +164,6 @@ const AwningControlModal = ({ isVisible, onClose }) => {
       isStopped: true,
       position: limitEvent.limitType === 'extended' ? 1 : 0
     }));
-    
-    // Stop animations
-    stopAnimation();
-    
-    // Set final animation position
-    const finalPosition = limitEvent.limitType === 'extended' ? 1 : 0;
-    awningExtension.setValue(finalPosition);
-    shadowOpacity.setValue(finalPosition);
-    supportPosts.setValue(finalPosition);
   };
 
   /**
@@ -257,16 +218,13 @@ const AwningControlModal = ({ isVisible, onClose }) => {
       return { ...prev, ...newState };
     });
     
-    // Update status and animations immediately
+    // Update status immediately
     if (command === 'extend') {
       updateStatus('Extending awning...', 0);
-      animateExtend();
     } else if (command === 'retract') {
       updateStatus('Retracting awning...', 0);
-      animateRetract();
     } else if (command === 'stop') {
       updateStatus('Stopping awning...', 2000);
-      stopAnimation();
     }
     
     // Execute actual command in background (non-blocking)
@@ -308,7 +266,6 @@ const AwningControlModal = ({ isVisible, onClose }) => {
           isRetracting: false,
           isStopped: true
         }));
-        stopAnimation();
       }
     } catch (error) {
       console.error(`Error executing command ${command}:`, error);
@@ -320,7 +277,6 @@ const AwningControlModal = ({ isVisible, onClose }) => {
         isRetracting: false,
         isStopped: true
       }));
-      stopAnimation();
     }
   };
 
@@ -345,7 +301,7 @@ const AwningControlModal = ({ isVisible, onClose }) => {
       statusTimeout.current = stopTimeout;
     } else {
       // Extend/retract take time, but can be interrupted
-      const duration = command === 'extend' ? 8000 : 6000;
+      const duration = command === 'extend' ? AWNING_EXTEND_DURATION : AWNING_RETRACT_DURATION;
       
       const completionTimeout = setTimeout(() => {
         // Only complete if still in the same state (not interrupted)
@@ -388,241 +344,10 @@ const AwningControlModal = ({ isVisible, onClose }) => {
     }
   };
 
-  // Create continuous fabric wave animation
-  const createFabricWaveAnimation = () => {
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(fabricWave, {
-          toValue: 1,
-          duration: 2000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: false,
-        }),
-        Animated.timing(fabricWave, {
-          toValue: -1,
-          duration: 2000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: false,
-        }),
-        Animated.timing(fabricWave, {
-          toValue: 0,
-          duration: 1000,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: false,
-        }),
-      ])
-    );
-    
-    fabricWaveAnimation.current = animation;
-    return animation;
-  };
-  
-  // Create motor vibration animation
-  const createMotorVibrationAnimation = () => {
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(motorVibration, {
-          toValue: 3,
-          duration: 80,
-          easing: Easing.linear,
-          useNativeDriver: false,
-        }),
-        Animated.timing(motorVibration, {
-          toValue: -3,
-          duration: 80,
-          easing: Easing.linear,
-          useNativeDriver: false,
-        }),
-        Animated.timing(motorVibration, {
-          toValue: 0,
-          duration: 40,
-          easing: Easing.linear,
-          useNativeDriver: false,
-        }),
-      ])
-    );
-    
-    motorVibrationAnimation.current = animation;
-    return animation;
-  };
-  
-  // Enhanced extension animation with seamless transitions
-  const animateExtend = () => {
-    console.log('Starting extend animation from current position');
-    
-    // Stop any existing animations first
-    if (currentMainAnimation.current) {
-      currentMainAnimation.current.stop();
-    }
-    
-    // Stop fabric wave and motor vibration
-    if (fabricWaveAnimation.current) {
-      fabricWaveAnimation.current.stop();
-    }
-    if (motorVibrationAnimation.current) {
-      motorVibrationAnimation.current.stop();
-    }
-    
-    // Start motor vibration
-    const motorAnim = createMotorVibrationAnimation();
-    motorAnim.start();
-    
-    // Calculate remaining animation time based on current position
-    const currentValue = awningExtension._value || 0;
-    const remainingDistance = 1 - currentValue;
-    const baseDuration = 4000;
-    const animationDuration = baseDuration * remainingDistance;
-    
-    // Main extension animation
-    const mainAnim = Animated.parallel([
-      // Main awning extension
-      Animated.timing(awningExtension, {
-        toValue: 1,
-        duration: animationDuration,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: false,
-      }),
-      // Shadow grows
-      Animated.timing(shadowOpacity, {
-        toValue: 1,
-        duration: animationDuration,
-        easing: Easing.out(Easing.ease),
-        useNativeDriver: false,
-      }),
-      // Support posts extend
-      Animated.timing(supportPosts, {
-        toValue: 1,
-        duration: animationDuration * 0.875,
-        delay: animationDuration * 0.125,
-        easing: Easing.out(Easing.back(1.2)),
-        useNativeDriver: false,
-      }),
-    ]);
-    
-    currentMainAnimation.current = mainAnim;
-    
-    mainAnim.start(({ finished }) => {
-      if (finished) {
-        // Stop motor vibration
-        if (motorVibrationAnimation.current) {
-          motorVibrationAnimation.current.stop();
-        }
-        motorVibration.setValue(0);
-        
-        // Start gentle fabric wave when fully extended
-        if (awningState.isExtending) {
-          createFabricWaveAnimation().start();
-        }
-        
-        // Update position state
-        setAwningState(prev => ({ ...prev, position: 1 }));
-      }
-    });
-  };
-  
-  // Enhanced retraction animation with seamless transitions
-  const animateRetract = () => {
-    console.log('Starting retract animation from current position');
-    
-    // Stop any existing animations first
-    if (currentMainAnimation.current) {
-      currentMainAnimation.current.stop();
-    }
-    
-    // Stop fabric wave
-    if (fabricWaveAnimation.current) {
-      fabricWaveAnimation.current.stop();
-    }
-    fabricWave.setValue(0);
-    
-    // Stop existing motor vibration
-    if (motorVibrationAnimation.current) {
-      motorVibrationAnimation.current.stop();
-    }
-    
-    // Start motor vibration
-    const motorAnim = createMotorVibrationAnimation();
-    motorAnim.start();
-    
-    // Calculate remaining animation time based on current position
-    const currentValue = awningExtension._value || 0;
-    const remainingDistance = currentValue;
-    const baseDuration = 3500;
-    const animationDuration = baseDuration * remainingDistance;
-    
-    // Main retraction animation
-    const mainAnim = Animated.parallel([
-      // Main awning retraction
-      Animated.timing(awningExtension, {
-        toValue: 0,
-        duration: animationDuration,
-        easing: Easing.in(Easing.quad),
-        useNativeDriver: false,
-      }),
-      // Shadow fades
-      Animated.timing(shadowOpacity, {
-        toValue: 0,
-        duration: animationDuration,
-        easing: Easing.in(Easing.ease),
-        useNativeDriver: false,
-      }),
-      // Support posts retract
-      Animated.timing(supportPosts, {
-        toValue: 0,
-        duration: animationDuration * 0.571,
-        easing: Easing.in(Easing.back(1.5)),
-        useNativeDriver: false,
-      }),
-    ]);
-    
-    currentMainAnimation.current = mainAnim;
-    
-    mainAnim.start(({ finished }) => {
-      if (finished) {
-        // Stop motor vibration
-        if (motorVibrationAnimation.current) {
-          motorVibrationAnimation.current.stop();
-        }
-        motorVibration.setValue(0);
-        
-        // Update position state
-        setAwningState(prev => ({ ...prev, position: 0 }));
-      }
-    });
-  };
-  
-  // Stop animation at current position (instant response)
-  const stopAnimation = () => {
-    console.log('Stopping animations at current position');
-    
-    // Stop all animations immediately
-    if (currentMainAnimation.current) {
-      currentMainAnimation.current.stop();
-    }
-    
-    awningExtension.stopAnimation();
-    shadowOpacity.stopAnimation();
-    supportPosts.stopAnimation();
-    
-    if (fabricWaveAnimation.current) {
-      fabricWaveAnimation.current.stop();
-    }
-    if (motorVibrationAnimation.current) {
-      motorVibrationAnimation.current.stop();
-    }
-    
-    // Reset vibrations
-    motorVibration.setValue(0);
-    fabricWave.setValue(0);
-  };
-
   // Reset when modal closes
   useEffect(() => {
     if (!isVisible) {
-      // Stop all animations
-      stopAnimation();
-      
-      // Reset all states
+      // Reset to fully retracted
       setAwningState({
         isExtending: false,
         isRetracting: false,
@@ -638,13 +363,6 @@ const AwningControlModal = ({ isVisible, onClose }) => {
       if (statusTimeout.current) {
         clearTimeout(statusTimeout.current);
       }
-      
-      // Reset all animated values to initial state
-      awningExtension.setValue(0);
-      fabricWave.setValue(0);
-      motorVibration.setValue(0);
-      shadowOpacity.setValue(0);
-      supportPosts.setValue(0);
     }
   }, [isVisible]);
 
@@ -668,7 +386,6 @@ const AwningControlModal = ({ isVisible, onClose }) => {
         : awningState.position <= 0
           ? 'Retracted'
           : 'Stopped';
-  const progressWidth = awningExtension.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
 
   const controls = [
     { command: 'retract', label: 'Retract', icon: 'arrow-collapse-left', active: awningState.isRetracting },
@@ -719,17 +436,6 @@ const AwningControlModal = ({ isVisible, onClose }) => {
             >
               <Ionicons name="close" size={22} color="#FFFFFF" />
             </TouchableOpacity>
-          </View>
-
-          {/* Awning visual */}
-          <AwningScene ext={sceneExt} wave={sceneWave} moving={isMoving} />
-
-          <View style={styles.progressTrack}>
-            <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
-          </View>
-          <View style={styles.progressLabels}>
-            <Text style={styles.progressLabel}>Retracted</Text>
-            <Text style={styles.progressLabel}>Extended</Text>
           </View>
 
           {/* Controls */}
@@ -862,28 +568,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  progressTrack: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    marginTop: 16,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 3,
-    backgroundColor: '#FFB267',
-  },
-  progressLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 6,
-  },
-  progressLabel: {
-    color: '#9E9696',
-    fontSize: 12,
-    fontFamily: FontFamily.latoRegular,
   },
   controls: {
     flexDirection: 'row',

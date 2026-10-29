@@ -166,8 +166,9 @@ const AirCon = ({ onClose }) => {
   useEffect(() => {
     const unsubscribe = rvStateManager.subscribeToExternalChanges((newState) => {
       if (newState.climate && newState.climate.temperature !== undefined) {
-        // Only update if not actively sliding and temperature is different
-        if (!isSlidingRef.current && newState.climate.temperature !== temp) {
+        // Only update if not actively sliding, no local change is waiting to send, and temperature is different
+        const hasPendingChange = tempRef.current !== lastSentTempRef.current;
+        if (!isSlidingRef.current && !hasPendingChange && newState.climate.temperature !== temp) {
           const roundedTemp = Math.round(newState.climate.temperature);
           console.log('AirCon: External temperature change detected:', roundedTemp);
           setTemp(roundedTemp);
@@ -405,21 +406,15 @@ const AirCon = ({ onClose }) => {
         console.error('AirCon: Failed to save to AsyncStorage:', storageError);
       }
       
-      // Skip API call if no climate control is active
-      if (!climate.coolingOn && !climate.toeKickOn) {
-        console.log('AirCon: Temperature updated in state but not sent to API (no climate control active)');
-        lastSentTempRef.current = temp;
-        setLastTemp(temp);
-        return;
-      }
-      
+      // Always send: the app often doesn't know the AC/heat is on (e.g. it was started from
+      // the Firefly panel), and the thermostat accepts setpoint changes in any mode.
       try {
         console.log('AirCon: Sending temperature change from', lastSentTempRef.current, 'to', temp);
-        
+
         await handleTemperatureChange(
           temp,
           lastSentTempRef.current,
-          climate.coolingOn || climate.toeKickOn,
+          true,
           setIsProcessing,
           (message) => {
             setStatusMessage(message);

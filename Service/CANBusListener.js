@@ -24,6 +24,7 @@ class CANBusListener extends EventEmitter {
     this.lastKnownStates = {
       lights: {}, // lightId: { isOn, brightness, lastUpdate }
       water: {},  // device: { isOn, lastUpdate }
+      tanks: {},  // instance: { relativeLevel, resolution, lastUpdate }
       climate: {} // various climate states
     };
     
@@ -267,6 +268,12 @@ class CANBusListener extends EventEmitter {
           return false; // No change
         }
       }
+      // For tanks, check the reported level
+      else if (category === 'tanks') {
+        if (lastState.relativeLevel === newState.relativeLevel && lastState.resolution === newState.resolution) {
+          return false; // No change
+        }
+      }
     }
     
     // Record the message in buffer and update last known state
@@ -363,6 +370,34 @@ class CANBusListener extends EventEmitter {
         }
       }
       
+      // Check for tank level messages (TANK_STATUS, DGN 1FFB7 -> ID 19FFB7xx)
+      // Byte 0 = instance (0 fresh, 1 black, 2 gray), byte 1 = relative level, byte 2 = resolution
+      else if (id.substring(2, 6).toUpperCase() === 'FFB7' && Array.isArray(data) && data.length >= 3) {
+        const instance = this.hexToDecimal(data[0]);
+        const newState = {
+          relativeLevel: this.hexToDecimal(data[1]),
+          resolution: this.hexToDecimal(data[2]),
+        };
+
+        // 0xFF means "not available" in RV-C - skip rather than report a bogus level
+        const levelAvailable = newState.relativeLevel !== 255 && newState.resolution > 0 && newState.resolution !== 255;
+
+        if (levelAvailable && this.shouldEmitStateChange('tanks', instance, newState)) {
+          console.log(`CANBusListener: Tank ${instance} level ${newState.relativeLevel}/${newState.resolution}`);
+
+          this.emit('message', {
+            dgn: '1FFB7',
+            name: 'TANK_STATUS',
+            instance: instance,
+            'relative level': newState.relativeLevel,
+            resolution: newState.resolution,
+            stateChange: true
+          });
+
+          this.lastHeartbeat = Date.now();
+        }
+      }
+
       // Check for water system messages (looking for DC_DIMMER_COMMAND_2)
       else if (id === '19FEDB9F' && Array.isArray(data) && data.length > 0) {
         // Check if this is a water pump or heater status
@@ -371,9 +406,11 @@ class CANBusListener extends EventEmitter {
         
         // Water pump is typically instance 44 (0x2C)
         // Water heater is typically instance 43 (0x2B)
-        if (instance === 44 || instance === 43) {
+        // Byte 3 = 5 is a toggle: level byte is always C8, so it doesn't reveal the new state
+        const command = data[3] ? this.hexToDecimal(data[3]) : 0;
+        if ((instance === 44 || instance === 43) && command !== 5) {
           const deviceType = instance === 44 ? 'water_pump' : 'water_heater';
-          const isOn = data[2] && this.hexToDecimal(data[2]) > 0;
+          const isOn = command !== 3 && !!data[2] && this.hexToDecimal(data[2]) > 0;
           
           const newState = {
             isOn: isOn,
@@ -506,6 +543,7 @@ class CANBusListener extends EventEmitter {
     this.lastKnownStates = {
       lights: {},
       water: {},
+      tanks: {},
       climate: {}
     };
     this.messageBuffer.clear();

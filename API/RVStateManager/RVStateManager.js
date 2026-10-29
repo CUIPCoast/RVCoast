@@ -324,9 +324,19 @@ class RVStateManager {
       const instanceHex = data[0];
       const instance = parseInt(instanceHex, 16);
       
+      // DC_DIMMER_COMMAND_2 byte 3: 3 = off, 5 = toggle, others set a level from byte 2.
+      // Toggle frames carry level C8 regardless of direction, so they say nothing about
+      // the resulting state — the sender already updated state optimistically.
+      const command = data[3] ? parseInt(data[3], 16) : 0;
+      const isWaterInstance = instance === 44 || instance === 43;
+      if (isWaterInstance && command === 5) {
+        console.log(`RVStateManager: Water ${instance === 44 ? 'pump' : 'heater'} toggle from CAN (ignored)`);
+        return;
+      }
+
       // Check for water system commands
       if (instance === 44) { // Water pump (0x2C)
-        const isOn = data[2] && parseInt(data[2], 16) > 0;
+        const isOn = command !== 3 && !!data[2] && parseInt(data[2], 16) > 0;
         console.log(`RVStateManager: Water pump ${isOn ? 'ON' : 'OFF'} from CAN`);
         // CRITICAL: Preserve heater state when updating pump
         const currentWaterState = this.getCategoryState('water');
@@ -335,7 +345,7 @@ class RVStateManager {
           heaterOn: currentWaterState.heaterOn || false
         });
       } else if (instance === 43) { // Water heater (0x2B)
-        const isOn = data[2] && parseInt(data[2], 16) > 0;
+        const isOn = command !== 3 && !!data[2] && parseInt(data[2], 16) > 0;
         console.log(`RVStateManager: Water heater ${isOn ? 'ON' : 'OFF'} from CAN`);
         // CRITICAL: Preserve pump state when updating heater
         const currentWaterState = this.getCategoryState('water');
@@ -348,7 +358,6 @@ class RVStateManager {
         const lightId = this.mapInstanceToLightId(instance);
         if (lightId) {
           // This might be a toggle command
-          const command = data[3] ? parseInt(data[3], 16) : 0;
           if (command === 5) { // Toggle command
             console.log(`RVStateManager: Light toggle from CAN - ${lightId}`);
             // We don't know the new state from the command, so we'll wait for the status update
@@ -709,7 +718,9 @@ class RVStateManager {
       const message = {
         type: 'stateUpdate',
         sourceDeviceId: this.state.deviceId,
-        state: { [category]: this.state[category] },
+        // Only the fields that changed - sending the whole category would push this
+        // device's stale values (e.g. an old setpoint) over newer edits elsewhere
+        state: { [category]: data },
         timestamp: new Date().toISOString()
       };
       

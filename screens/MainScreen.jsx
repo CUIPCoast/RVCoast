@@ -481,6 +481,7 @@ const MainScreen = () => {
                             soc={victronData?.battery ? victronData.battery.soc : null}
                             power={victronData?.battery?.power}
                             voltage={victronData?.battery?.voltage ? `${parseFloat(victronData.battery.voltage).toFixed(1)} V` : null}
+                            shorePower={!!victronData?.grid?.isConnected}
                         />
 
                         

@@ -166,8 +166,9 @@ const ClimateControlScreenTablet = () => {
   useEffect(() => {
     const unsubscribe = rvStateManager.subscribeToExternalChanges((newState) => {
       if (newState.climate) {
-        // Update temperature when external changes occur - but only if not sliding
-        if (newState.climate.temperature !== undefined && !isSlidingRef.current && newState.climate.temperature !== temp) {
+        // Update temperature when external changes occur - but only if not sliding or waiting to send a local change
+        const hasPendingChange = tempRef.current !== lastSentTempRef.current;
+        if (newState.climate.temperature !== undefined && !isSlidingRef.current && !hasPendingChange && newState.climate.temperature !== temp) {
           const roundedTemp = Math.round(newState.climate.temperature);
           console.log('ClimateControl: External temperature change detected:', roundedTemp);
           setTemp(roundedTemp);
@@ -241,14 +242,8 @@ const ClimateControlScreenTablet = () => {
         console.error('ClimateControl: Failed to save to AsyncStorage:', storageError);
       }
       
-      // Skip API call if no climate control is active
-      if (!isCoolToggled && !isToekickToggled && !isFurnaceToggled) {
-        console.log('ClimateControl: Temperature updated in state but not sent to API (no climate control active)');
-        lastSentTempRef.current = temp;
-        setLastTemp(temp);
-        return;
-      }
-      
+      // Always send: the app often doesn't know the AC/heat is on (e.g. it was started from
+      // the Firefly panel), and the thermostat accepts setpoint changes in any mode.
       try {
         setIsLoading(true);
         
