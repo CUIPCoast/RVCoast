@@ -48,7 +48,7 @@ const AirCon = ({ onClose }) => {
     } catch (error) {
       console.error('Error getting initial temp:', error);
     }
-    return 72; // Only use default if no state exists
+    return 70; // Only use default if no state exists
   };
   
   const initialTemp = getInitialTemp();
@@ -138,24 +138,24 @@ const AirCon = ({ onClose }) => {
         }
         
         // Priority 3: Default value if nothing is found
-        console.log('AirCon: No saved temperature found, using default 72°F');
-        setTemp(72);
-        setLastTemp(72);
-        lastSentTempRef.current = 72;
+        console.log('AirCon: No saved temperature found, using default 70°F');
+        setTemp(70);
+        setLastTemp(70);
+        lastSentTempRef.current = 70;
         
         // Save default to both storage locations
-        await AsyncStorage.setItem('temperature', '72');
+        await AsyncStorage.setItem('temperature', '70');
         rvStateManager.updateClimateState({ 
-          temperature: 72,
+          temperature: 70,
           lastUpdated: new Date().toISOString()
         });
         
       } catch (error) {
         console.error('Error initializing AirCon state:', error);
         // Emergency fallback
-        setTemp(72);
-        setLastTemp(72);
-        lastSentTempRef.current = 72;
+        setTemp(70);
+        setLastTemp(70);
+        lastSentTempRef.current = 70;
       }
     };
     

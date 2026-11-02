@@ -88,12 +88,14 @@ class EventEmitter {
   }
 }
 
+const DEFAULT_SETPOINT_F = 70;
+
 class RVStateManager {
   constructor() {
     // Core state storage
     this.state = {
       lights: {},        // All light states
-      climate: {},       // Climate control states 
+      climate: { temperature: DEFAULT_SETPOINT_F }, // Climate control states
       water: {},         // Water system states
       power: {},         // Power management states
       fans: {},          // Fan control states
@@ -135,6 +137,9 @@ class RVStateManager {
           this.state = { ...this.state, ...JSON.parse(storedState) };
           console.log('Loaded cached RV state from storage');
         }
+        // The thermostat always boots at the default setpoint rather than the cached one
+        this.state.climate = { ...this.state.climate, temperature: DEFAULT_SETPOINT_F };
+        await AsyncStorage.setItem('temperature', String(DEFAULT_SETPOINT_F));
       } catch (storageError) {
         console.warn('Failed to load cached state, using defaults:', storageError.message);
       }
